@@ -81,7 +81,7 @@ const newChat = async () => {
     <header class="assistant-header">
       <div class="brand">
         <div class="assistant-avatar" aria-hidden="true">
-          <span>环</span>
+          <img src="/huanbao-avatar.png" alt="" />
         </div>
         <div class="brand-copy">
           <h1>环宝智能问答助手</h1>
@@ -95,62 +95,72 @@ const newChat = async () => {
           新对话
         </button>
         <button class="expand-button" type="button" aria-label="展开助手">
-          <span aria-hidden="true">↗</span>
+          <span aria-hidden="true">⛶</span>
         </button>
       </div>
     </header>
 
     <main ref="chatBodyRef" class="chat-body">
-      <section class="welcome-card" aria-label="助手欢迎信息">
-        <div class="welcome-copy">
-          <span class="welcome-tag">智慧办公 AI 助手</span>
-          <h2>您好，我是环宝智能问答助手。</h2>
-          <p>可为您解答智慧办公使用问题、定位业务表单入口，并指引流程办理路径。</p>
+      <div class="chat-content">
+        <section class="welcome-card" aria-label="助手欢迎信息">
+          <div class="welcome-copy">
+            <span class="welcome-tag">智慧办公 AI 助手</span>
+            <h2>您好，我是环宝智能问答助手。</h2>
+            <p>可为您解答智慧办公使用问题、定位业务表单入口，并指引流程办理路径。</p>
+          </div>
+          <div class="welcome-figure" aria-hidden="true">
+            <img src="/huanbao-hero.png" alt="" />
+          </div>
+        </section>
+
+        <section class="message-list" aria-label="对话消息">
+          <div
+            v-for="message in messages"
+            :key="message.id"
+            class="message-row"
+            :class="message.role === 'user' ? 'message-row-user' : 'message-row-assistant'"
+          >
+            <span v-if="message.role === 'assistant'" class="message-avatar" aria-hidden="true">
+              <img src="/huanbao-hero.png" alt="" />
+            </span>
+            <div
+              class="message"
+              :class="message.role === 'user' ? 'message-user' : 'message-assistant'"
+            >
+              {{ message.content }}
+            </div>
+          </div>
+        </section>
+
+        <div class="recommend-list" aria-label="推荐问法">
+          <button
+            v-for="question in recommendQuestions"
+            :key="question"
+            class="question-chip"
+            type="button"
+            @click="handleRecommendClick(question)"
+          >
+            <span>{{ question }}</span>
+            <span aria-hidden="true">›</span>
+          </button>
         </div>
-        <div class="mini-avatar" aria-hidden="true">
-          <div class="mini-sprout"></div>
-          <span>环</span>
+
+        <div class="capability-list" aria-label="助手能力">
+          <span class="capability-item capability-blue"><span aria-hidden="true">?</span>知识问答</span>
+          <span class="capability-item capability-green"><span aria-hidden="true">⌖</span>表单定位</span>
+          <span class="capability-item capability-purple"><span aria-hidden="true">⇄</span>流程指引</span>
         </div>
-      </section>
 
-      <section class="message-list" aria-label="对话消息">
-        <div
-          v-for="message in messages"
-          :key="message.id"
-          class="message"
-          :class="message.role === 'user' ? 'message-user' : 'message-assistant'"
-        >
-          {{ message.content }}
+        <div v-if="messages.length === 1" class="empty-state">
+          <strong>对话记录将显示在这里</strong>
+          <span>您可以开始提问，助手将为您提供专业解答</span>
         </div>
-      </section>
-
-      <div class="recommend-list" aria-label="推荐问法">
-        <button
-          v-for="question in recommendQuestions"
-          :key="question"
-          class="question-chip"
-          type="button"
-          @click="handleRecommendClick(question)"
-        >
-          <span>{{ question }}</span>
-          <span aria-hidden="true">›</span>
-        </button>
-      </div>
-
-      <div class="capability-list" aria-label="助手能力">
-        <span class="capability-item"><span aria-hidden="true">□</span>知识问答</span>
-        <span class="capability-item"><span aria-hidden="true">◇</span>表单定位</span>
-        <span class="capability-item"><span aria-hidden="true">△</span>流程指引</span>
-      </div>
-
-      <div v-if="messages.length === 1" class="empty-state">
-        <strong>对话记录将显示在这里</strong>
-        <span>您可以开始提问，助手将为您提供专业解答</span>
       </div>
     </main>
 
     <footer class="assistant-footer">
       <form class="input-shell" @submit.prevent="sendMessage()">
+        <span class="input-attach" aria-hidden="true">↵</span>
         <input
           v-model="inputValue"
           type="text"
