@@ -597,6 +597,16 @@ button {
   outline-offset: 2px;
 }
 
+.question-chip:focus {
+  outline: none;
+}
+
+.question-chip:focus-visible {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
 @media (min-width: 960px) {
   body {
     padding: 0;

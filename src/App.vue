@@ -1,5 +1,6 @@
 <script setup>
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
+import { sendChatMessage } from './services/chatApi'
 
 const recommendQuestions = [
   '采购请示单在哪里发起？',
@@ -7,31 +8,13 @@ const recommendQuestions = [
   '如何查看我的待办任务？',
 ]
 
-const messages = ref([
-  {
-    id: 1,
-    role: 'assistant',
-    content: '很高兴为您服务！您可以试着问我：',
-  },
-])
+const messages = ref([])
 const inputValue = ref('')
 const chatBodyRef = ref(null)
+const conversationId = ref('')
+const hasMessages = computed(() => messages.value.length > 0)
 
-const getAssistantReply = (question) => {
-  if (question.includes('采购请示单')) {
-    return '采购请示单可在招标采购模块中发起。后续接入系统后，可直接为您打开对应表单入口。'
-  }
-
-  if (question.includes('合同评审')) {
-    return '合同评审卡片可在合同管理相关模块中查看和办理。后续可支持定位表单入口。'
-  }
-
-  if (question.includes('待办')) {
-    return '您可以在门户首页“我的待办”区域查看待办事项，后续可支持一键跳转待办中心。'
-  }
-
-  return '已收到您的问题，后续将接入智慧办公知识库和流程服务进行回答。'
-}
+const createMessageId = () => Date.now() + Math.random()
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -44,18 +27,43 @@ const sendMessage = async (question = inputValue.value) => {
   const content = question.trim()
   if (!content) return
 
+  const loadingMessageId = createMessageId()
+
   messages.value.push({
-    id: Date.now(),
+    id: createMessageId(),
     role: 'user',
     content,
+    loading: false,
   })
   messages.value.push({
-    id: Date.now() + 1,
+    id: loadingMessageId,
     role: 'assistant',
-    content: getAssistantReply(content),
+    content: '环宝正在思考中...',
+    loading: true,
   })
 
   inputValue.value = ''
+  await scrollToBottom()
+
+  try {
+    const result = await sendChatMessage(content, {
+      conversationId: conversationId.value,
+    })
+    conversationId.value = result.conversationId
+
+    const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
+    if (loadingMessage) {
+      loadingMessage.content = result.answer
+      loadingMessage.loading = false
+    }
+  } catch {
+    const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
+    if (loadingMessage) {
+      loadingMessage.content = '当前服务暂时不可用，请稍后重试。'
+      loadingMessage.loading = false
+    }
+  }
+
   await scrollToBottom()
 }
 
@@ -64,14 +72,9 @@ const handleRecommendClick = (question) => {
 }
 
 const newChat = async () => {
-  messages.value = [
-    {
-      id: Date.now(),
-      role: 'assistant',
-      content: '很高兴为您服务！您可以试着问我：',
-    },
-  ]
+  messages.value = []
   inputValue.value = ''
+  conversationId.value = ''
   await scrollToBottom()
 }
 </script>
@@ -111,6 +114,13 @@ const newChat = async () => {
         </section>
 
         <section class="message-list" aria-label="对话消息">
+          <div v-if="!hasMessages" class="message-row message-row-assistant">
+            <span class="message-avatar" aria-hidden="true">
+              <img src="/huanbao-avatar.png" alt="" />
+            </span>
+            <div class="message message-assistant">很高兴为您服务！您可以试着问我：</div>
+          </div>
+
           <div
             v-for="message in messages"
             :key="message.id"
@@ -129,7 +139,7 @@ const newChat = async () => {
           </div>
         </section>
 
-        <div class="recommend-list" aria-label="推荐问法">
+        <div v-if="!hasMessages" class="recommend-list" aria-label="推荐问法">
           <button
             v-for="question in recommendQuestions"
             :key="question"
@@ -142,13 +152,13 @@ const newChat = async () => {
           </button>
         </div>
 
-        <div class="capability-list" aria-label="助手能力">
+        <div v-if="!hasMessages" class="capability-list" aria-label="助手能力">
           <span class="capability-item capability-blue"><span aria-hidden="true">?</span>知识问答</span>
           <span class="capability-item capability-green"><span aria-hidden="true">⌖</span>表单定位</span>
           <span class="capability-item capability-purple"><span aria-hidden="true">⇄</span>流程指引</span>
         </div>
 
-        <div v-if="messages.length === 1" class="empty-state">
+        <div v-if="!hasMessages" class="empty-state">
           <strong>对话记录将显示在这里</strong>
           <span>您可以开始提问，助手将为您提供专业解答</span>
         </div>
