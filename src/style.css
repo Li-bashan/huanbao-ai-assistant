@@ -223,57 +223,56 @@ button {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 145px;
-  height: auto;
-  padding: 16px 18px;
+  justify-content: flex-start;
+  width: 100%;
+  height: 140px;
+  min-height: 140px;
+  max-height: 140px;
+  padding: 0;
   overflow: hidden;
   border: 1px solid #dbeafe;
   border-radius: 16px;
-  background: linear-gradient(135deg, #ffffff 0%, #eef8ff 100%);
+  background:
+    url("/huanbao-welcome-bg.png") center center / cover no-repeat,
+    #eef8ff;
   box-shadow: 0 8px 20px rgba(30, 96, 160, 0.06);
 }
 
 .welcome-card::before {
   position: absolute;
   content: "";
-  right: -34px;
-  bottom: -42px;
-  width: 178px;
-  height: 118px;
-  border-radius: 50%;
-  border: 1px solid rgba(125, 211, 252, 0.22);
-  background:
-    linear-gradient(90deg, rgba(56, 189, 248, 0.075) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(20, 184, 166, 0.065) 1px, transparent 1px);
-  background-size: 18px 18px;
-  opacity: 0.7;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.48) 44%,
+    rgba(255, 255, 255, 0.05) 70%
+  );
   pointer-events: none;
 }
 
 .welcome-card::after {
-  position: absolute;
-  content: "";
-  top: 24px;
-  right: 136px;
-  width: 76px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.18), transparent);
-  pointer-events: none;
+  content: none;
 }
 
 .welcome-copy {
   position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
+  z-index: 2;
+  width: 58%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 18px;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
 .welcome-tag {
   display: inline-flex;
   align-items: center;
-  margin-bottom: 0;
+  width: fit-content;
+  margin-bottom: 6px;
   padding: 4px 9px;
   border-radius: 999px;
   color: #0284c7;
@@ -285,48 +284,19 @@ button {
 }
 
 .welcome-copy h2 {
-  margin: 8px 0 0;
+  margin: 0 0 5px;
   color: #0f2747;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 
 .welcome-copy p {
   max-width: 280px;
-  margin: 7px 0 0;
-  color: #52677f;
-  font-size: 13px;
-  line-height: 1.8;
-}
-
-.welcome-figure {
-  position: relative;
-  z-index: 1;
-  width: 170px;
-  height: 150px;
-  flex: 0 0 170px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid rgba(191, 219, 254, 0.72);
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.12));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
-}
-
-.welcome-figure img {
-  width: 150px;
-  max-width: none;
-  max-height: none;
-  height: auto;
-  display: block;
-  object-fit: cover;
-  transform: scale(1.18) translate(2px, 10px);
-  transform-origin: center center;
-  filter: drop-shadow(0 10px 14px rgba(29, 140, 248, 0.12));
+  margin: 0;
+  color: #51677f;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .message-list {
@@ -372,8 +342,6 @@ button {
   display: block;
   border-radius: 50%;
   object-fit: cover;
-  object-position: center 20%;
-  transform: scale(1.18);
 }
 
 .message {
@@ -674,40 +642,36 @@ button {
 
   .welcome-card {
     align-items: center;
-    gap: 10px;
-    height: 158px;
-    padding: 14px;
+    height: 140px;
+    min-height: 140px;
+    max-height: 140px;
+    padding: 0;
+    background:
+      url("/huanbao-welcome-bg.png") center center / cover no-repeat,
+      #eef8ff;
   }
 
   .welcome-card::after {
-    right: 96px;
+    content: none;
   }
 
   .welcome-copy h2 {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .welcome-copy p {
     max-width: 220px;
-    line-height: 1.65;
+    line-height: 1.55;
+  }
+
+  .welcome-copy {
+    width: 58%;
+    padding: 12px 18px;
   }
 
   .welcome-copy p,
   .message {
     font-size: 13px;
-  }
-
-  .welcome-figure {
-    width: 118px;
-    height: 118px;
-    flex: 0 0 118px;
-    border-radius: 20px;
-  }
-
-  .welcome-figure img {
-    width: 116px;
-    max-height: none;
-    transform: scale(1.16) translate(1px, 8px);
   }
 
   .question-chip {

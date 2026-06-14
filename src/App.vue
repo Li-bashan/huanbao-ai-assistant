@@ -108,9 +108,6 @@ const newChat = async () => {
             <h2>您好，我是环宝智能问答助手。</h2>
             <p>可为您解答智慧办公使用问题、定位业务表单入口，并指引流程办理路径。</p>
           </div>
-          <div class="welcome-figure" aria-hidden="true">
-            <img src="/huanbao-hero.png" alt="" />
-          </div>
         </section>
 
         <section class="message-list" aria-label="对话消息">
@@ -121,7 +118,7 @@ const newChat = async () => {
             :class="message.role === 'user' ? 'message-row-user' : 'message-row-assistant'"
           >
             <span v-if="message.role === 'assistant'" class="message-avatar" aria-hidden="true">
-              <img src="/huanbao-hero.png" alt="" />
+              <img src="/huanbao-avatar.png" alt="" />
             </span>
             <div
               class="message"
