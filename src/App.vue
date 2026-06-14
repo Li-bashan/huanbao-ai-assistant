@@ -1,11 +1,12 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { sendChatMessage } from './services/chatApi'
+import { renderMarkdown } from './utils/markdown'
 
 const recommendQuestions = [
-  '采购请示单在哪里发起？',
-  '合同评审卡片如何使用？',
-  '如何查看我的待办任务？',
+  '差旅费包括哪些费用？',
+  '出差住宿费和伙食补助标准是多少？',
+  '公务用车如何申请？',
 ]
 
 const messages = ref([])
@@ -40,6 +41,8 @@ const sendMessage = async (question = inputValue.value) => {
     role: 'assistant',
     content: '环宝正在思考中...',
     loading: true,
+    sources: [],
+    messageId: '',
   })
 
   inputValue.value = ''
@@ -55,12 +58,16 @@ const sendMessage = async (question = inputValue.value) => {
     if (loadingMessage) {
       loadingMessage.content = result.answer
       loadingMessage.loading = false
+      loadingMessage.sources = result.sources || []
+      loadingMessage.messageId = result.messageId || ''
     }
   } catch {
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
     if (loadingMessage) {
       loadingMessage.content = '当前服务暂时不可用，请稍后重试。'
       loadingMessage.loading = false
+      loadingMessage.sources = []
+      loadingMessage.messageId = ''
     }
   }
 
@@ -80,14 +87,14 @@ const newChat = async () => {
 </script>
 
 <template>
-  <section class="ai-assistant" aria-label="环宝智能问答助手">
+  <section class="ai-assistant" aria-label="环宝制度问答助手">
     <header class="assistant-header">
       <div class="brand">
         <div class="assistant-avatar" aria-hidden="true">
           <img src="/huanbao-avatar.png" alt="" />
         </div>
         <div class="brand-copy">
-          <h1>环宝智能问答助手</h1>
+          <h1>环宝制度问答助手</h1>
           <p><span class="status-dot"></span>在线服务中</p>
         </div>
       </div>
@@ -107,9 +114,9 @@ const newChat = async () => {
       <div class="chat-content">
         <section class="welcome-card" aria-label="助手欢迎信息">
           <div class="welcome-copy">
-            <span class="welcome-tag">智慧办公 AI 助手</span>
-            <h2>您好，我是环宝智能问答助手。</h2>
-            <p>可为您解答智慧办公使用问题、定位业务表单入口，并指引流程办理路径。</p>
+            <span class="welcome-tag">公司制度知识库</span>
+            <h2>您好，我是环宝制度问答助手。</h2>
+            <p>可为您查询公司内部制度、管理办法和流程规范，支持差旅费、公务用车、审批要求、报销标准等制度问题解答。</p>
           </div>
         </section>
 
@@ -118,7 +125,7 @@ const newChat = async () => {
             <span class="message-avatar" aria-hidden="true">
               <img src="/huanbao-avatar.png" alt="" />
             </span>
-            <div class="message message-assistant">很高兴为您服务！您可以试着问我：</div>
+            <div class="message message-assistant">很高兴为您服务！您可以这样查询制度：</div>
           </div>
 
           <div
@@ -134,7 +141,33 @@ const newChat = async () => {
               class="message"
               :class="message.role === 'user' ? 'message-user' : 'message-assistant'"
             >
-              {{ message.content }}
+              <div
+                v-if="message.role === 'assistant'"
+                class="markdown-content"
+                v-html="renderMarkdown(message.content)"
+              ></div>
+              <template v-else>{{ message.content }}</template>
+
+              <div
+                v-if="message.role === 'assistant' && message.sources?.length"
+                class="message-sources"
+              >
+                <div class="sources-title">引用 · 制度来源</div>
+                <div class="source-list">
+                  <div
+                    v-for="source in message.sources.slice(0, 3)"
+                    :key="source.id"
+                    class="source-item"
+                    :title="source.documentName"
+                  >
+                    <span class="source-icon" aria-hidden="true">📄</span>
+                    <span class="source-name">{{ source.documentName }}</span>
+                    <span v-if="source.datasetName" class="source-dataset">
+                      {{ source.datasetName }}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -153,9 +186,9 @@ const newChat = async () => {
         </div>
 
         <div v-if="!hasMessages" class="capability-list" aria-label="助手能力">
-          <span class="capability-item capability-blue"><span aria-hidden="true">?</span>知识问答</span>
-          <span class="capability-item capability-green"><span aria-hidden="true">⌖</span>表单定位</span>
-          <span class="capability-item capability-purple"><span aria-hidden="true">⇄</span>流程指引</span>
+          <span class="capability-item capability-blue"><span aria-hidden="true">?</span>制度查询</span>
+          <span class="capability-item capability-green"><span aria-hidden="true">⌖</span>报销标准</span>
+          <span class="capability-item capability-purple"><span aria-hidden="true">⇄</span>审批规则</span>
         </div>
 
         <div v-if="!hasMessages" class="empty-state">
@@ -171,8 +204,8 @@ const newChat = async () => {
         <input
           v-model="inputValue"
           type="text"
-          placeholder="请输入您的问题..."
-          aria-label="请输入您的问题"
+          placeholder="请输入您要查询的制度问题..."
+          aria-label="请输入您要查询的制度问题"
         />
         <button class="send-button" type="submit">发送</button>
       </form>

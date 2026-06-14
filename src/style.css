@@ -368,6 +368,114 @@ button {
   box-shadow: 0 8px 18px rgba(20, 184, 166, 0.18);
 }
 
+.markdown-content {
+  line-height: 1.7;
+}
+
+.markdown-content p {
+  margin: 0 0 8px;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content strong {
+  color: #0f2747;
+  font-weight: 700;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 6px 0 8px 18px;
+  padding: 0;
+}
+
+.markdown-content li {
+  margin: 3px 0;
+}
+
+.markdown-content code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(15, 39, 71, 0.06);
+  font-size: 12px;
+}
+
+.markdown-content pre {
+  margin: 8px 0;
+  padding: 10px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: rgba(15, 39, 71, 0.06);
+}
+
+.markdown-content pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.message-sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.sources-title {
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-item {
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 8px;
+  color: #475569;
+  background: rgba(241, 245, 249, 0.8);
+  font-size: 12px;
+}
+
+.source-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: #2563eb;
+  background: rgba(219, 234, 254, 0.8);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.source-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-dataset {
+  max-width: 36%;
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: #94a3b8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .recommend-list {
   display: flex;
   flex-direction: column;
