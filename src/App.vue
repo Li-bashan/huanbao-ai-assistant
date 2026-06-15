@@ -1,6 +1,16 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { sendChatMessage } from './services/chatApi'
+import {
+  clearCurrentConversation,
+  createConversationId,
+  createConversationTitle,
+  getConversationHistory,
+  getCurrentConversation,
+  sanitizeMessages,
+  saveConversationToHistory,
+  saveCurrentConversation,
+} from './utils/conversationStorage'
 import { renderMarkdown } from './utils/markdown'
 
 const recommendQuestions = [
@@ -13,9 +23,57 @@ const messages = ref([])
 const inputValue = ref('')
 const chatBodyRef = ref(null)
 const conversationId = ref('')
+const currentConversationId = ref(createConversationId())
+const conversationHistory = ref([])
+const showHistory = ref(false)
 const hasMessages = computed(() => messages.value.length > 0)
 
 const createMessageId = () => Date.now() + Math.random()
+
+const buildCurrentConversation = () => {
+  const storedMessages = sanitizeMessages(messages.value)
+
+  if (!storedMessages.length) return null
+
+  const now = Date.now()
+
+  return {
+    id: currentConversationId.value,
+    title: createConversationTitle(storedMessages),
+    conversationId: conversationId.value,
+    messages: storedMessages,
+    createdAt: getCurrentConversation()?.id === currentConversationId.value
+      ? getCurrentConversation().createdAt
+      : now,
+    updatedAt: now,
+  }
+}
+
+const saveActiveConversation = () => {
+  if (!messages.value.length) {
+    clearCurrentConversation()
+    return null
+  }
+
+  if (messages.value.some((message) => message.loading)) return null
+
+  const conversation = buildCurrentConversation()
+  if (!conversation) return null
+
+  saveCurrentConversation(conversation)
+  return conversation
+}
+
+const formatHistoryTime = (timestamp) => {
+  if (!timestamp) return ''
+
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -85,12 +143,61 @@ const toggleSource = (message, sourceId) => {
   message.expandedSourceId = message.expandedSourceId === sourceId ? '' : sourceId
 }
 
+const toggleHistory = () => {
+  conversationHistory.value = getConversationHistory()
+  showHistory.value = !showHistory.value
+}
+
+const restoreConversation = async (conversation) => {
+  if (!conversation) return
+
+  const activeConversation = saveActiveConversation()
+  if (activeConversation) {
+    conversationHistory.value = saveConversationToHistory(activeConversation)
+  }
+
+  currentConversationId.value = conversation.id || createConversationId()
+  conversationId.value = conversation.conversationId || ''
+  messages.value = sanitizeMessages(conversation.messages || [])
+  showHistory.value = false
+
+  await scrollToBottom()
+}
+
 const newChat = async () => {
+  const conversation = saveActiveConversation()
+  if (conversation) {
+    conversationHistory.value = saveConversationToHistory(conversation)
+  }
+
   messages.value = []
   inputValue.value = ''
   conversationId.value = ''
+  currentConversationId.value = createConversationId()
+  showHistory.value = false
+  clearCurrentConversation()
   await scrollToBottom()
 }
+
+onMounted(async () => {
+  conversationHistory.value = getConversationHistory()
+  const currentConversation = getCurrentConversation()
+
+  if (currentConversation?.messages?.length) {
+    currentConversationId.value = currentConversation.id || createConversationId()
+    conversationId.value = currentConversation.conversationId || ''
+    messages.value = sanitizeMessages(currentConversation.messages)
+    await scrollToBottom()
+  }
+})
+
+watch(
+  [messages, conversationId],
+  () => {
+    saveActiveConversation()
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -107,6 +214,35 @@ const newChat = async () => {
       </div>
 
       <div class="header-actions" aria-label="助手操作">
+        <div class="history-wrapper">
+          <button
+            class="history-button"
+            type="button"
+            :aria-expanded="showHistory"
+            @click="toggleHistory"
+          >
+            历史
+          </button>
+          <div v-if="showHistory" class="history-panel">
+            <div class="history-title">最近会话</div>
+            <div v-if="conversationHistory.length" class="history-list">
+              <button
+                v-for="conversation in conversationHistory"
+                :key="conversation.id"
+                class="history-item"
+                type="button"
+                :title="conversation.title"
+                @click="restoreConversation(conversation)"
+              >
+                <span class="history-item-title">{{ conversation.title }}</span>
+                <span class="history-item-time">
+                  {{ formatHistoryTime(conversation.updatedAt) }}
+                </span>
+              </button>
+            </div>
+            <div v-else class="history-empty">暂无历史记录。</div>
+          </div>
+        </div>
         <button class="new-chat-button" type="button" @click="newChat">
           <span class="plus-icon" aria-hidden="true">+</span>
           新对话

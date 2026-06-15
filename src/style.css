@@ -131,6 +131,8 @@ button {
 
 .new-chat-button,
 .expand-button,
+.history-button,
+.history-item,
 .question-chip,
 .send-button {
   cursor: pointer;
@@ -139,6 +141,96 @@ button {
     border-color 0.18s ease,
     background 0.18s ease,
     box-shadow 0.18s ease;
+}
+
+.history-wrapper {
+  position: relative;
+}
+
+.history-button {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid rgba(191, 219, 254, 0.82);
+  border-radius: 14px;
+  color: #2563eb;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.history-button:hover {
+  background: #eff6ff;
+  border-color: rgba(96, 165, 250, 0.72);
+  transform: translateY(-1px);
+}
+
+.history-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 30;
+  width: 320px;
+  max-height: 360px;
+  padding: 12px;
+  overflow-y: auto;
+  border: 1px solid #e2eaf5;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 30px rgba(15, 39, 71, 0.1);
+}
+
+.history-title {
+  margin-bottom: 8px;
+  color: #0f2747;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #334155;
+  background: #f8fbff;
+  text-align: left;
+}
+
+.history-item:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.history-item-title,
+.history-item-time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-item-time,
+.history-empty {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.history-empty {
+  padding: 16px 4px 8px;
+  text-align: center;
 }
 
 .new-chat-button {
