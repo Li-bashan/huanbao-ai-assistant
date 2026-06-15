@@ -433,11 +433,18 @@ button {
   gap: 6px;
 }
 
+.source-card {
+  max-width: 100%;
+  min-width: 0;
+  cursor: pointer;
+}
+
 .source-item {
   max-width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   padding: 6px 8px;
   border: 1px solid rgba(226, 232, 240, 0.9);
@@ -445,6 +452,13 @@ button {
   color: #475569;
   background: rgba(241, 245, 249, 0.8);
   font-size: 12px;
+}
+
+.source-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .source-icon {
@@ -474,6 +488,32 @@ button {
   color: #94a3b8;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.source-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.source-content {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 8px;
+  color: #475569;
+  background: rgba(248, 250, 252, 0.9);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.source-content-title {
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .recommend-list {

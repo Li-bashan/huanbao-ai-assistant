@@ -43,6 +43,7 @@ const sendMessage = async (question = inputValue.value) => {
     loading: true,
     sources: [],
     messageId: '',
+    expandedSourceId: '',
   })
 
   inputValue.value = ''
@@ -60,6 +61,7 @@ const sendMessage = async (question = inputValue.value) => {
       loadingMessage.loading = false
       loadingMessage.sources = result.sources || []
       loadingMessage.messageId = result.messageId || ''
+      loadingMessage.expandedSourceId = ''
     }
   } catch {
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
@@ -68,6 +70,7 @@ const sendMessage = async (question = inputValue.value) => {
       loadingMessage.loading = false
       loadingMessage.sources = []
       loadingMessage.messageId = ''
+      loadingMessage.expandedSourceId = ''
     }
   }
 
@@ -76,6 +79,10 @@ const sendMessage = async (question = inputValue.value) => {
 
 const handleRecommendClick = (question) => {
   sendMessage(question)
+}
+
+const toggleSource = (message, sourceId) => {
+  message.expandedSourceId = message.expandedSourceId === sourceId ? '' : sourceId
 }
 
 const newChat = async () => {
@@ -157,14 +164,26 @@ const newChat = async () => {
                   <div
                     v-for="source in message.sources.slice(0, 3)"
                     :key="source.id"
-                    class="source-item"
+                    class="source-card"
                     :title="source.documentName"
+                    @click="toggleSource(message, source.id)"
                   >
-                    <span class="source-icon" aria-hidden="true">📄</span>
-                    <span class="source-name">{{ source.documentName }}</span>
-                    <span v-if="source.datasetName" class="source-dataset">
-                      {{ source.datasetName }}
-                    </span>
+                    <div class="source-item">
+                      <div class="source-main">
+                        <span class="source-icon" aria-hidden="true">📄</span>
+                        <span class="source-name">{{ source.documentName }}</span>
+                        <span v-if="source.datasetName" class="source-dataset">
+                          {{ source.datasetName }}
+                        </span>
+                      </div>
+                      <span class="source-toggle" aria-hidden="true">
+                        {{ message.expandedSourceId === source.id ? '⌃' : '⌄' }}
+                      </span>
+                    </div>
+                    <div v-if="message.expandedSourceId === source.id" class="source-content">
+                      <div class="source-content-title">知识库原文片段</div>
+                      <div>{{ source.content || '暂无可展示的原文片段。' }}</div>
+                    </div>
                   </div>
                 </div>
               </div>

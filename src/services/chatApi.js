@@ -37,6 +37,43 @@ function normalizeSources(resources = []) {
   return Array.from(sourceMap.values()).slice(0, 3)
 }
 
+function normalizeAnswer(answer = '') {
+  const text = String(answer || '').trim()
+  const fallbackAnswer = '当前知识库中未查询到相关制度依据。建议您换一种表述继续查询，或联系相关责任部门确认。'
+
+  if (!text) {
+    return {
+      answer: fallbackAnswer,
+      noHit: true,
+    }
+  }
+
+  const noHitKeywords = [
+    '暂时没有把握',
+    '换个方式描述',
+    '当前知识库中未查询到',
+    '未查询到',
+    '未查询到相关',
+    '未找到相关',
+    '没有找到相关',
+    '无法回答',
+  ]
+
+  const isNoHit = noHitKeywords.some((keyword) => text.includes(keyword))
+
+  if (isNoHit) {
+    return {
+      answer: fallbackAnswer,
+      noHit: true,
+    }
+  }
+
+  return {
+    answer: text,
+    noHit: false,
+  }
+}
+
 export async function sendChatMessage(question, options = {}) {
   const useDify = import.meta.env.VITE_USE_DIFY === 'true'
 
@@ -81,11 +118,13 @@ export async function sendChatMessage(question, options = {}) {
 
   const data = await response.json()
   const rawSources = data.metadata?.retriever_resources || []
+  const normalizedAnswer = normalizeAnswer(data.answer)
 
   return {
-    answer: data.answer || '当前未获取到有效回答。',
+    answer: normalizedAnswer.answer,
     conversationId: data.conversation_id || options.conversationId || '',
     messageId: data.message_id || '',
-    sources: normalizeSources(rawSources),
+    sources: normalizedAnswer.noHit ? [] : normalizeSources(rawSources),
+    noHit: normalizedAnswer.noHit,
   }
 }
