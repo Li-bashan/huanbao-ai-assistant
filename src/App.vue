@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { sendChatMessage } from './services/chatApi'
+import { assistantModes, defaultAssistantModeKey } from './config/assistantModes'
+import { sendChatMessage, streamChatMessage } from './services/chatApi'
 import {
   clearCurrentConversation,
   createConversationId,
@@ -13,11 +14,30 @@ import {
 } from './utils/conversationStorage'
 import { renderMarkdown } from './utils/markdown'
 
-const recommendQuestions = [
-  '差旅费包括哪些费用？',
-  '出差住宿费和伙食补助标准是多少？',
-  '公务用车如何申请？',
-]
+const MODE_STORAGE_KEY = 'huanbao_current_mode'
+const capabilityClassNames = ['capability-blue', 'capability-green', 'capability-purple']
+const normalizeModeKey = (modeKey) =>
+  modeKey === 'office' || modeKey === 'general' ? 'office-ai' : modeKey
+
+const getModeByKey = (modeKey) =>
+  assistantModes.find((mode) => mode.key === normalizeModeKey(modeKey)) || assistantModes[0]
+
+const getStoredModeKey = () => {
+  try {
+    const storedModeKey = localStorage.getItem(MODE_STORAGE_KEY)
+    return getModeByKey(storedModeKey).key
+  } catch {
+    return defaultAssistantModeKey
+  }
+}
+
+const saveModeKey = (modeKey) => {
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, modeKey)
+  } catch {
+    // Ignore storage failures so the assistant remains usable.
+  }
+}
 
 const messages = ref([])
 const inputValue = ref('')
@@ -26,7 +46,12 @@ const conversationId = ref('')
 const currentConversationId = ref(createConversationId())
 const conversationHistory = ref([])
 const showHistory = ref(false)
+const showModeMenu = ref(false)
+const currentModeKey = ref(getStoredModeKey())
+const currentMode = computed(() => getModeByKey(currentModeKey.value))
 const hasMessages = computed(() => messages.value.length > 0)
+const isStreamingMode = computed(() => currentMode.value.key === 'office-ai')
+let closeModeTimer = null
 
 const createMessageId = () => Date.now() + Math.random()
 
@@ -36,15 +61,16 @@ const buildCurrentConversation = () => {
   if (!storedMessages.length) return null
 
   const now = Date.now()
+  const currentConversation = getCurrentConversation()
 
   return {
     id: currentConversationId.value,
+    modeKey: currentMode.value.key,
     title: createConversationTitle(storedMessages),
     conversationId: conversationId.value,
     messages: storedMessages,
-    createdAt: getCurrentConversation()?.id === currentConversationId.value
-      ? getCurrentConversation().createdAt
-      : now,
+    createdAt:
+      currentConversation?.id === currentConversationId.value ? currentConversation.createdAt : now,
     updatedAt: now,
   }
 }
@@ -75,6 +101,8 @@ const formatHistoryTime = (timestamp) => {
   })
 }
 
+const getHistoryModeLabel = (modeKey) => getModeByKey(modeKey || defaultAssistantModeKey).label
+
 const scrollToBottom = async () => {
   await nextTick()
   if (chatBodyRef.value) {
@@ -97,8 +125,9 @@ const sendMessage = async (question = inputValue.value) => {
   messages.value.push({
     id: loadingMessageId,
     role: 'assistant',
-    content: '环宝正在思考中...',
+    content: isStreamingMode.value ? '环宝正在生成中...' : '环宝正在思考中...',
     loading: true,
+    streaming: isStreamingMode.value,
     sources: [],
     messageId: '',
     expandedSourceId: '',
@@ -108,24 +137,58 @@ const sendMessage = async (question = inputValue.value) => {
   await scrollToBottom()
 
   try {
-    const result = await sendChatMessage(content, {
+    const requestOptions = {
       conversationId: conversationId.value,
-    })
+      apiMode: currentMode.value.apiMode,
+      modeKey: currentMode.value.key,
+    }
+
+    const result = isStreamingMode.value
+      ? await streamChatMessage(content, {
+          ...requestOptions,
+          onMessage: (messageContent, meta = {}) => {
+            const streamingMessage = messages.value.find(
+              (message) => message.id === loadingMessageId,
+            )
+            if (!streamingMessage) return
+
+            if (meta.replace) {
+              streamingMessage.content = messageContent || '环宝正在生成中...'
+              scrollToBottom()
+              return
+            }
+
+            if (
+              streamingMessage.streaming &&
+              streamingMessage.content === '环宝正在生成中...'
+            ) {
+              streamingMessage.content = ''
+            }
+
+            streamingMessage.content += messageContent
+            scrollToBottom()
+          },
+        })
+      : await sendChatMessage(content, requestOptions)
+
     conversationId.value = result.conversationId
 
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
     if (loadingMessage) {
-      loadingMessage.content = result.answer
+      loadingMessage.content = result.answer || loadingMessage.content
       loadingMessage.loading = false
+      loadingMessage.streaming = false
       loadingMessage.sources = result.sources || []
       loadingMessage.messageId = result.messageId || ''
       loadingMessage.expandedSourceId = ''
     }
-  } catch {
+  } catch (error) {
+    console.error(error)
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
     if (loadingMessage) {
       loadingMessage.content = '当前服务暂时不可用，请稍后重试。'
       loadingMessage.loading = false
+      loadingMessage.streaming = false
       loadingMessage.sources = []
       loadingMessage.messageId = ''
       loadingMessage.expandedSourceId = ''
@@ -146,6 +209,60 @@ const toggleSource = (message, sourceId) => {
 const toggleHistory = () => {
   conversationHistory.value = getConversationHistory()
   showHistory.value = !showHistory.value
+  showModeMenu.value = false
+}
+
+const cancelCloseModeMenu = () => {
+  if (closeModeTimer) {
+    clearTimeout(closeModeTimer)
+    closeModeTimer = null
+  }
+}
+
+const openModeMenu = () => {
+  cancelCloseModeMenu()
+  showModeMenu.value = true
+  showHistory.value = false
+}
+
+const scheduleCloseModeMenu = () => {
+  cancelCloseModeMenu()
+  closeModeTimer = setTimeout(() => {
+    showModeMenu.value = false
+    closeModeTimer = null
+  }, 150)
+}
+
+const toggleModeMenu = () => {
+  cancelCloseModeMenu()
+  showModeMenu.value = !showModeMenu.value
+  showHistory.value = false
+}
+
+const resetConversationState = async () => {
+  messages.value = []
+  inputValue.value = ''
+  conversationId.value = ''
+  currentConversationId.value = createConversationId()
+  clearCurrentConversation()
+  await scrollToBottom()
+}
+
+const switchMode = async (modeKey) => {
+  const nextMode = getModeByKey(modeKey)
+  cancelCloseModeMenu()
+  showModeMenu.value = false
+
+  if (nextMode.key === currentMode.value.key) return
+
+  const activeConversation = saveActiveConversation()
+  if (activeConversation) {
+    conversationHistory.value = saveConversationToHistory(activeConversation)
+  }
+
+  currentModeKey.value = nextMode.key
+  saveModeKey(nextMode.key)
+  await resetConversationState()
 }
 
 const restoreConversation = async (conversation) => {
@@ -156,10 +273,13 @@ const restoreConversation = async (conversation) => {
     conversationHistory.value = saveConversationToHistory(activeConversation)
   }
 
+  currentModeKey.value = getModeByKey(conversation.modeKey || defaultAssistantModeKey).key
+  saveModeKey(currentModeKey.value)
   currentConversationId.value = conversation.id || createConversationId()
   conversationId.value = conversation.conversationId || ''
   messages.value = sanitizeMessages(conversation.messages || [])
   showHistory.value = false
+  showModeMenu.value = false
 
   await scrollToBottom()
 }
@@ -175,6 +295,7 @@ const newChat = async () => {
   conversationId.value = ''
   currentConversationId.value = createConversationId()
   showHistory.value = false
+  showModeMenu.value = false
   clearCurrentConversation()
   await scrollToBottom()
 }
@@ -184,6 +305,8 @@ onMounted(async () => {
   const currentConversation = getCurrentConversation()
 
   if (currentConversation?.messages?.length) {
+    currentModeKey.value = getModeByKey(currentConversation.modeKey || currentModeKey.value).key
+    saveModeKey(currentModeKey.value)
     currentConversationId.value = currentConversation.id || createConversationId()
     conversationId.value = currentConversation.conversationId || ''
     messages.value = sanitizeMessages(currentConversation.messages)
@@ -201,19 +324,52 @@ watch(
 </script>
 
 <template>
-  <section class="ai-assistant" aria-label="环宝制度问答助手">
+  <section class="ai-assistant" :aria-label="currentMode.title">
     <header class="assistant-header">
       <div class="brand">
         <div class="assistant-avatar" aria-hidden="true">
           <img src="/huanbao-avatar.png" alt="" />
         </div>
         <div class="brand-copy">
-          <h1>环宝制度问答助手</h1>
+          <h1>{{ currentMode.title }}</h1>
           <p><span class="status-dot"></span>在线服务中</p>
         </div>
       </div>
 
       <div class="header-actions" aria-label="助手操作">
+        <div
+          class="mode-switch"
+          @mouseenter="openModeMenu"
+          @mouseleave="scheduleCloseModeMenu"
+        >
+          <button
+            class="mode-current-button"
+            type="button"
+            :aria-expanded="showModeMenu"
+            @click="toggleModeMenu"
+          >
+            <span>{{ currentMode.label }}</span>
+            <span class="mode-caret" aria-hidden="true">▾</span>
+          </button>
+          <div
+            v-if="showModeMenu"
+            class="mode-popover"
+            @mouseenter="cancelCloseModeMenu"
+            @mouseleave="scheduleCloseModeMenu"
+          >
+            <button
+              v-for="mode in assistantModes"
+              :key="mode.key"
+              class="mode-option"
+              :class="{ active: mode.key === currentMode.key }"
+              type="button"
+              @click="switchMode(mode.key)"
+            >
+              <span class="mode-option-title">{{ mode.label }}</span>
+              <span class="mode-option-desc">{{ mode.desc }}</span>
+            </button>
+          </div>
+        </div>
         <div class="history-wrapper">
           <button
             class="history-button"
@@ -234,7 +390,10 @@ watch(
                 :title="conversation.title"
                 @click="restoreConversation(conversation)"
               >
-                <span class="history-item-title">{{ conversation.title }}</span>
+                <span class="history-item-head">
+                  <span class="history-item-title">{{ conversation.title }}</span>
+                  <span class="history-mode">{{ getHistoryModeLabel(conversation.modeKey) }}</span>
+                </span>
                 <span class="history-item-time">
                   {{ formatHistoryTime(conversation.updatedAt) }}
                 </span>
@@ -257,9 +416,9 @@ watch(
       <div class="chat-content">
         <section class="welcome-card" aria-label="助手欢迎信息">
           <div class="welcome-copy">
-            <span class="welcome-tag">公司制度知识库</span>
-            <h2>您好，我是环宝制度问答助手。</h2>
-            <p>可为您查询公司内部制度、管理办法和流程规范，支持差旅费、公务用车、审批要求、报销标准等制度问题解答。</p>
+            <span class="welcome-tag">{{ currentMode.badge }}</span>
+            <h2>{{ currentMode.welcomeTitle }}</h2>
+            <p>{{ currentMode.welcomeDesc }}</p>
           </div>
         </section>
 
@@ -268,7 +427,7 @@ watch(
             <span class="message-avatar" aria-hidden="true">
               <img src="/huanbao-avatar.png" alt="" />
             </span>
-            <div class="message message-assistant">很高兴为您服务！您可以这样查询制度：</div>
+            <div class="message message-assistant">{{ currentMode.guideText }}</div>
           </div>
 
           <div
@@ -329,7 +488,7 @@ watch(
 
         <div v-if="!hasMessages" class="recommend-list" aria-label="推荐问法">
           <button
-            v-for="question in recommendQuestions"
+            v-for="question in currentMode.suggestions"
             :key="question"
             class="question-chip"
             type="button"
@@ -341,9 +500,15 @@ watch(
         </div>
 
         <div v-if="!hasMessages" class="capability-list" aria-label="助手能力">
-          <span class="capability-item capability-blue"><span aria-hidden="true">?</span>制度查询</span>
-          <span class="capability-item capability-green"><span aria-hidden="true">⌖</span>报销标准</span>
-          <span class="capability-item capability-purple"><span aria-hidden="true">⇄</span>审批规则</span>
+          <span
+            v-for="(capability, index) in currentMode.capabilities"
+            :key="capability"
+            class="capability-item"
+            :class="capabilityClassNames[index] || 'capability-blue'"
+          >
+            <span aria-hidden="true">{{ ['?', '⌖', '⇄'][index] || '?' }}</span>
+            {{ capability }}
+          </span>
         </div>
 
         <div v-if="!hasMessages" class="empty-state">
@@ -359,8 +524,8 @@ watch(
         <input
           v-model="inputValue"
           type="text"
-          placeholder="请输入您要查询的制度问题..."
-          aria-label="请输入您要查询的制度问题"
+          :placeholder="currentMode.placeholder"
+          :aria-label="currentMode.placeholder"
         />
         <button class="send-button" type="submit">发送</button>
       </form>

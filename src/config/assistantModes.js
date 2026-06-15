@@ -1,0 +1,55 @@
+export const assistantModes = [
+  {
+    key: 'policy',
+    label: '制度问答',
+    desc: '查询制度依据',
+    title: '环宝制度问答助手',
+    badge: '公司制度知识库',
+    welcomeTitle: '您好，我是环宝制度问答助手。',
+    welcomeDesc:
+      '可为您查询公司内部制度、管理办法和流程规范，支持差旅费、公务用车、审批要求、报销标准等制度问题解答。',
+    guideText: '很高兴为您服务！您可以这样查询制度：',
+    placeholder: '请输入您要查询的制度问题...',
+    suggestions: [
+      '差旅费包括哪些费用？',
+      '出差住宿费和伙食补助标准是多少？',
+      '公务用车如何申请？',
+    ],
+    capabilities: ['制度查询', '报销标准', '审批规则'],
+    apiMode: 'dify',
+  },
+  {
+    key: 'office-ai',
+    label: '办公智能',
+    desc: '处理办公材料',
+    title: '环宝办公智能助手',
+    badge: '办公材料处理',
+    welcomeTitle: '您好，我是环宝办公智能助手。',
+    welcomeDesc: '可协助您整理会议纪要、润色汇报材料、生成工作总结、草拟通知公告和提炼文档摘要。',
+    guideText: '很高兴为您服务！您可以这样处理办公材料：',
+    placeholder: '请输入您要处理的办公内容...',
+    suggestions: [
+      '帮我整理一份会议纪要',
+      '帮我润色一段事项审批说明',
+      '帮我生成一份本周工作总结',
+    ],
+    capabilities: ['会议纪要', '材料润色', '工作总结'],
+    apiMode: 'dify',
+  },
+  {
+    key: 'workflow',
+    label: '流程助手',
+    desc: '办理业务事项',
+    title: '环宝流程助手',
+    badge: '流程办理助手',
+    welcomeTitle: '您好，我是环宝流程助手。',
+    welcomeDesc: '后续可支持表单定位、流程发起、菜单跳转和字段预填，帮助您更快办理业务事项。',
+    guideText: '很高兴为您服务！您可以这样办理业务事项：',
+    placeholder: '请输入您要办理的流程事项...',
+    suggestions: ['打开采购请示单', '发起合同评审流程', '查看我的待办任务'],
+    capabilities: ['打开表单', '发起流程', '待办定位'],
+    apiMode: 'mock',
+  },
+]
+
+export const defaultAssistantModeKey = 'policy'
