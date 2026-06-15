@@ -1,6 +1,6 @@
 const CURRENT_CONVERSATION_KEY = 'huanbao_current_conversation'
 const CONVERSATION_HISTORY_KEY = 'huanbao_conversation_history'
-const MAX_HISTORY_COUNT = 20
+const MAX_HISTORY_COUNT = 50
 
 function readJson(key, fallback) {
   try {
@@ -25,9 +25,32 @@ export function createConversationTitle(messages = []) {
   return title.length > 18 ? `${title.slice(0, 18)}...` : title
 }
 
+function normalizeConversation(conversation) {
+  if (!conversation?.messages?.length) return null
+
+  const messages = sanitizeMessages(conversation.messages)
+  if (!messages.length) return null
+
+  const timestamp = conversation.updatedAt || conversation.createdAt || Date.now()
+
+  return {
+    id: conversation.id || `conv_${timestamp}`,
+    title: conversation.title || createConversationTitle(messages),
+    modeKey: conversation.modeKey || 'policy',
+    conversationId: conversation.conversationId || '',
+    messages,
+    createdAt: conversation.createdAt || timestamp,
+    updatedAt: timestamp,
+  }
+}
+
 export function sanitizeMessages(messages = []) {
   return messages
-    .filter((message) => !message.loading)
+    .filter((message) => {
+      if (message.loading || message.streaming) return false
+      if (message.role === 'assistant' && !message.content && !message.workflowCard) return false
+      return true
+    })
     .map((message) => ({
       id: message.id,
       role: message.role,
@@ -35,6 +58,18 @@ export function sanitizeMessages(messages = []) {
       loading: false,
       messageId: message.messageId || '',
       expandedSourceId: '',
+      workflowCard: message.workflowCard
+        ? {
+            workflowName: message.workflowCard.workflowName || '',
+            description: message.workflowCard.description || '',
+            actions: Array.isArray(message.workflowCard.actions)
+              ? message.workflowCard.actions
+              : [],
+            requiredFields: Array.isArray(message.workflowCard.requiredFields)
+              ? message.workflowCard.requiredFields
+              : [],
+          }
+        : null,
       sources: Array.isArray(message.sources)
         ? message.sources.map((source) => ({
             id: source.id,
@@ -53,8 +88,9 @@ export function getCurrentConversation() {
 }
 
 export function saveCurrentConversation(conversation) {
-  if (!conversation?.messages?.length) return
-  writeJson(CURRENT_CONVERSATION_KEY, conversation)
+  const normalizedConversation = normalizeConversation(conversation)
+  if (!normalizedConversation) return
+  writeJson(CURRENT_CONVERSATION_KEY, normalizedConversation)
 }
 
 export function clearCurrentConversation() {
@@ -63,20 +99,33 @@ export function clearCurrentConversation() {
 
 export function getConversationHistory() {
   const history = readJson(CONVERSATION_HISTORY_KEY, [])
-  return Array.isArray(history) ? history : []
+  if (!Array.isArray(history)) return []
+
+  return history
+    .map((item) => normalizeConversation(item))
+    .filter(Boolean)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, MAX_HISTORY_COUNT)
 }
 
 export function saveConversationToHistory(conversation) {
-  if (!conversation?.messages?.length) return getConversationHistory()
+  const normalizedConversation = normalizeConversation(conversation)
+  if (!normalizedConversation) return getConversationHistory()
 
   const history = getConversationHistory()
   const nextHistory = [
-    conversation,
-    ...history.filter((item) => item.id !== conversation.id),
+    normalizedConversation,
+    ...history.filter((item) => item.id !== normalizedConversation.id),
   ]
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .slice(0, MAX_HISTORY_COUNT)
 
+  writeJson(CONVERSATION_HISTORY_KEY, nextHistory)
+  return nextHistory
+}
+
+export function deleteConversationFromHistory(conversationId) {
+  const nextHistory = getConversationHistory().filter((item) => item.id !== conversationId)
   writeJson(CONVERSATION_HISTORY_KEY, nextHistory)
   return nextHistory
 }

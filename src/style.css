@@ -135,7 +135,12 @@ button {
 .mode-option,
 .history-button,
 .history-item,
+.history-item-main,
+.history-filter-button,
+.history-clear-button,
+.history-delete-button,
 .question-chip,
+.message-toolbar button,
 .send-button {
   cursor: pointer;
   transition:
@@ -248,8 +253,8 @@ button {
   top: calc(100% + 10px);
   right: 0;
   z-index: 30;
-  width: 320px;
-  max-height: 360px;
+  width: 360px;
+  max-height: 480px;
   padding: 12px;
   overflow-y: auto;
   border: 1px solid #e2eaf5;
@@ -258,28 +263,100 @@ button {
   box-shadow: 0 14px 30px rgba(15, 39, 71, 0.1);
 }
 
-.history-title {
+.history-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 8px;
+}
+
+.history-title {
   color: #0f2747;
   font-size: 13px;
   font-weight: 800;
 }
 
+.history-clear-button {
+  border: 0;
+  color: #94a3b8;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-clear-button:hover {
+  color: #ef4444;
+}
+
+.history-search {
+  width: 100%;
+  height: 34px;
+  margin-bottom: 8px;
+  padding: 0 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  outline: none;
+  color: #0f2747;
+  background: #f8fbff;
+  font-size: 13px;
+}
+
+.history-search:focus {
+  border-color: #93c5fd;
+  background: #ffffff;
+}
+
+.history-filter-list {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.history-filter-button {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  color: #64748b;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-filter-button:hover,
+.history-filter-button.active {
+  color: #1677c8;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
 .history-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+}
+
+.history-group {
+  display: grid;
+  gap: 7px;
+}
+
+.history-group-title {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .history-item {
   width: 100%;
-  display: grid;
-  gap: 4px;
-  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   color: #334155;
   background: #f8fbff;
-  text-align: left;
 }
 
 .history-item:hover {
@@ -287,19 +364,30 @@ button {
   background: #eff6ff;
 }
 
-.history-item-head,
+.history-item-main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
 .history-item-title,
-.history-item-time {
+.history-item-meta {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.history-item-head {
+.history-item-meta {
   display: flex;
   align-items: center;
   gap: 6px;
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .history-item-title {
@@ -318,10 +406,27 @@ button {
   font-weight: 700;
 }
 
-.history-item-time,
 .history-empty {
   color: #94a3b8;
   font-size: 12px;
+}
+
+.history-delete-button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 8px;
+  color: #cbd5e1;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-item:hover .history-delete-button {
+  color: #ef4444;
+}
+
+.history-delete-button:hover {
+  background: #fee2e2;
 }
 
 .history-empty {
@@ -554,6 +659,120 @@ button {
   border-radius: 16px 16px 4px 16px;
   background: linear-gradient(135deg, #1d8cf8, #14b8a6);
   box-shadow: 0 8px 18px rgba(20, 184, 166, 0.18);
+}
+
+.workflow-card {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(191, 219, 254, 0.92);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 18px rgba(30, 96, 160, 0.06);
+}
+
+.workflow-card-header {
+  display: grid;
+  gap: 4px;
+}
+
+.workflow-card-kicker {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #0284c7;
+  background: #e0f2fe;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workflow-card-header strong {
+  color: #0f2747;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.workflow-card-header p,
+.workflow-empty-fields {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.workflow-section {
+  margin-top: 10px;
+}
+
+.workflow-section-title {
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workflow-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.workflow-action-button {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1677c8;
+  background: rgba(239, 246, 255, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.workflow-action-button:hover {
+  border-color: #60a5fa;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.workflow-field-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #52677f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.message-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.message-toolbar button {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #64748b;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.message-toolbar button:hover {
+  color: #1677c8;
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .markdown-content {
