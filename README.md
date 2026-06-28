@@ -75,23 +75,17 @@ npm run build
 
 ## 环境变量
 
-真实密钥只放 `.env.local` 或部署平台环境变量，不能提交到仓库。
+前端环境变量只放非敏感配置。Dify API Key 在 AI Gateway 版本中只能放后端环境变量，不能放进 `VITE_` 变量，因为 `VITE_` 会被打进浏览器产物。
 
 ```env
 VITE_DIFY_USER=your-user-id
 VITE_USE_DIFY=true
-
-VITE_POLICY_DIFY_API_BASE=http://your-dify-host/v1
-VITE_POLICY_DIFY_API_KEY=app-your-policy-key
-
-VITE_OFFICE_DIFY_API_BASE=http://your-dify-host/v1
-VITE_OFFICE_DIFY_API_KEY=app-your-office-key
+VITE_AI_GATEWAY_BASE_URL=http://localhost:8088
 ```
 
 说明：
-- `VITE_POLICY_DIFY_*` 用于制度问答。
-- `VITE_OFFICE_DIFY_*` 用于办公智能 Agent。
-- 旧变量 `VITE_DIFY_API_BASE` / `VITE_DIFY_API_KEY` 仅作为制度问答兼容回退。
+- `VITE_AI_GATEWAY_BASE_URL` 用于后续前端切换到 AI Gateway。
+- 旧版前端直连 Dify 变量仅作为历史兼容，不应用于企业级部署。
 - Vite 只能读取 `VITE_` 开头的变量。
 
 ## 服务器部署
@@ -150,9 +144,55 @@ systemctl reload nginx
 
 ## 后续开发方向
 
-- 流程助手 postMessage 动作协议。
-- 门户父页面监听助手动作。
-- 接入真实 iGIX 菜单 / 表单。
-- ticket 免登与用户身份注入。
-- 表单字段预填。
-- 服务端历史记录与审计。
+- AI Gateway：作为前端与 Dify、审计日志之间的后端安全中间层。
+- 流程助手 pending 入口逐项实测，通过后再开放。
+- 服务端权限校验与操作审计。
+- postMessage origin 白名单收口。
+
+## AI Gateway 后端服务
+
+仓库内新增独立 Spring Boot 服务：
+
+```text
+ai-gateway/
+  pom.xml
+  src/main/java/com/huanbao/aigateway
+  src/main/resources/application.yml
+```
+
+定位：
+
+- Dify 制度问答代理。
+- 流程助手操作审计落库。
+- 动作参数校验预留。
+- 统一异常处理和参数校验。
+- 健康检查。
+
+技术栈：
+
+- Spring Boot 3.x
+- Java 17
+- PostgreSQL
+- Spring Web
+- Validation
+- JdbcTemplate
+
+本地启动：
+
+```bash
+cd ~/company-projects/huanbao-ai-assistant/ai-gateway
+
+export AI_GATEWAY_DB_URL=jdbc:postgresql://localhost:5432/huanbao_ai
+export AI_GATEWAY_DB_USERNAME=postgres
+export AI_GATEWAY_DB_PASSWORD=your-password
+export DIFY_POLICY_API_BASE=http://your-dify-host/v1
+export DIFY_POLICY_API_KEY=replace-with-backend-env-secret
+
+mvn spring-boot:run
+```
+
+注意：
+
+- 真实 Dify API Key 只能放后端环境变量或后端配置，不能提交到代码和文档。
+- 当前前端还未切换到 AI Gateway，后续需要将制度问答请求从前端直连 Dify 改为调用 `/api/ai/policy/chat`。
+- 操作审计表 SQL 位于 `docs/sql/ai_action_audit.sql`。

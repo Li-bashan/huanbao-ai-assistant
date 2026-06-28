@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { assistantModes, defaultAssistantModeKey } from './config/assistantModes'
-import { detectWorkflowAction } from './config/workflowActions'
+import { ENABLE_WORKFLOW_PREFILL, detectWorkflowAction } from './config/workflowActions'
 import { sendChatMessage, streamChatMessage } from './services/chatApi'
 import {
   clearCurrentConversation,
@@ -16,6 +16,8 @@ import {
   saveCurrentConversation,
 } from './utils/conversationStorage'
 import { detectIntent } from './utils/intentRouter'
+import { sendIgixAction } from './utils/actionBridge'
+import { getIgixCurrentUser } from './utils/igixUser'
 import { renderMarkdown } from './utils/markdown'
 import {
   copyText,
@@ -60,8 +62,14 @@ const showModeMenu = ref(false)
 const historySearch = ref('')
 const historyFilter = ref('all')
 const copiedMessageId = ref('')
+const currentUser = ref(null)
 const currentModeKey = ref(getStoredModeKey())
 const currentMode = computed(() => getModeByKey(currentModeKey.value))
+const welcomeTitle = computed(() =>
+  currentUser.value?.name
+    ? `您好，${currentUser.value.name}，我是${currentMode.value.title}。`
+    : currentMode.value.welcomeTitle,
+)
 const hasMessages = computed(() => messages.value.length > 0)
 const isStreamingMode = computed(() => currentMode.value.key === 'office-ai')
 const conversationTitle = computed(() => createConversationTitle(sanitizeMessages(messages.value)))
@@ -188,8 +196,14 @@ const createWorkflowCardMessage = (workflowResult) => ({
   workflowCard: {
     workflowName: workflowResult.workflowName,
     description: workflowResult.description,
+    status: workflowResult.status,
+    statusReason: workflowResult.statusReason,
     actions: workflowResult.actions,
+    actionPayloads: workflowResult.actionPayloads,
+    prefillFields: workflowResult.prefillFields,
+    parsedFields: workflowResult.parsedFields,
     requiredFields: workflowResult.requiredFields,
+    unavailableReason: workflowResult.unavailableReason,
   },
 })
 
@@ -208,7 +222,7 @@ const appendAssistantMessage = async (content) => {
 }
 
 const sendWorkflowMessage = async (content) => {
-  const workflowResult = detectWorkflowAction(content)
+  const workflowResult = detectWorkflowAction(content, { currentUser: currentUser.value })
 
   messages.value.push({
     id: createMessageId(),
@@ -218,7 +232,20 @@ const sendWorkflowMessage = async (content) => {
   })
 
   if (workflowResult.matched) {
-    messages.value.push(createWorkflowCardMessage(workflowResult))
+    if (workflowResult.type === 'workflow_list') {
+      messages.value.push({
+        id: createMessageId(),
+        role: 'assistant',
+        content: workflowResult.content,
+        loading: false,
+        streaming: false,
+        sources: [],
+        messageId: '',
+        expandedSourceId: '',
+      })
+    } else {
+      messages.value.push(createWorkflowCardMessage(workflowResult))
+    }
   } else {
     messages.value.push({
       id: createMessageId(),
@@ -241,7 +268,7 @@ const sendMessage = async (question = inputValue.value) => {
   const content = question.trim()
   if (!content) return
 
-  const detectedIntent = detectIntent(content)
+  const detectedIntent = detectIntent(content, { currentModeKey: currentMode.value.key })
   const routedMode = detectedIntent.modeKey ? getModeByKey(detectedIntent.modeKey) : currentMode.value
 
   if (detectedIntent.modeKey && routedMode.key !== currentMode.value.key) {
@@ -372,9 +399,39 @@ const toggleSource = (message, sourceId) => {
 const handleWorkflowActionClick = (workflowCard, action) => {
   if (!workflowCard) return
 
+  const getWorkflowActionPayload = () => {
+    const basePayload =
+      workflowCard.actionPayloads?.[action] ||
+      (action.includes('预填') ? Object.values(workflowCard.actionPayloads || {})[0] : null)
+
+    if (!basePayload) return null
+
+    const parsedFields = ENABLE_WORKFLOW_PREFILL ? workflowCard.parsedFields || {} : {}
+    const hasFields = Object.keys(parsedFields).length > 0
+
+    return hasFields
+      ? {
+          ...basePayload,
+          fields: parsedFields,
+        }
+      : basePayload
+  }
+
   if (action.includes('打开')) {
+    const actionPayload = getWorkflowActionPayload()
+
+    if (!actionPayload) {
+      appendAssistantMessage(
+        workflowCard.unavailableReason ||
+          workflowCard.statusReason ||
+          `“${workflowCard.workflowName}”暂未配置可执行动作。`,
+      )
+      return
+    }
+
+    sendIgixAction(actionPayload, { status: workflowCard.status })
     appendAssistantMessage(
-      `当前为演示动作，后续将接入业务系统打开“${workflowCard.workflowName}”。`,
+      `已向 iGIX 发送打开“${workflowCard.workflowName}”的动作，请在门户页面中查看表单打开结果。`,
     )
     return
   }
@@ -388,10 +445,29 @@ const handleWorkflowActionClick = (workflowCard, action) => {
   }
 
   if (action.includes('预填')) {
-    const fields = workflowCard.requiredFields?.length
-      ? workflowCard.requiredFields.join('、')
-      : '暂无需要补充的字段。'
-    appendAssistantMessage(`请补充以下信息：${fields}`)
+    if (!ENABLE_WORKFLOW_PREFILL) {
+      appendAssistantMessage('企业级试点上线版暂不支持字段预填，请使用打开表单动作后在 iGIX 页面内填写。')
+      return
+    }
+
+    const actionPayload = getWorkflowActionPayload()
+
+    if (!actionPayload) {
+      appendAssistantMessage(
+        workflowCard.unavailableReason || `“${workflowCard.workflowName}”暂未配置可执行动作。`,
+      )
+      return
+    }
+
+    if (!actionPayload.fields) {
+      appendAssistantMessage('当前未识别到可预填字段，请补充项目名称、联系人、联系电话或预算金额。')
+      return
+    }
+
+    sendIgixAction(actionPayload, { status: workflowCard.status })
+    appendAssistantMessage(
+      `已向 iGIX 发送打开“${workflowCard.workflowName}”并预填字段的动作，请在门户页面中查看表单结果。`,
+    )
   }
 }
 
@@ -500,6 +576,7 @@ const newChat = async () => {
 }
 
 onMounted(async () => {
+  currentUser.value = await getIgixCurrentUser()
   conversationHistory.value = getConversationHistory()
   const currentConversation = getCurrentConversation()
 
@@ -651,9 +728,6 @@ watch(
           <span class="plus-icon" aria-hidden="true">+</span>
           新对话
         </button>
-        <button class="expand-button" type="button" aria-label="展开助手">
-          <span aria-hidden="true">⛶</span>
-        </button>
       </div>
     </header>
 
@@ -662,7 +736,7 @@ watch(
         <section class="welcome-card" aria-label="助手欢迎信息">
           <div class="welcome-copy">
             <span class="welcome-tag">{{ currentMode.badge }}</span>
-            <h2>{{ currentMode.welcomeTitle }}</h2>
+            <h2>{{ welcomeTitle }}</h2>
             <p>{{ currentMode.welcomeDesc }}</p>
           </div>
         </section>
@@ -704,7 +778,7 @@ watch(
 
                 <div class="workflow-section">
                   <div class="workflow-section-title">可执行操作</div>
-                  <div class="workflow-action-list">
+                  <div v-if="message.workflowCard.actions?.length" class="workflow-action-list">
                     <button
                       v-for="action in message.workflowCard.actions"
                       :key="action"
@@ -715,6 +789,9 @@ watch(
                       {{ action }}
                     </button>
                   </div>
+                  <p v-else class="workflow-empty-fields">
+                    {{ message.workflowCard.unavailableReason || '该事项暂未配置可执行动作。' }}
+                  </p>
                 </div>
 
                 <div class="workflow-section">
@@ -804,10 +881,6 @@ watch(
           </span>
         </div>
 
-        <div v-if="!hasMessages" class="empty-state">
-          <strong>对话记录将显示在这里</strong>
-          <span>您可以开始提问，助手将为您提供专业解答</span>
-        </div>
       </div>
     </main>
 

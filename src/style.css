@@ -130,7 +130,6 @@ button {
 }
 
 .new-chat-button,
-.expand-button,
 .mode-current-button,
 .mode-option,
 .history-button,
@@ -457,26 +456,6 @@ button {
 .plus-icon {
   font-size: 20px;
   line-height: 1;
-  transform: translateY(-1px);
-}
-
-.expand-button {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #bfdbfe;
-  border-radius: 14px;
-  color: #2563eb;
-  font-size: 18px;
-  font-weight: 800;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
-}
-
-.expand-button:hover {
-  background: #eff6ff;
-  border-color: #60a5fa;
   transform: translateY(-1px);
 }
 
@@ -1035,39 +1014,6 @@ button {
   background: #ede9fe;
 }
 
-.empty-state {
-  margin-top: auto;
-  margin-bottom: auto;
-  display: grid;
-  gap: 5px;
-  color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: center;
-  opacity: 0.8;
-}
-
-.empty-state::before {
-  content: "...";
-  width: 42px;
-  height: 42px;
-  margin: 0 auto 7px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #dbeafe;
-  border-radius: 15px;
-  color: rgba(148, 163, 184, 0.78);
-  background: rgba(255, 255, 255, 0.45);
-  box-shadow: 0 8px 18px rgba(30, 96, 160, 0.04);
-  font-size: 18px;
-  letter-spacing: 1px;
-}
-
-.empty-state strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-
 .assistant-footer {
   height: 88px;
   min-height: 88px;
@@ -1144,7 +1090,6 @@ button {
 }
 
 .new-chat-button:focus-visible,
-.expand-button:focus-visible,
 .question-chip:focus-visible,
 .send-button:focus-visible,
 .input-shell input:focus-visible {

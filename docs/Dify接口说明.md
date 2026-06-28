@@ -1,5 +1,7 @@
 # Dify 接口说明
 
+> 说明：本文保留前端直连 Dify 的历史接口说明。企业级试点上线版应通过 AI Gateway 代理制度问答，Dify API Key 只能配置在后端环境变量，不能放入前端 `VITE_` 变量。
+
 ## Dify 在项目中的作用
 
 Dify 提供两个智能能力：
@@ -13,7 +15,7 @@ Dify 提供两个智能能力：
 
 - 模式：`policy`
 - 方法：blocking
-- 环境变量：
+- 历史前端直连环境变量：
   - `VITE_POLICY_DIFY_API_BASE`
   - `VITE_POLICY_DIFY_API_KEY`
 - 兼容回退：

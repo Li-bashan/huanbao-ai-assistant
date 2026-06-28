@@ -1,0 +1,24 @@
+server:
+  port: ${AI_GATEWAY_PORT:8088}
+
+spring:
+  application:
+    name: huanbao-ai-gateway
+  datasource:
+    url: ${AI_GATEWAY_DB_URL:jdbc:postgresql://localhost:5432/huanbao_ai}
+    username: ${AI_GATEWAY_DB_USERNAME:postgres}
+    password: ${AI_GATEWAY_DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+app:
+  version: ${AI_GATEWAY_VERSION:0.1.0}
+
+dify:
+  policy:
+    api-base: ${DIFY_POLICY_API_BASE:http://localhost/v1}
+    api-key: ${DIFY_POLICY_API_KEY:}
+    timeout-ms: ${DIFY_POLICY_TIMEOUT_MS:30000}
+
+logging:
+  level:
+    com.huanbao.aigateway: INFO

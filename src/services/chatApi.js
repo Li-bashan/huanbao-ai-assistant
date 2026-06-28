@@ -6,17 +6,23 @@ function normalizeSources(resources = []) {
   resources.forEach((item, index) => {
     const documentId = item.document_id || ''
     const documentName = item.document_name || ''
-    const key = documentId || documentName || item.segment_id || String(index)
+    const segmentId = item.segment_id || ''
+    const segmentPosition = item.segment_position || item.position || index + 1
+    const key =
+      segmentId ||
+      [documentId, segmentPosition].filter(Boolean).join(':') ||
+      [documentName, segmentPosition].filter(Boolean).join(':') ||
+      String(index)
 
     if (!key) return
 
     const source = {
-      id: documentId || key,
+      id: key,
       datasetName: item.dataset_name || '',
       documentName,
       content: item.content || '',
       score: typeof item.score === 'number' ? item.score : 0,
-      position: item.position || index + 1,
+      position: segmentPosition,
     }
 
     const existing = sourceMap.get(key)
@@ -37,6 +43,25 @@ function normalizeSources(resources = []) {
   return Array.from(sourceMap.values()).slice(0, 3)
 }
 
+function logPolicyRetrieverDebug(answer = '', resources = []) {
+  if (!import.meta.env.DEV) return
+
+  console.groupCollapsed('[Dify Debug] policy blocking retriever resources')
+  console.log('answer', answer || '')
+  console.log('retriever_resources.length', Array.isArray(resources) ? resources.length : 0)
+  ;(Array.isArray(resources) ? resources : []).forEach((item, index) => {
+    console.log(`retriever_resource[${index}]`, {
+      document_name: item.document_name || '',
+      content: item.content || '',
+      score: item.score,
+      segment_position: item.segment_position,
+      dataset_name: item.dataset_name || '',
+      metadata: item.metadata || {},
+    })
+  })
+  console.groupEnd()
+}
+
 function removeThinkContent(text = '') {
   return String(text || '')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
@@ -45,31 +70,56 @@ function removeThinkContent(text = '') {
     .trim()
 }
 
-function normalizeAnswer(answer = '') {
+function hasEffectiveSources(resources = []) {
+  if (!Array.isArray(resources)) return false
+
+  return resources.some(
+    (item) =>
+      item?.document_id ||
+      item?.document_name ||
+      item?.segment_id ||
+      item?.content,
+  )
+}
+
+function normalizeAnswer(answer = '', resources = []) {
   const text = removeThinkContent(answer)
   const fallbackAnswer = '当前知识库中未查询到相关制度依据。建议您换一种表述继续查询，或联系相关责任部门确认。'
+  const hasSources = hasEffectiveSources(resources)
 
   if (!text) {
     return {
       answer: fallbackAnswer,
-      noHit: true,
+      noHit: !hasSources,
     }
   }
 
-  const noHitKeywords = [
-    '暂时没有把握',
-    '换个方式描述',
-    '当前知识库中未查询到',
-    '未查询到',
-    '未查询到相关',
-    '未找到相关',
-    '没有找到相关',
-    '无法回答',
+  if (hasSources) {
+    return {
+      answer: text,
+      noHit: false,
+    }
+  }
+
+  const compactText = text.replace(/\s+/g, '')
+  const explicitNoHitPatterns = [
+    '当前知识库中未查询到相关制度依据',
+    '当前知识库中未查询到相关内容',
+    '当前知识库资料未明确',
+    '当前制度资料未明确',
+    '未查询到相关制度依据',
+    '未查询到相关内容',
+    '未找到相关制度依据',
+    '未找到相关内容',
+    '没有找到相关制度依据',
+    '没有找到相关内容',
   ]
 
-  const isNoHit = noHitKeywords.some((keyword) => text.includes(keyword))
+  const isExplicitNoHit = explicitNoHitPatterns.some((pattern) =>
+    compactText.includes(pattern),
+  )
 
-  if (isNoHit) {
+  if (isExplicitNoHit) {
     return {
       answer: fallbackAnswer,
       noHit: true,
@@ -169,7 +219,8 @@ export async function sendChatMessage(question, options = {}) {
 
   const data = await response.json()
   const rawSources = data.metadata?.retriever_resources || []
-  const normalizedAnswer = normalizeAnswer(data.answer)
+  logPolicyRetrieverDebug(data.answer, rawSources)
+  const normalizedAnswer = normalizeAnswer(data.answer, rawSources)
 
   return {
     answer: normalizedAnswer.answer,
