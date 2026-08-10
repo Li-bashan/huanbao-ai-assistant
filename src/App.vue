@@ -1,5 +1,14 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import {
+  Expand,
+  History,
+  Maximize2,
+  MessageSquarePlus,
+  Minimize2,
+  PanelRightClose,
+  X,
+} from '@lucide/vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { assistantModes, defaultAssistantModeKey } from './config/assistantModes'
 import { ENABLE_WORKFLOW_PREFILL, detectWorkflowAction } from './config/workflowActions'
 import { sendChatMessage, streamChatMessage } from './services/chatApi'
@@ -18,6 +27,7 @@ import {
 import { detectIntent } from './utils/intentRouter'
 import { sendIgixAction } from './utils/actionBridge'
 import { getIgixCurrentUser } from './utils/igixUser'
+import { createIgixAssistantWindow } from './utils/igixAssistantWindow'
 import { renderMarkdown } from './utils/markdown'
 import {
   copyText,
@@ -63,6 +73,12 @@ const historySearch = ref('')
 const historyFilter = ref('all')
 const copiedMessageId = ref('')
 const currentUser = ref(null)
+const windowState = ref({
+  revision: '',
+  isOpen: true,
+  view: 'compact',
+  iframeLoaded: false,
+})
 const currentModeKey = ref(getStoredModeKey())
 const currentMode = computed(() => getModeByKey(currentModeKey.value))
 const welcomeTitle = computed(() =>
@@ -80,6 +96,9 @@ const historyFilters = [
   { key: 'workflow', label: '流程' },
 ]
 let closeModeTimer = null
+const assistantWindow = createIgixAssistantWindow()
+let unbindWindowEscape = null
+let unsubscribeWindowState = null
 
 const createMessageId = () => Date.now() + Math.random()
 
@@ -576,6 +595,12 @@ const newChat = async () => {
 }
 
 onMounted(async () => {
+  unbindWindowEscape = assistantWindow.bindEscape()
+  unsubscribeWindowState = assistantWindow.onStateChange((state) => {
+    windowState.value = state
+  })
+  assistantWindow.getState()
+
   currentUser.value = await getIgixCurrentUser()
   conversationHistory.value = getConversationHistory()
   const currentConversation = getCurrentConversation()
@@ -590,6 +615,12 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => {
+  if (unbindWindowEscape) unbindWindowEscape()
+  if (unsubscribeWindowState) unsubscribeWindowState()
+  assistantWindow.destroy()
+})
+
 watch(
   [messages, conversationId],
   () => {
@@ -600,7 +631,11 @@ watch(
 </script>
 
 <template>
-  <section class="ai-assistant" :aria-label="currentMode.title">
+  <section
+    class="ai-assistant"
+    :class="`assistant-view-${windowState.view || 'compact'}`"
+    :aria-label="currentMode.title"
+  >
     <header class="assistant-header">
       <div class="brand">
         <div class="assistant-avatar" aria-hidden="true">
@@ -613,47 +648,20 @@ watch(
       </div>
 
       <div class="header-actions" aria-label="助手操作">
-        <div
-          class="mode-switch"
-          @mouseenter="openModeMenu"
-          @mouseleave="scheduleCloseModeMenu"
-        >
-          <button
-            class="mode-current-button"
-            type="button"
-            :aria-expanded="showModeMenu"
-            @click="toggleModeMenu"
-          >
-            <span>{{ currentMode.label }}</span>
-            <span class="mode-caret" aria-hidden="true">▾</span>
-          </button>
-          <div
-            v-if="showModeMenu"
-            class="mode-popover"
-            @mouseenter="cancelCloseModeMenu"
-            @mouseleave="scheduleCloseModeMenu"
-          >
-            <button
-              v-for="mode in assistantModes"
-              :key="mode.key"
-              class="mode-option"
-              :class="{ active: mode.key === currentMode.key }"
-              type="button"
-              @click="switchMode(mode.key)"
-            >
-              <span class="mode-option-title">{{ mode.label }}</span>
-              <span class="mode-option-desc">{{ mode.desc }}</span>
-            </button>
-          </div>
-        </div>
+        <button class="new-chat-button" type="button" title="新对话" aria-label="新对话" @click="newChat">
+          <MessageSquarePlus class="titlebar-icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
+          <span class="visually-hidden">新对话</span>
+        </button>
         <div class="history-wrapper">
           <button
             class="history-button"
             type="button"
+            title="历史记录"
+            aria-label="历史记录"
             :aria-expanded="showHistory"
             @click="toggleHistory"
           >
-            历史
+            <History class="titlebar-icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
           </button>
           <div v-if="showHistory" class="history-panel">
             <div class="history-panel-head">
@@ -724,9 +732,56 @@ watch(
             <div v-else class="history-empty">暂无历史会话。</div>
           </div>
         </div>
-        <button class="new-chat-button" type="button" @click="newChat">
-          <span class="plus-icon" aria-hidden="true">+</span>
-          新对话
+        <span class="titlebar-divider" aria-hidden="true"></span>
+        <button
+          v-if="windowState.view !== 'fullscreen'"
+          class="window-control-button"
+          type="button"
+          :title="windowState.view === 'wide' ? '切换小窗口' : '切换中窗口'"
+          @click="assistantWindow.toggleWide()"
+        >
+          <Minimize2
+            v-if="windowState.view === 'wide'"
+            class="titlebar-icon"
+            :size="18"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+          <Maximize2
+            v-else
+            class="titlebar-icon"
+            :size="18"
+            :stroke-width="1.8"
+            aria-hidden="true"
+          />
+        </button>
+        <button
+          v-if="windowState.view !== 'fullscreen'"
+          class="window-control-button"
+          type="button"
+          title="切换全屏"
+          @click="assistantWindow.toggleFullscreen()"
+        >
+          <Expand class="titlebar-icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
+        </button>
+        <button
+          v-if="windowState.view === 'fullscreen'"
+          class="window-control-button"
+          type="button"
+          title="切换小窗口"
+          aria-label="切换小窗口"
+          @click="assistantWindow.compact()"
+        >
+          <PanelRightClose class="titlebar-icon" :size="18" :stroke-width="1.8" aria-hidden="true" />
+        </button>
+        <button
+          class="window-control-button window-control-close"
+          type="button"
+          title="关闭"
+          aria-label="关闭"
+          @click="assistantWindow.close()"
+        >
+          <X class="titlebar-icon" :size="19" :stroke-width="1.8" aria-hidden="true" />
         </button>
       </div>
     </header>

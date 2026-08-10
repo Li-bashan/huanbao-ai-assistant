@@ -8,12 +8,14 @@ spring:
     url: ${AI_GATEWAY_DB_URL:jdbc:postgresql://localhost:5432/huanbao_ai}
     username: ${AI_GATEWAY_DB_USERNAME:postgres}
     password: ${AI_GATEWAY_DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
+    driver-class-name: ${AI_GATEWAY_DB_DRIVER:org.postgresql.Driver}
 
 app:
   version: ${AI_GATEWAY_VERSION:0.1.0}
 
 dify:
+  http:
+    api-key: ${DIFY_HTTP_API_KEY:}
   policy:
     api-base: ${DIFY_POLICY_API_BASE:http://localhost/v1}
     api-key: ${DIFY_POLICY_API_KEY:}

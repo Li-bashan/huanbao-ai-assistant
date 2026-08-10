@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>17</java.version>
+        <kingbase.jdbc.version>8.6.0</kingbase.jdbc.version>
     </properties>
 
     <dependencies>
@@ -59,4 +60,20 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- Activate this profile when packaging for KingbaseES. -->
+    <profiles>
+        <profile>
+            <id>kingbase</id>
+            <dependencies>
+                <dependency>
+                    <groupId>cn.com.kingbase</groupId>
+                    <artifactId>kingbase8</artifactId>
+                    <version>${kingbase.jdbc.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
 </project>
