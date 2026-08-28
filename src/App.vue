@@ -1,6 +1,10 @@
 <script setup>
 import {
+  Check,
+  Copy,
   Expand,
+  FileDown,
+  FileText,
   History,
   Maximize2,
   MessageSquarePlus,
@@ -8,7 +12,6 @@ import {
   PanelRightClose,
   RefreshCw,
   Square,
-  ChevronDown,
   X,
 } from '@lucide/vue'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -21,9 +24,10 @@ import {
 } from './config/dataQueryCatalog'
 import { ENABLE_WORKFLOW_PREFILL, detectWorkflowAction } from './config/workflowActions'
 import CapabilitySelector from './components/CapabilitySelector.vue'
+import AssistantExecution from './components/AssistantExecution.vue'
 import DataQueryHome from './components/DataQueryHome.vue'
 import DataQueryUserAdmin from './components/DataQueryUserAdmin.vue'
-import { sendChatMessage, streamChatMessage } from './services/chatApi'
+import { sendChatMessage, stopChatMessage, streamChatMessage } from './services/chatApi'
 import { checkDataQueryAccess } from './services/dataQueryAccessApi'
 import {
   clearCurrentConversation,
@@ -46,6 +50,13 @@ import {
   removeDataQueryChartPayload,
 } from './utils/dataQueryChart'
 import { renderMarkdown } from './utils/markdown'
+import {
+  applyDifyExecutionEvent,
+  completeDifyExecution,
+  createDifyExecutionProcess,
+  failDifyExecution,
+  stopDifyExecution,
+} from './utils/difyMessageState'
 import {
   copyText,
   exportMarkdown,
@@ -522,103 +533,34 @@ const sendDataQueryExplorationMessage = async (content, exploration) => {
   await scrollToBottom()
 }
 
-const createDataQueryWorkflowProcess = () => ({
-  status: 'running',
-  expanded: false,
-  steps: [],
-})
-
-const getWorkflowEventData = (event) =>
-  event?.data && typeof event.data === 'object' ? event.data : {}
-
-const getWorkflowStepKey = (data) =>
-  String(data.node_id || data.nodeId || data.title || data.node_title || data.index || 'workflow-node')
-
-const getWorkflowStepTitle = (data) =>
-  data.title || data.node_title || data.nodeName || data.node_id || '执行节点'
-
-const getWorkflowElapsedTime = (data, step) => {
-  const value = Number(data.elapsed_time ?? data.elapsedTime)
-  if (Number.isFinite(value)) return value
-  if (step?.startedAt) return (Date.now() - step.startedAt) / 1000
-  return null
+const handleDifyExecutionEvent = (message, event) => {
+  if (!message?.executionProcess) return
+  applyDifyExecutionEvent(message.executionProcess, event)
+  scrollToBottom()
 }
 
-const formatWorkflowElapsed = (value) => {
-  const seconds = Number(value)
-  if (!Number.isFinite(seconds)) return '处理中'
-  const milliseconds = seconds * 1000
-  return milliseconds >= 1000
-    ? `${seconds.toFixed(3)} s`
-    : `${milliseconds.toFixed(3)} ms`
-}
-
-const updateDataQueryWorkflowProcess = (message, event) => {
-  if (!message || message.modeKey !== 'data-query') return
-  if (!message.workflowProcess) message.workflowProcess = createDataQueryWorkflowProcess()
-
-  const data = getWorkflowEventData(event)
-  if (event.event === 'workflow_started') {
-    message.workflowProcess.status = 'running'
-    return
-  }
-
-  if (event.event === 'node_started' || event.event === 'node_finished') {
-    const key = getWorkflowStepKey(data)
-    let step = message.workflowProcess.steps.find((item) => item.key === key)
-
-    if (!step) {
-      step = {
-        key,
-        title: getWorkflowStepTitle(data),
-        status: 'running',
-        elapsedTime: null,
-        startedAt: null,
-      }
-      message.workflowProcess.steps.push(step)
-    }
-
-    step.title = getWorkflowStepTitle(data)
-    if (event.event === 'node_started') {
-      step.status = 'running'
-      step.startedAt = Date.now()
-    } else {
-      step.status = data.status === 'failed' || data.error ? 'failed' : 'success'
-      step.elapsedTime = getWorkflowElapsedTime(data, step)
-    }
-    return
-  }
-
-  if (event.event === 'workflow_finished' || event.event === 'message_end') {
-    const failed = data.status === 'failed' || data.error
-    message.workflowProcess.status = failed ? 'failed' : 'success'
-    message.workflowProcess.steps.forEach((step) => {
-      if (step.status === 'running') step.status = failed ? 'failed' : 'success'
-      if (step.elapsedTime === null) step.elapsedTime = getWorkflowElapsedTime(data, step)
-    })
-  }
+const toggleDifyExecution = (message) => {
+  const process = message?.executionProcess
+  if (!process) return
+  process.expanded = !process.expanded
+  process.userExpanded = true
 }
 
 const markMessageAsCancelled = (messageId) => {
   const message = messages.value.find((item) => item.id === messageId)
   if (!message) return
 
-  message.content = '已停止本次执行。'
+  const partialContent = message.content?.trim()
+  if (!partialContent?.endsWith('已停止本次执行。')) {
+    message.content = partialContent
+      ? `${message.content}\n\n已停止本次执行。`
+      : '已停止本次执行。'
+  }
   message.loading = false
   message.streaming = false
   message.status = ''
-  message.chartOption = null
-  message.sources = []
-  message.messageId = ''
-  message.expandedSourceId = ''
   message.followUps = []
-
-  if (message.workflowProcess) {
-    message.workflowProcess.status = 'cancelled'
-    message.workflowProcess.steps.forEach((step) => {
-      if (step.status === 'running') step.status = 'cancelled'
-    })
-  }
+  stopDifyExecution(message.executionProcess)
 }
 
 const isCancelledChatError = (error, requestController) =>
@@ -626,7 +568,7 @@ const isCancelledChatError = (error, requestController) =>
   error?.name === 'AbortError' ||
   error?.code === 'CHAT_CANCELLED'
 
-const cancelCurrentExecution = () => {
+const cancelCurrentExecution = async () => {
   if (!activeChatRequest) return
 
   const request = activeChatRequest
@@ -634,7 +576,10 @@ const cancelCurrentExecution = () => {
   inputValue.value = request.question || ''
   markMessageAsCancelled(request.messageId)
   activeChatRequest = null
-  scrollToBottom()
+  await stopChatMessage(request.taskId, {
+    modeKey: request.modeKey,
+  }).catch(() => false)
+  await scrollToBottom()
 }
 
 const handleSendButtonClick = () => {
@@ -704,8 +649,10 @@ const sendMessage = async (question = inputValue.value) => {
     }
   }
 
+  const requestMode = currentMode.value
+  const requestModeKey = requestMode.key
   const loadingMessageId = createMessageId()
-  const shouldStream = currentMode.value.key === 'data-query' || isStreamingMode.value
+  const shouldStream = requestModeKey === 'data-query' || requestModeKey === 'office-ai'
 
   messages.value.push({
     id: createMessageId(),
@@ -717,21 +664,21 @@ const sendMessage = async (question = inputValue.value) => {
   messages.value.push({
     id: loadingMessageId,
     role: 'assistant',
-    content: isStreamingMode.value || currentMode.value.key === 'data-query' ? '' : '环宝正在思考中...',
+    content: shouldStream ? '' : '环宝正在思考中...',
     loading: true,
     streaming: shouldStream,
     status:
-      currentMode.value.key === 'data-query'
+      requestModeKey === 'data-query'
         ? '正在处理生产指标查询...'
-        : isStreamingMode.value
+        : shouldStream
           ? '环宝正在生成中...'
           : '',
     sources: [],
     messageId: '',
     expandedSourceId: '',
     chartOption: null,
-    workflowProcess: currentMode.value.key === 'data-query' ? createDataQueryWorkflowProcess() : null,
-    modeKey: currentMode.value.key,
+    executionProcess: shouldStream ? createDifyExecutionProcess() : null,
+    modeKey: requestModeKey,
   })
 
   const requestController = new AbortController()
@@ -739,6 +686,8 @@ const sendMessage = async (question = inputValue.value) => {
     controller: requestController,
     messageId: loadingMessageId,
     question: content,
+    modeKey: requestModeKey,
+    taskId: '',
   }
 
   inputValue.value = ''
@@ -746,17 +695,22 @@ const sendMessage = async (question = inputValue.value) => {
 
   try {
     const requestOptions = {
-      conversationId: getModeConversationId(currentMode.value.key),
-      apiMode: currentMode.value.apiMode,
-      modeKey: currentMode.value.key,
+      conversationId: getModeConversationId(requestModeKey),
+      apiMode: requestMode.apiMode,
+      modeKey: requestModeKey,
       currentUserName: currentUser.value?.name || '',
       signal: requestController.signal,
+      onTask: (taskId) => {
+        if (activeChatRequest?.controller === requestController && taskId) {
+          activeChatRequest.taskId = taskId
+        }
+      },
     }
     let hasStreamedAnswer = false
 
     const result = shouldStream
       ? await streamChatMessage(
-        currentMode.value.key === 'data-query' ? content : handoffQuestion,
+        requestModeKey === 'data-query' ? content : handoffQuestion,
         {
           ...requestOptions,
           onMessage: (messageContent, meta = {}) => {
@@ -800,14 +754,13 @@ const sendMessage = async (question = inputValue.value) => {
             streamingMessage.chartOption = chartOption
             scrollToBottom()
           },
-          onWorkflowEvent: (event) => {
+          onDifyEvent: (event) => {
             if (requestController.signal.aborted) return
             const streamingMessage = messages.value.find(
               (message) => message.id === loadingMessageId,
             )
             if (!streamingMessage) return
-            updateDataQueryWorkflowProcess(streamingMessage, event)
-            scrollToBottom()
+            handleDifyExecutionEvent(streamingMessage, event)
           },
         },
       )
@@ -815,7 +768,7 @@ const sendMessage = async (question = inputValue.value) => {
 
     if (requestController.signal.aborted) return
 
-    setModeConversationId(currentMode.value.key, result.conversationId)
+    setModeConversationId(requestModeKey, result.conversationId)
 
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
     if (loadingMessage) {
@@ -823,25 +776,20 @@ const sendMessage = async (question = inputValue.value) => {
       loadingMessage.loading = false
       loadingMessage.streaming = false
       loadingMessage.status = ''
-      if (loadingMessage.workflowProcess?.status === 'running') {
-        loadingMessage.workflowProcess.status = 'success'
-        loadingMessage.workflowProcess.steps.forEach((step) => {
-          if (step.status === 'running') step.status = 'success'
-        })
-      }
+      completeDifyExecution(loadingMessage.executionProcess)
       loadingMessage.sources = result.sources || []
       loadingMessage.messageId = result.messageId || ''
       loadingMessage.expandedSourceId = ''
-      loadingMessage.modeKey = currentMode.value.key
+      loadingMessage.modeKey = requestModeKey
       loadingMessage.chartOption =
         result.chartOption ||
-        (currentMode.value.key === 'data-query'
+        (requestModeKey === 'data-query'
           ? createDataQueryChartOptionFromAnswer(result.answer)
           : null) ||
         loadingMessage.chartOption ||
         null
       loadingMessage.followUps =
-        currentMode.value.key === 'data-query' ? buildDataQueryFollowUps(content) : []
+        requestModeKey === 'data-query' ? buildDataQueryFollowUps(content) : []
     }
   } catch (error) {
     if (isCancelledChatError(error, requestController)) {
@@ -850,14 +798,14 @@ const sendMessage = async (question = inputValue.value) => {
     }
 
     console.error(error)
-    if (currentMode.value.key === 'data-query' && error?.code === 'DATA_QUERY_NOT_COVERED') {
+    if (requestModeKey === 'data-query' && error?.code === 'DATA_QUERY_NOT_COVERED') {
       dataQueryAccessStatus.value = 'not-covered'
       dataQueryAccessErrorKind.value = ''
     }
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
     if (loadingMessage) {
       loadingMessage.content =
-        currentMode.value.key === 'data-query'
+        requestModeKey === 'data-query'
           ? error?.code === 'DATA_QUERY_NOT_COVERED'
             ? '您所在部门暂不支持生产指标智能问数，如有业务需要，请联系管理员申请。'
             : error?.message || '当前服务暂时不可用，请稍后重试。'
@@ -868,12 +816,7 @@ const sendMessage = async (question = inputValue.value) => {
       loadingMessage.messageId = ''
       loadingMessage.expandedSourceId = ''
       loadingMessage.status = ''
-      if (loadingMessage.workflowProcess) {
-        loadingMessage.workflowProcess.status = 'failed'
-        loadingMessage.workflowProcess.steps.forEach((step) => {
-          if (step.status === 'running') step.status = 'failed'
-        })
-      }
+      failDifyExecution(loadingMessage.executionProcess, loadingMessage.content)
     }
   } finally {
     if (activeChatRequest?.controller === requestController) {
@@ -1396,59 +1339,13 @@ watch(
                 <RefreshCw :size="14" :stroke-width="1.8" aria-hidden="true" />
                 <span>{{ message.content }}</span>
               </div>
-              <section
-                v-if="message.modeKey === 'data-query' && message.workflowProcess"
-                class="data-query-workflow-process"
-                :class="`data-query-workflow-process-${message.workflowProcess.status}`"
-                aria-label="正在执行的节点"
-              >
-                <button
-                  type="button"
-                  class="data-query-workflow-process-head"
-                  :aria-expanded="message.workflowProcess.expanded"
-                  @click="message.workflowProcess.expanded = !message.workflowProcess.expanded"
-                >
-                  <span class="data-query-workflow-process-icon" aria-hidden="true">
-                    {{ message.workflowProcess.status === 'failed' ? '!' : message.workflowProcess.status === 'cancelled' ? '–' : message.workflowProcess.status === 'running' ? '·' : '✓' }}
-                  </span>
-                  <strong>正在执行的节点</strong>
-                  <span class="data-query-workflow-process-status">
-                    <span>
-                      {{ message.workflowProcess.status === 'success' ? '已完成' : message.workflowProcess.status === 'failed' ? '执行失败' : message.workflowProcess.status === 'cancelled' ? '已停止' : message.status || '正在执行...' }}
-                    </span>
-                    <span
-                      v-if="message.workflowProcess.status === 'running' && message.loading"
-                      class="message-status-dots"
-                      aria-hidden="true"
-                    ><i></i><i></i><i></i></span>
-                  </span>
-                  <ChevronDown
-                    class="data-query-workflow-process-caret"
-                    :class="{ 'data-query-workflow-process-caret-expanded': message.workflowProcess.expanded }"
-                    :size="15"
-                    :stroke-width="2"
-                    aria-hidden="true"
-                  />
-                </button>
-                <div v-if="message.workflowProcess.expanded" class="data-query-workflow-step-list">
-                  <div v-for="step in message.workflowProcess.steps" :key="step.key" class="data-query-workflow-step">
-                    <span
-                      class="data-query-workflow-step-icon"
-                      :class="`data-query-workflow-step-icon-${step.status}`"
-                      aria-hidden="true"
-                    >
-                      {{ step.status === 'failed' ? '!' : step.status === 'running' ? '·' : step.status === 'cancelled' ? '–' : '✓' }}
-                    </span>
-                    <span class="data-query-workflow-step-title">{{ step.title }}</span>
-                    <span class="data-query-workflow-step-time">
-                      {{ step.status === 'running' ? '处理中' : step.status === 'cancelled' ? '已停止' : formatWorkflowElapsed(step.elapsedTime) }}
-                    </span>
-                    <span v-if="step.status === 'success'" class="data-query-workflow-step-check" aria-hidden="true">✓</span>
-                  </div>
-                </div>
-              </section>
+              <AssistantExecution
+                v-if="message.role === 'assistant' && message.executionProcess"
+                :process="message.executionProcess"
+                @toggle="toggleDifyExecution(message)"
+              />
               <div
-                v-if="message.role === 'assistant' && message.loading && !message.content && message.status && !message.workflowProcess"
+                v-if="message.role === 'assistant' && message.loading && !message.content && message.status && !message.executionProcess?.visible"
                 class="message-status"
                 aria-live="polite"
               >
@@ -1457,7 +1354,7 @@ watch(
               </div>
               <div
                 v-else-if="message.role === 'assistant' && !message.messageType && message.modeKey !== 'data-query'"
-                class="markdown-content"
+                class="markdown-body markdown-content"
                 :class="{ 'data-query-answer': message.modeKey === 'data-query' }"
                 v-html="renderMarkdown(message.modeKey === 'data-query' ? removeDataQueryChartPayload(message.content) : message.content)"
               ></div>
@@ -1578,14 +1475,33 @@ watch(
               </div>
 
               <div v-if="canUseMessageTools(message)" class="message-toolbar">
-                <button type="button" @click="copyMessageContent(message)">
-                  {{ copiedMessageId === message.id ? '已复制' : '复制' }}
+                <button
+                  type="button"
+                  :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
+                  :aria-label="copiedMessageId === message.id ? '已复制' : '复制回答'"
+                  @click="copyMessageContent(message)"
+                >
+                  <Check v-if="copiedMessageId === message.id" :size="15" :stroke-width="2" aria-hidden="true" />
+                  <Copy v-else :size="15" :stroke-width="2" aria-hidden="true" />
+                  <span class="visually-hidden">{{ copiedMessageId === message.id ? '已复制' : '复制回答' }}</span>
                 </button>
-                <button type="button" @click="exportMessageAsMarkdown(message)">
-                  导出 Markdown
+                <button
+                  type="button"
+                  title="导出 Markdown"
+                  aria-label="导出 Markdown"
+                  @click="exportMessageAsMarkdown(message)"
+                >
+                  <FileDown :size="15" :stroke-width="2" aria-hidden="true" />
+                  <span class="visually-hidden">导出 Markdown</span>
                 </button>
-                <button type="button" @click="exportMessageAsWordHtml(message)">
-                  导出 Word
+                <button
+                  type="button"
+                  title="导出 Word"
+                  aria-label="导出 Word"
+                  @click="exportMessageAsWordHtml(message)"
+                >
+                  <FileText :size="15" :stroke-width="2" aria-hidden="true" />
+                  <span class="visually-hidden">导出 Word</span>
                 </button>
               </div>
             </div>

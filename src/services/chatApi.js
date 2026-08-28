@@ -3,6 +3,7 @@ import {
   extractDataQueryChartOption,
   removeDataQueryChartPayload,
 } from '../utils/dataQueryChart.js'
+import { DIFY_EXECUTION_EVENTS } from '../utils/difyMessageState.js'
 
 function createChatAbortError() {
   const error = new Error('当前执行已停止。')
@@ -271,6 +272,28 @@ function getDifyConfig(options = {}) {
   return null
 }
 
+export async function stopChatMessage(taskId, options = {}) {
+  if (!taskId) return false
+
+  const difyConfig = getDifyConfig(options)
+  if (!difyConfig?.apiBase || !difyConfig?.apiKey) return false
+
+  const user = import.meta.env.VITE_DIFY_USER || 'huanbao-web-user'
+  const response = await fetch(
+    `${difyConfig.apiBase.replace(/\/$/, '')}/chat-messages/${encodeURIComponent(taskId)}/stop`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${difyConfig.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ user }),
+    },
+  )
+
+  return response.ok
+}
+
 async function sendMockMessage(question, options = {}) {
   await waitWithSignal(600, options.signal)
 
@@ -407,6 +430,7 @@ export async function streamChatMessage(question, options = {}) {
     let conversationId = options.conversationId || ''
     let messageId = ''
     let chartOption = null
+    let rawSources = []
     let lastAnswerEvent = null
 
     const getVisibleAnswer = (value) => {
@@ -421,23 +445,29 @@ export async function streamChatMessage(question, options = {}) {
       options.onChart?.(nextOption)
     }
 
+    const notifyDifyEvent = (data) => {
+      options.onDifyEvent?.(data)
+      if (DIFY_EXECUTION_EVENTS.includes(data.event)) {
+        options.onWorkflowEvent?.(data)
+      }
+    }
+
     const handleEvent = (eventData) => {
       if (!eventData || eventData === '[DONE]') return
 
-      const data = JSON.parse(eventData)
-
-      const isWorkflowEvent = [
-        'workflow_started',
-        'node_started',
-        'node_finished',
-        'workflow_finished',
-      ].includes(data.event)
-      if (options.modeKey === 'data-query' && isWorkflowEvent) {
-        options.onWorkflowEvent?.({ event: data.event, data: data.data || data })
+      let data
+      try {
+        data = JSON.parse(eventData)
+      } catch {
+        return
       }
 
+      if (!data?.event) return
+      options.onTask?.(data.task_id || data.data?.task_id || '')
+      notifyDifyEvent(data)
+
       if (data.event === 'message' || data.event === 'agent_message') {
-        const deltaText = data.answer || ''
+        const deltaText = data.answer || data.text || ''
         if (deltaText) {
           const isRepeatedAcrossEventTypes =
             lastAnswerEvent &&
@@ -448,6 +478,26 @@ export async function streamChatMessage(question, options = {}) {
             fullAnswerRaw = mergeStreamAnswer(fullAnswerRaw, deltaText)
           }
           lastAnswerEvent = { event: data.event, text: deltaText }
+          if (options.modeKey === 'data-query') updateChartOption(fullAnswerRaw)
+          options.onMessage?.(getVisibleAnswer(fullAnswerRaw), { replace: true })
+        }
+        return
+      }
+
+      if (data.event === 'message_replace' || data.event === 'text_replace') {
+        const replacement = data.answer || data.text || data.data?.answer || data.data?.text || ''
+        if (replacement) {
+          fullAnswerRaw = replacement
+          if (options.modeKey === 'data-query') updateChartOption(fullAnswerRaw)
+          options.onMessage?.(getVisibleAnswer(fullAnswerRaw), { replace: true })
+        }
+        return
+      }
+
+      if (data.event === 'text_chunk') {
+        const chunk = data.text || data.answer || data.data?.text || data.data?.answer || ''
+        if (chunk) {
+          fullAnswerRaw = mergeStreamAnswer(fullAnswerRaw, chunk)
           if (options.modeKey === 'data-query') updateChartOption(fullAnswerRaw)
           options.onMessage?.(getVisibleAnswer(fullAnswerRaw), { replace: true })
         }
@@ -480,14 +530,17 @@ export async function streamChatMessage(question, options = {}) {
       if (data.event === 'message_end') {
         conversationId = data.conversation_id || conversationId
         messageId = data.message_id || messageId
-        if (options.modeKey === 'data-query') {
-          options.onWorkflowEvent?.({ event: data.event, data })
-        }
+        rawSources =
+          data.metadata?.retriever_resources ||
+          data.data?.metadata?.retriever_resources ||
+          data.data?.retriever_resources ||
+          []
+        lastAnswerEvent = null
         return
       }
 
       if (data.event === 'error') {
-        throw new Error(data.message || 'Dify streaming error')
+        throw new Error(data.message || data.data?.message || data.error || 'Dify streaming error')
       }
     }
 
@@ -506,6 +559,7 @@ export async function streamChatMessage(question, options = {}) {
       })
     }
 
+    buffer += decoder.decode()
     buffer
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -522,7 +576,7 @@ export async function streamChatMessage(question, options = {}) {
         (chartOption ? '查询结果已整理如下。' : '当前未获取到有效回答，请稍后重试。'),
       conversationId,
       messageId,
-      sources: [],
+      sources: normalizeSources(rawSources),
       noHit: false,
       chartOption,
     }

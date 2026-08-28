@@ -35,18 +35,46 @@ function sanitizeMessageChartOption(message) {
   return createDataQueryChartOptionFromAnswer(sanitizeMessageContent(message))
 }
 
-function sanitizeWorkflowProcess(process) {
-  if (!process || !Array.isArray(process.steps)) return null
+function sanitizeExecutionProcess(process) {
+  if (!process) return null
+
+  const rawNodes = Array.isArray(process.nodes)
+    ? process.nodes
+    : Array.isArray(process.steps)
+      ? process.steps
+      : Array.isArray(process.tracing)
+        ? process.tracing
+        : []
+  const normalizeStatus = (status) => {
+    if (status === 'succeeded' || status === 'completed') return 'success'
+    if (status === 'cancelled' || status === 'canceled') return 'stopped'
+    return ['pending', 'waiting', 'running', 'retrying', 'success', 'failed', 'stopped', 'paused'].includes(status)
+      ? status
+      : 'success'
+  }
 
   return {
-    status: ['running', 'success', 'failed', 'cancelled'].includes(process.status) ? process.status : 'success',
+    status: normalizeStatus(process.status),
+    visible: process.visible !== false,
     expanded: process.expanded === true,
-    steps: process.steps.slice(0, 80).map((step, index) => ({
-      key: step.key || `workflow-step-${index}`,
-      title: step.title || '执行节点',
-      status: ['running', 'success', 'failed', 'cancelled'].includes(step.status) ? step.status : 'success',
-      elapsedTime: Number.isFinite(Number(step.elapsedTime)) ? Number(step.elapsedTime) : null,
+    userExpanded: false,
+    workflowRunId: process.workflowRunId || process.workflow_run_id || '',
+    currentNodeId: '',
+    startedAt: Number.isFinite(Number(process.startedAt)) ? Number(process.startedAt) : null,
+    finishedAt: Number.isFinite(Number(process.finishedAt)) ? Number(process.finishedAt) : null,
+    error: process.error || '',
+    nodes: rawNodes.slice(0, 80).map((node, index) => ({
+      key: node.key || node.node_id || node.id || `execution-node-${index}`,
+      title: node.title || node.node_title || node.nodeName || '执行节点',
+      nodeType: node.nodeType || node.node_type || '',
+      status: normalizeStatus(node.status),
+      startedAt: Number.isFinite(Number(node.startedAt)) ? Number(node.startedAt) : null,
+      finishedAt: Number.isFinite(Number(node.finishedAt)) ? Number(node.finishedAt) : null,
+      elapsedTime: Number.isFinite(Number(node.elapsedTime)) ? Number(node.elapsedTime) : null,
+      error: node.error || '',
+      retryCount: Number.isFinite(Number(node.retryCount)) ? Number(node.retryCount) : 0,
     })),
+    thoughts: [],
   }
 }
 
@@ -91,7 +119,15 @@ export function sanitizeMessages(messages = []) {
       if (message.loading || message.streaming) return false
       const content = sanitizeMessageContent(message)
       const chartOption = sanitizeMessageChartOption(message)
-      if (message.role === 'assistant' && !content && !message.workflowCard && !chartOption) return false
+      const executionProcess = message.executionProcess || message.workflowProcess
+      if (
+        message.role === 'assistant' &&
+        !content &&
+        !message.workflowCard &&
+        !chartOption &&
+        !executionProcess?.nodes?.length &&
+        !executionProcess?.steps?.length
+      ) return false
       return true
     })
     .map((message) => ({
@@ -101,7 +137,7 @@ export function sanitizeMessages(messages = []) {
       loading: false,
       messageType: message.messageType || '',
       modeKey: message.modeKey || '',
-      workflowProcess: sanitizeWorkflowProcess(message.workflowProcess),
+      executionProcess: sanitizeExecutionProcess(message.executionProcess || message.workflowProcess),
       followUps: Array.isArray(message.followUps) ? message.followUps.slice(0, 3) : [],
       dataExploration: message.dataExploration
         ? {

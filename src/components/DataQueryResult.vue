@@ -117,7 +117,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="data-query-result">
-    <div class="markdown-content data-query-answer" v-html="renderMarkdown(beforeTable)"></div>
+    <div class="markdown-body markdown-content data-query-answer" v-html="renderMarkdown(beforeTable)"></div>
 
     <section
       v-if="rankingTable"
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <div v-if="rankingTable" class="markdown-content data-query-answer" v-html="renderMarkdown(afterTable)"></div>
+    <div v-if="rankingTable" class="markdown-body markdown-content data-query-answer" v-html="renderMarkdown(afterTable)"></div>
     <DataQueryChart v-if="chartOption" :option="chartOption" />
   </div>
 </template>

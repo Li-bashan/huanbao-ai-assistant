@@ -1,6 +1,22 @@
-# Dify HTTP 节点查询人大金仓
+# Dify / AI Gateway 查询人大金仓接入说明
 
-链路：
+更新时间：2026-08-28
+
+> 重要：截至 2026-08-28，线上 `智慧办公—智能问数` 工作流还没有使用 Dify HTTP 节点，也没有调用仓库内的 AI Gateway。当前工作流通过 `rookie_text2data / rookie_excute_sql` 插件直接连接 KingbaseES。本文件下面的 HTTP 节点方案是目标接入方案，不代表当前线上链路。
+
+## 当前实际链路
+
+```text
+前端
+    ↓ POST /v1/chat-messages，streaming
+Dify 智能问数应用
+    ↓ rookie_text2data / rookie_excute_sql
+KingbaseES
+```
+
+当前应用和工作流详见[《Dify 智能问数工作流现状》](./Dify智能问数工作流现状.md)。
+
+## 计划中的 Gateway 链路
 
 ```text
 Dify HTTP 请求节点
@@ -45,7 +61,9 @@ java -jar target/ai-gateway-0.1.0.jar
 `ai_action_audit`，因此应确保该表已创建，并为查询账号授权。智能问数白名单表
 `ai_data_query_user` 的建表 SQL 位于 `docs/sql/ai_data_query_user.sql`。
 
-## 3. Dify HTTP 请求节点
+## 3. Dify HTTP 请求节点（目标方案，当前未启用）
+
+以下配置用于后续把数据库访问迁移到 AI Gateway；当前线上工作流不会读取这些 HTTP 节点示例中的 `userName` 或 `queryCode`。
 
 - 方法：`POST`
 - URL：`http://AI_GATEWAY地址:8088/api/ai/data/query`
