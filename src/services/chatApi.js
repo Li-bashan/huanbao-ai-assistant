@@ -1,3 +1,35 @@
+import {
+  createDataQueryChartOptionFromAnswer,
+  extractDataQueryChartOption,
+  removeDataQueryChartPayload,
+} from '../utils/dataQueryChart.js'
+
+function createChatAbortError() {
+  const error = new Error('当前执行已停止。')
+  error.name = 'AbortError'
+  error.code = 'CHAT_CANCELLED'
+  return error
+}
+
+function waitWithSignal(milliseconds, signal) {
+  if (signal?.aborted) return Promise.reject(createChatAbortError())
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', handleAbort)
+      resolve()
+    }, milliseconds)
+
+    const handleAbort = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', handleAbort)
+      reject(createChatAbortError())
+    }
+
+    signal?.addEventListener('abort', handleAbort, { once: true })
+  })
+}
+
 function normalizeSources(resources = []) {
   if (!Array.isArray(resources)) return []
 
@@ -136,6 +168,79 @@ function isOfficeMode(modeKey) {
   return ['office', 'office-ai', 'general'].includes(modeKey)
 }
 
+function mergeStreamAnswer(current = '', incoming = '') {
+  const previous = String(current || '')
+  const next = String(incoming || '')
+  if (!next) return previous
+  if (!previous) return next
+
+  // Dify 不同应用可能发送增量文本，也可能发送截至当前的累计文本。
+  if (next.length > previous.length && next.startsWith(previous)) return next
+  if (previous.length > next.length && previous.startsWith(next)) return previous
+
+  return `${previous}${next}`
+}
+
+function getErrorMessage(status, fallback = '当前服务暂时不可用，请稍后重试。') {
+  if (status === 401) return '智能问数服务认证失败，请联系管理员检查配置。'
+  if (status === 403) return '智能问数服务暂时无法完成请求，请稍后重试。'
+  if (status === 404) return '智能问数服务接口暂不可用，请联系管理员。'
+  if (status >= 500) return '智能问数服务暂时不可用，请稍后重试。'
+  return fallback
+}
+
+const RETRYABLE_DIFY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+
+async function fetchDifyWithRetry(url, init, signal, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(url, init)
+      if (!RETRYABLE_DIFY_STATUS.has(response.status) || attempt === retries) {
+        return response
+      }
+
+      await response.body?.cancel().catch(() => {})
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError' || attempt === retries) {
+        throw error
+      }
+    }
+
+    await waitWithSignal(250 * 2 ** attempt, signal)
+  }
+
+  throw new Error('Dify 请求失败。')
+}
+
+function getWorkflowAnswer(data) {
+  const outputs = data?.data?.outputs || data?.outputs || {}
+  const answer = outputs.answer || outputs.text || outputs.result || outputs.response || outputs.output
+
+  if (typeof answer === 'string' && answer.trim()) return answer.trim()
+  if (answer !== undefined && answer !== null) return JSON.stringify(answer, null, 2)
+
+  const fallback = data?.answer || data?.data?.answer
+  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim()
+  return ''
+}
+
+function findWorkflowErrorCode(value, depth = 0) {
+  if (depth > 5 || value === null || value === undefined) return ''
+  if (typeof value === 'string') {
+    return value.includes('DATA_QUERY_NOT_COVERED') ? 'DATA_QUERY_NOT_COVERED' : ''
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => findWorkflowErrorCode(item, depth + 1)).find(Boolean) || ''
+  }
+  if (typeof value === 'object') {
+    if (value.code === 'DATA_QUERY_NOT_COVERED') return value.code
+    return Object.values(value)
+      .map((item) => findWorkflowErrorCode(item, depth + 1))
+      .find(Boolean) || ''
+  }
+  return ''
+}
+
 function getDifyConfig(options = {}) {
   const modeKey = options.modeKey || 'policy'
 
@@ -144,6 +249,14 @@ function getDifyConfig(options = {}) {
       apiBase: import.meta.env.VITE_POLICY_DIFY_API_BASE || import.meta.env.VITE_DIFY_API_BASE,
       apiKey: import.meta.env.VITE_POLICY_DIFY_API_KEY || import.meta.env.VITE_DIFY_API_KEY,
       modeName: '制度问答',
+    }
+  }
+
+  if (modeKey === 'data-query') {
+    return {
+      apiBase: import.meta.env.VITE_DATA_QUERY_DIFY_API_BASE,
+      apiKey: import.meta.env.VITE_DATA_QUERY_DIFY_API_KEY,
+      modeName: '智能问数',
     }
   }
 
@@ -159,7 +272,7 @@ function getDifyConfig(options = {}) {
 }
 
 async function sendMockMessage(question, options = {}) {
-  await new Promise((resolve) => setTimeout(resolve, 600))
+  await waitWithSignal(600, options.signal)
 
   const mockAnswer =
     options.modeKey === 'workflow'
@@ -197,8 +310,9 @@ export async function sendChatMessage(question, options = {}) {
     throw new Error(`${modeName} Dify API 配置缺失，请检查 .env.local`)
   }
 
-  const response = await fetch(`${apiBase.replace(/\/$/, '')}/chat-messages`, {
+  const response = await fetchDifyWithRetry(`${apiBase.replace(/\/$/, '')}/chat-messages`, {
     method: 'POST',
+    signal: options.signal,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -210,11 +324,11 @@ export async function sendChatMessage(question, options = {}) {
       conversation_id: options.conversationId || '',
       user,
     }),
-  })
+  }, options.signal)
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
-    throw new Error(`Dify 请求失败：${response.status} ${errorText}`)
+    throw new Error(getErrorMessage(response.status, `Dify 请求失败：${response.status} ${errorText}`))
   }
 
   const data = await response.json()
@@ -260,12 +374,16 @@ export async function streamChatMessage(question, options = {}) {
   try {
     const response = await fetch(`${apiBase.replace(/\/$/, '')}/chat-messages`, {
       method: 'POST',
+      signal: options.signal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        inputs: {},
+        inputs:
+          options.modeKey === 'data-query'
+            ? { current_user_name: options.currentUserName || '' }
+            : {},
         query: question,
         response_mode: 'streaming',
         conversation_id: options.conversationId || '',
@@ -288,24 +406,83 @@ export async function streamChatMessage(question, options = {}) {
     let fullAnswerRaw = ''
     let conversationId = options.conversationId || ''
     let messageId = ''
+    let chartOption = null
+    let lastAnswerEvent = null
+
+    const getVisibleAnswer = (value) => {
+      const answer = removeThinkContent(value)
+      return options.modeKey === 'data-query' ? removeDataQueryChartPayload(answer) : answer
+    }
+
+    const updateChartOption = (value) => {
+      const nextOption = extractDataQueryChartOption(value)
+      if (!nextOption) return
+      chartOption = nextOption
+      options.onChart?.(nextOption)
+    }
 
     const handleEvent = (eventData) => {
       if (!eventData || eventData === '[DONE]') return
 
       const data = JSON.parse(eventData)
 
+      const isWorkflowEvent = [
+        'workflow_started',
+        'node_started',
+        'node_finished',
+        'workflow_finished',
+      ].includes(data.event)
+      if (options.modeKey === 'data-query' && isWorkflowEvent) {
+        options.onWorkflowEvent?.({ event: data.event, data: data.data || data })
+      }
+
       if (data.event === 'message' || data.event === 'agent_message') {
         const deltaText = data.answer || ''
         if (deltaText) {
-          fullAnswerRaw += deltaText
-          options.onMessage?.(removeThinkContent(fullAnswerRaw), { replace: true })
+          const isRepeatedAcrossEventTypes =
+            lastAnswerEvent &&
+            lastAnswerEvent.event !== data.event &&
+            lastAnswerEvent.text === deltaText
+
+          if (!isRepeatedAcrossEventTypes) {
+            fullAnswerRaw = mergeStreamAnswer(fullAnswerRaw, deltaText)
+          }
+          lastAnswerEvent = { event: data.event, text: deltaText }
+          if (options.modeKey === 'data-query') updateChartOption(fullAnswerRaw)
+          options.onMessage?.(getVisibleAnswer(fullAnswerRaw), { replace: true })
         }
         return
+      }
+
+      if (options.modeKey === 'data-query') {
+        if (data.event === 'workflow_started') {
+          options.onStatus?.('已连接智能问数服务，正在解析查询条件...')
+          return
+        }
+
+        if (data.event === 'node_started') {
+          options.onStatus?.('正在处理生产指标查询...')
+          return
+        }
+
+        if (data.event === 'node_finished') {
+          options.onStatus?.('查询步骤已完成，正在继续汇总...')
+          return
+        }
+
+        if (data.event === 'workflow_finished') {
+          updateChartOption(data.data?.outputs || data.outputs)
+          options.onStatus?.('正在整理查询结果...')
+          return
+        }
       }
 
       if (data.event === 'message_end') {
         conversationId = data.conversation_id || conversationId
         messageId = data.message_id || messageId
+        if (options.modeKey === 'data-query') {
+          options.onWorkflowEvent?.({ event: data.event, data })
+        }
         return
       }
 
@@ -337,12 +514,17 @@ export async function streamChatMessage(question, options = {}) {
         handleEvent(line.replace(/^data:\s*/, ''))
       })
 
+    if (options.modeKey === 'data-query') updateChartOption(fullAnswerRaw)
+
     const result = {
-      answer: removeThinkContent(fullAnswerRaw) || '当前未获取到有效回答，请稍后重试。',
+      answer:
+        getVisibleAnswer(fullAnswerRaw) ||
+        (chartOption ? '查询结果已整理如下。' : '当前未获取到有效回答，请稍后重试。'),
       conversationId,
       messageId,
       sources: [],
       noHit: false,
+      chartOption,
     }
 
     options.onComplete?.(result)
@@ -350,5 +532,82 @@ export async function streamChatMessage(question, options = {}) {
   } catch (error) {
     options.onError?.(error)
     throw error
+  }
+}
+
+export async function runDataQueryWorkflow(question, options = {}) {
+  if (import.meta.env.VITE_USE_DIFY !== 'true') {
+    throw new Error('智能问数服务未启用。')
+  }
+
+  const apiBase = import.meta.env.VITE_DATA_QUERY_DIFY_API_BASE
+  const apiKey = import.meta.env.VITE_DATA_QUERY_DIFY_API_KEY
+  const user = import.meta.env.VITE_DIFY_USER || 'huanbao-web-user'
+
+  if (!apiBase || !apiKey) {
+    throw new Error('智能问数 Dify API 配置缺失，请联系管理员检查配置。')
+  }
+
+  let response
+  try {
+    response = await fetch(`${apiBase.replace(/\/$/, '')}/chat-messages`, {
+      method: 'POST',
+      signal: options.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {
+          current_user_name: options.currentUserName || '',
+        },
+        query: question,
+        response_mode: 'blocking',
+        conversation_id: options.conversationId || '',
+        user,
+      }),
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError' || error?.code === 'CHAT_CANCELLED') throw error
+    throw new Error('网络连接失败，请稍后重试。')
+  }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status))
+  }
+
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    throw new Error('智能问数返回格式异常，请稍后重试。')
+  }
+
+  const workflowErrorCode = findWorkflowErrorCode(data)
+  if (workflowErrorCode === 'DATA_QUERY_NOT_COVERED') {
+    const error = new Error('您所在部门暂不支持生产指标智能问数，如有业务需要，请联系管理员申请。')
+    error.code = workflowErrorCode
+    throw error
+  }
+
+  if (data?.status === 'failed' || data?.data?.status === 'failed') {
+    throw new Error('智能问数应用执行失败，请稍后重试。')
+  }
+
+  const rawAnswer = getWorkflowAnswer(data)
+  const answer = removeDataQueryChartPayload(rawAnswer)
+  const chartOption = extractDataQueryChartOption(data) || createDataQueryChartOptionFromAnswer(rawAnswer)
+  if (!answer && !chartOption) {
+    throw new Error('本次未查询到有效结果，请换一种生产指标或时间范围试试。')
+  }
+
+  return {
+    answer: answer || '查询结果已整理如下。',
+    conversationId: data?.conversation_id || options.conversationId || '',
+    messageId: data?.message_id || data?.task_id || data?.workflow_run_id || '',
+    sources: [],
+    noHit: false,
+    chartOption,
+    data: data?.data?.outputs || data?.outputs || null,
   }
 }

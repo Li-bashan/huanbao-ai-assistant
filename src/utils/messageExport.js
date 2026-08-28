@@ -89,9 +89,13 @@ export function getPlainMessageText(message, modeLabel = '') {
 }
 
 export async function copyText(text) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text)
-    return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return
+    }
+  } catch {
+    // Embedded portal frames may expose the API but reject its permission request.
   }
 
   const textarea = document.createElement('textarea')
@@ -101,8 +105,11 @@ export async function copyText(text) {
   textarea.style.opacity = '0'
   document.body.appendChild(textarea)
   textarea.select()
-  document.execCommand('copy')
-  textarea.remove()
+  try {
+    if (!document.execCommand('copy')) throw new Error('copy-failed')
+  } finally {
+    textarea.remove()
+  }
 }
 
 export function exportMarkdown(message, modeLabel, conversationTitle) {

@@ -10,9 +10,34 @@ const USER_FIELD_KEYS = [
   'tenantName',
 ]
 
+const USER_REQUEST_MESSAGE_TYPE = 'IGIX_AI_USER_REQUEST'
+const USER_RESPONSE_MESSAGE_TYPE = 'IGIX_AI_USER_RESPONSE'
+const USER_REQUEST_TIMEOUT_MS = 1800
+
 function normalizeText(value) {
   const text = String(value || '').trim()
   return text || ''
+}
+
+function resolveParentOrigin() {
+  const configuredOrigin = normalizeText(import.meta.env?.VITE_IGIX_PORTAL_ORIGIN)
+
+  if (configuredOrigin) return configuredOrigin.replace(/\/$/, '')
+
+  if (document.referrer) {
+    try {
+      return new URL(document.referrer).origin
+    } catch {
+      // Fall through to the known iGIX platform origin.
+    }
+  }
+
+  return 'http://172.17.3.34:5300'
+}
+
+function createRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `igix-user-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 export function normalizeIgixUser(rawUser) {
@@ -74,13 +99,75 @@ function findUserInfosService() {
   return null
 }
 
-export async function getIgixCurrentUser() {
+function requestUserFromParent() {
+  let parentWindow = null
+
+  try {
+    if (window.parent && window.parent !== window) {
+      parentWindow = window.parent
+    }
+  } catch {
+    return Promise.resolve(null)
+  }
+
+  if (!parentWindow) return Promise.resolve(null)
+
+  const parentOrigin = resolveParentOrigin()
+  const requestId = createRequestId()
+
+  return new Promise((resolve) => {
+    let settled = false
+
+    const finish = (userInfo) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeoutId)
+      window.removeEventListener('message', handleMessage)
+      resolve(userInfo)
+    }
+
+    const handleMessage = (event) => {
+      if (event.source !== parentWindow || event.origin !== parentOrigin) return
+
+      const data = event.data
+      if (
+        !data ||
+        data.type !== USER_RESPONSE_MESSAGE_TYPE ||
+        data.requestId !== requestId
+      ) {
+        return
+      }
+
+      finish(normalizeIgixUser(data.userInfo))
+    }
+
+    const timeoutId = window.setTimeout(() => finish(null), USER_REQUEST_TIMEOUT_MS)
+    window.addEventListener('message', handleMessage)
+
+    try {
+      parentWindow.postMessage(
+        {
+          type: USER_REQUEST_MESSAGE_TYPE,
+          requestId,
+        },
+        parentOrigin,
+      )
+    } catch (error) {
+      if (import.meta.env?.DEV) {
+        console.warn('IGIX CURRENT USER BRIDGE UNAVAILABLE', error)
+      }
+      finish(null)
+    }
+  })
+}
+
+async function getIgixCurrentUserDirect() {
   try {
     const userService = findUserInfosService()
 
     if (!userService) {
       if (import.meta.env?.DEV) {
-        console.info('IGIX CURRENT USER SERVICE NOT FOUND')
+        console.info('IGIX CURRENT USER SERVICE NOT FOUND; trying parent postMessage bridge')
       }
 
       return null
@@ -104,4 +191,28 @@ export async function getIgixCurrentUser() {
 
     return null
   }
+}
+
+export async function getIgixCurrentUser() {
+  const directUser = await getIgixCurrentUserDirect()
+  if (directUser) return directUser
+
+  const bridgedUser = await requestUserFromParent()
+
+  if (bridgedUser) {
+    if (import.meta.env?.DEV) {
+      console.info('IGIX CURRENT USER', {
+        scope: 'parent-postMessage',
+        userInfo: bridgedUser,
+      })
+    }
+
+    return bridgedUser
+  }
+
+  if (import.meta.env?.DEV) {
+    console.info('IGIX CURRENT USER UNAVAILABLE: direct service and parent bridge both failed')
+  }
+
+  return null
 }

@@ -22,6 +22,8 @@ AI Gateway 是 `huanbao-ai-assistant` 前端与 Dify、审计日志之间的后�
 - 不改变前端 `postMessage` 协议。
 - 不在前端暴露 Dify API Key。
 
+智能问数人员白名单接口和试点边界见[智能问数人员开放范围说明](./智能问数人员开放范围说明.md)。
+
 ## 统一返回结构
 
 ```json

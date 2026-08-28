@@ -6,10 +6,12 @@
 
 ## Dify 在项目中的作用
 
-Dify 提供两个智能能力：
+Dify 提供三类智能能力，产品层共展示四项能力（流程助手由前端规则和 iGIX 动作卡片实现）：
 
 - 制度问答知识库。
 - 办公智能 Agent。
+
+- 智能问数独立 Dify 问数应用，仅查询生产指标数据。
 
 流程助手当前不调用 Dify。
 
@@ -31,6 +33,15 @@ Dify 提供两个智能能力：
 - 环境变量：
   - `VITE_OFFICE_DIFY_API_BASE`
   - `VITE_OFFICE_DIFY_API_KEY`
+
+## 智能问数接口
+
+- 模式：`data-query`
+- 方法：当前代码使用 `POST /chat-messages`。
+- `response_mode`：`streaming`。
+- 环境变量：`VITE_DATA_QUERY_DIFY_API_BASE`、`VITE_DATA_QUERY_DIFY_API_KEY`。
+- 请求输入：`query` 为用户问题，`inputs.current_user_name` 为 iGIX 当前登录人姓名，供 Dify HTTP 节点透传到 Gateway。
+- 返回处理：优先读取 `data.outputs.answer/text/result/response/output`；空结果和 workflow failed 统一提示，不在前端生成业务数据。
 
 ## blocking 请求格式
 
@@ -108,3 +119,4 @@ Dify 提供两个智能能力：
 - 不要写真实 API Key。
 - `.env.local` 不提交。
 - 生产建议走后端代理隐藏 Key。
+- 智能问数人员开放范围见[智能问数人员开放范围说明](./智能问数人员开放范围说明.md)，Dify HTTP 节点必须把 `current_user_name` 放进 Gateway 请求体 `userName`。

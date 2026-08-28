@@ -19,12 +19,18 @@ public class DifyDataQueryService {
     private static final int MAX_DAYS = 366;
 
     private final DifyDataQueryRepository repository;
+    private final DataQueryAccessService accessService;
 
-    public DifyDataQueryService(DifyDataQueryRepository repository) {
+    public DifyDataQueryService(
+        DifyDataQueryRepository repository,
+        DataQueryAccessService accessService
+    ) {
         this.repository = repository;
+        this.accessService = accessService;
     }
 
     public DifyDataQueryResponse query(DifyDataQueryRequest request) {
+        accessService.requireCovered(request.userName());
         List<Map<String, Object>> records = switch (request.queryCode()) {
             case "action_audit_recent" -> recent(request.safeParams());
             case "action_audit_summary" -> summary(request.safeParams());

@@ -1,3 +1,9 @@
+import {
+  createDataQueryChartOptionFromAnswer,
+  extractDataQueryChartOption,
+  removeDataQueryChartPayload,
+} from './dataQueryChart.js'
+
 const CURRENT_CONVERSATION_KEY = 'huanbao_current_conversation'
 const CONVERSATION_HISTORY_KEY = 'huanbao_conversation_history'
 const MAX_HISTORY_COUNT = 50
@@ -13,6 +19,35 @@ function readJson(key, fallback) {
 
 function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
+}
+
+function sanitizeMessageContent(message) {
+  if (message?.modeKey !== 'data-query') return message?.content
+  return removeDataQueryChartPayload(message?.content)
+}
+
+function sanitizeMessageChartOption(message) {
+  const chartOption = message?.chartOption
+    ? extractDataQueryChartOption(message.chartOption)
+    : null
+  if (chartOption) return chartOption
+  if (message?.modeKey !== 'data-query') return null
+  return createDataQueryChartOptionFromAnswer(sanitizeMessageContent(message))
+}
+
+function sanitizeWorkflowProcess(process) {
+  if (!process || !Array.isArray(process.steps)) return null
+
+  return {
+    status: ['running', 'success', 'failed', 'cancelled'].includes(process.status) ? process.status : 'success',
+    expanded: process.expanded === true,
+    steps: process.steps.slice(0, 80).map((step, index) => ({
+      key: step.key || `workflow-step-${index}`,
+      title: step.title || '执行节点',
+      status: ['running', 'success', 'failed', 'cancelled'].includes(step.status) ? step.status : 'success',
+      elapsedTime: Number.isFinite(Number(step.elapsedTime)) ? Number(step.elapsedTime) : null,
+    })),
+  }
 }
 
 export function createConversationId() {
@@ -38,6 +73,12 @@ function normalizeConversation(conversation) {
     title: conversation.title || createConversationTitle(messages),
     modeKey: conversation.modeKey || 'policy',
     conversationId: conversation.conversationId || '',
+    conversationIds:
+      conversation.conversationIds && typeof conversation.conversationIds === 'object'
+        ? conversation.conversationIds
+        : conversation.conversationId
+          ? { [conversation.modeKey || 'policy']: conversation.conversationId }
+          : {},
     messages,
     createdAt: conversation.createdAt || timestamp,
     updatedAt: timestamp,
@@ -45,17 +86,37 @@ function normalizeConversation(conversation) {
 }
 
 export function sanitizeMessages(messages = []) {
-  return messages
+  const sanitizedMessages = messages
     .filter((message) => {
       if (message.loading || message.streaming) return false
-      if (message.role === 'assistant' && !message.content && !message.workflowCard) return false
+      const content = sanitizeMessageContent(message)
+      const chartOption = sanitizeMessageChartOption(message)
+      if (message.role === 'assistant' && !content && !message.workflowCard && !chartOption) return false
       return true
     })
     .map((message) => ({
       id: message.id,
       role: message.role,
-      content: message.content,
+      content: sanitizeMessageContent(message),
       loading: false,
+      messageType: message.messageType || '',
+      modeKey: message.modeKey || '',
+      workflowProcess: sanitizeWorkflowProcess(message.workflowProcess),
+      followUps: Array.isArray(message.followUps) ? message.followUps.slice(0, 3) : [],
+      dataExploration: message.dataExploration
+        ? {
+            type: message.dataExploration.type || '',
+            title: message.dataExploration.title || '',
+            items: Array.isArray(message.dataExploration.items)
+              ? message.dataExploration.items.slice(0, 20).map((item) =>
+                  typeof item === 'string'
+                    ? item
+                    : { id: item.id || '', name: item.name || '' },
+                )
+              : [],
+          }
+        : null,
+      chartOption: sanitizeMessageChartOption(message),
       messageId: message.messageId || '',
       expandedSourceId: '',
       workflowCard: message.workflowCard
@@ -81,6 +142,16 @@ export function sanitizeMessages(messages = []) {
           }))
         : [],
     }))
+
+  return sanitizedMessages.filter((message, index) => {
+    const previousMessage = sanitizedMessages[index - 1]
+    return !(
+      message.role === 'user' &&
+      previousMessage?.role === 'user' &&
+      message.modeKey === previousMessage.modeKey &&
+      message.content?.trim() === previousMessage.content?.trim()
+    )
+  })
 }
 
 export function getCurrentConversation() {

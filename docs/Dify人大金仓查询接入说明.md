@@ -42,7 +42,8 @@ java -jar target/ai-gateway-0.1.0.jar
 ```
 
 数据库账号建议只授予所需表或视图的 `SELECT` 权限。当前示例查询读取
-`ai_action_audit`，因此应确保该表已创建，并为查询账号授权。
+`ai_action_audit`，因此应确保该表已创建，并为查询账号授权。智能问数白名单表
+`ai_data_query_user` 的建表 SQL 位于 `docs/sql/ai_data_query_user.sql`。
 
 ## 3. Dify HTTP 请求节点
 
@@ -56,6 +57,7 @@ java -jar target/ai-gateway-0.1.0.jar
 
 ```json
 {
+  "userName": "{{ current_user_name }}",
   "queryCode": "action_audit_recent",
   "params": {
     "userId": "{{#start.user_id#}}",
@@ -69,6 +71,7 @@ java -jar target/ai-gateway-0.1.0.jar
 
 ```json
 {
+  "userName": "{{ current_user_name }}",
   "queryCode": "action_audit_summary",
   "params": {
     "days": 7
@@ -101,6 +104,10 @@ java -jar target/ai-gateway-0.1.0.jar
 
 Dify 后续节点可读取 `body.data.records`。不同 Dify 版本的 HTTP 节点输出
 变量名可能略有差异，以节点调试面板显示的结构为准。
+
+`userName` 是前端传入的 `current_user_name`，仅用于本次试点白名单匹配。Gateway
+在执行任何固定查询前会再次校验该姓名：缺少时返回 `CURRENT_USER_MISSING`，不在
+启用名单时返回 `DATA_QUERY_NOT_COVERED`。前端状态不能绕过这一层校验。
 
 ## 4. 接真实业务查询
 
