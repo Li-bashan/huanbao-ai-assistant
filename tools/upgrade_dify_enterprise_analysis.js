@@ -350,7 +350,8 @@ def _indicator_inputs(intent, previous, question, analysis_type):
     for value in values:
         value = re.sub(r"^(?:请|帮我|查询|查看|统计|分析|比较|对比|了解|算一下)+", "", value)
         value = re.sub(r"^(?:今年|本年|去年|上年|本月|上月|本季度|近\d+个?月|近\d+天|近\d+年)+", "", value)
-        value = re.sub(r"(?:各|每|所有)?(?:项目公司|各公司|每家公司|所有公司)$", "", value)
+        value = re.sub(r"(?:各|每|所有)?项目公司", "", value)
+        value = re.sub(r"(?:各公司|每家公司|所有公司)$", "", value)
         value = re.sub(r"^(?:组织\s*[A-Za-z0-9_-]+|公司\s*[A-Za-z0-9_-]+)的", "", value)
         value = _text(value)
         if value and value not in ("项目公司", "各公司", "每家公司", "所有公司"):
