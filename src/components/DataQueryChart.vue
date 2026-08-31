@@ -27,6 +27,7 @@ import {
 import { CanvasRenderer } from 'echarts/renderers'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { adaptDataQueryChartOption } from '../utils/dataQueryChart.js'
+import { createIgixAssistantWindow } from '../utils/igixAssistantWindow.js'
 
 use([
   BarChart,
@@ -53,6 +54,7 @@ use([
 
 const props = defineProps({
   option: { type: Object, required: true },
+  windowView: { type: String, default: 'compact' },
 })
 
 const chartRef = ref(null)
@@ -60,10 +62,14 @@ const chartCardRef = ref(null)
 const isLocallyMaximized = ref(false)
 const isNativeFullscreen = ref(false)
 const isMaximized = computed(() => isLocallyMaximized.value || isNativeFullscreen.value)
+const isCompactWindow = computed(() => props.windowView === 'compact')
+const isExpandingWindow = ref(false)
 const actionMessage = ref('')
 let chartInstance = null
 let resizeObserver = null
 let actionMessageTimer = null
+let assistantWindow = null
+let expandWindowTimer = null
 
 const getChartOption = () => adaptDataQueryChartOption(props.option) || props.option
 
@@ -210,7 +216,20 @@ const renderChart = async () => {
 
 const resizeChart = () => chartInstance?.resize()
 
+const expandWindowForChart = () => {
+  if (!isCompactWindow.value || isExpandingWindow.value) return
+
+  isExpandingWindow.value = true
+  assistantWindow?.wide()
+  showActionMessage('正在展开中窗查看图表')
+  window.clearTimeout(expandWindowTimer)
+  expandWindowTimer = window.setTimeout(() => {
+    isExpandingWindow.value = false
+  }, 1200)
+}
+
 onMounted(() => {
+  assistantWindow = createIgixAssistantWindow()
   renderChart()
   document.addEventListener('fullscreenchange', syncFullscreenState)
   if (typeof ResizeObserver !== 'undefined') {
@@ -222,12 +241,21 @@ onMounted(() => {
 })
 
 watch(() => props.option, renderChart, { deep: true })
+watch(
+  () => props.windowView,
+  () => {
+    nextTick(resizeChart)
+  },
+)
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState)
   window.clearTimeout(actionMessageTimer)
+  window.clearTimeout(expandWindowTimer)
   resizeObserver?.disconnect()
   window.removeEventListener('resize', resizeChart)
+  assistantWindow?.destroy()
+  assistantWindow = null
   chartInstance?.dispose()
   chartInstance = null
 })
@@ -243,6 +271,18 @@ onBeforeUnmount(() => {
     <div class="data-query-chart-header">
       <div class="data-query-chart-label">ECHARTS</div>
       <div class="data-query-chart-toolbar" aria-label="图表操作">
+        <button
+          v-if="isCompactWindow && !isMaximized"
+          type="button"
+          class="data-query-chart-expand-button"
+          :disabled="isExpandingWindow"
+          title="展开中窗查看图表"
+          aria-label="展开中窗查看图表"
+          @click.stop="expandWindowForChart"
+        >
+          <Maximize2 :size="14" />
+          <span>{{ isExpandingWindow ? '展开中' : '展开大图' }}</span>
+        </button>
         <button type="button" title="复制图表" aria-label="复制图表" @click.stop="copyChart">
           <Check v-if="actionMessage === '图表已复制'" :size="15" />
           <Copy v-else :size="15" />

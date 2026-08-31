@@ -7,7 +7,8 @@ export const DATA_QUERY_ALLOWED_USER_NAMES = [
   '仇亿伦',
   '李金钟',
   '王邯宝',
-  '系统管理员'
+  '系统管理员',
+  '迟全虎'
 ]
 
 export function isDataQueryUserAllowed(userName) {

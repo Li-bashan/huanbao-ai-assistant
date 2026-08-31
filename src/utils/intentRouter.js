@@ -87,20 +87,38 @@ export function detectIntentWithMode(text = '', options = {}) {
   const policyMatches = matchKeywords(content, policyKeywords)
 
   if (workflowActionMatches.length) {
-    return { modeKey: 'workflow', confidence: 0.92, reason: `命中流程办理动作：${workflowActionMatches.join('、')}` }
+    return {
+      modeKey: 'workflow',
+      modeKeys: ['workflow'],
+      confidence: 0.92,
+      reason: `命中流程办理动作：${workflowActionMatches.join('、')}`,
+    }
   }
 
   if (officeMatches.length) {
-    return { modeKey: 'office-ai', confidence: 0.9, reason: `命中办公材料处理意图：${officeMatches.join('、')}` }
+    const modeKeys = ['office-ai']
+    if (dataMatches.length) modeKeys.unshift('data-query')
+    return {
+      modeKey: 'office-ai',
+      modeKeys,
+      confidence: 0.9,
+      reason: `命中办公材料处理意图：${officeMatches.join('、')}`,
+    }
   }
 
   if (dataMatches.length) {
-    return { modeKey: 'data-query', confidence: 0.9, reason: `命中生产指标问数意图：${dataMatches.join('、')}` }
+    return {
+      modeKey: 'data-query',
+      modeKeys: ['data-query'],
+      confidence: 0.9,
+      reason: `命中生产指标问数意图：${dataMatches.join('、')}`,
+    }
   }
 
   if (policyMatches.length) {
     return {
       modeKey: 'policy',
+      modeKeys: ['policy'],
       confidence: Math.min(0.92, 0.66 + policyMatches.length * 0.1),
       reason: `命中制度咨询关键词：${policyMatches.join('、')}`,
     }
@@ -108,10 +126,20 @@ export function detectIntentWithMode(text = '', options = {}) {
 
   // 没有明确跨域意图时继承当前模块，承接“那上个月呢”“详细一点”等上下文追问。
   if (currentModeKey === 'data-query') {
-    return { modeKey: '', confidence: 0.7, reason: '当前为智能问数，保持生产指标上下文' }
+    return {
+      modeKey: '',
+      modeKeys: ['data-query'],
+      confidence: 0.7,
+      reason: '当前为智能问数，保持生产指标上下文',
+    }
   }
   if (currentModeKey === 'workflow') {
-    return { modeKey: '', confidence: 0.1, reason: '当前为流程助手，但未命中明确流程动作' }
+    return {
+      modeKey: '',
+      modeKeys: ['workflow'],
+      confidence: 0.1,
+      reason: '当前为流程助手，但未命中明确流程动作',
+    }
   }
-  return { modeKey: '', confidence: 0, reason: '未命中明确意图关键词' }
+  return { modeKey: '', modeKeys: [], confidence: 0, reason: '未命中明确意图关键词' }
 }

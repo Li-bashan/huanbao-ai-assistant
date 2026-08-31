@@ -13,6 +13,7 @@ import { copyText } from '../utils/messageExport.js'
 const props = defineProps({
   answer: { type: String, default: '' },
   chartOption: { type: Object, default: null },
+  windowView: { type: String, default: 'compact' },
 })
 
 const tableCardRef = ref(null)
@@ -167,6 +168,6 @@ onBeforeUnmount(() => {
     </section>
 
     <div v-if="rankingTable" class="markdown-body markdown-content data-query-answer" v-html="renderMarkdown(afterTable)"></div>
-    <DataQueryChart v-if="chartOption" :option="chartOption" />
+    <DataQueryChart v-if="chartOption" :option="chartOption" :window-view="windowView" />
   </div>
 </template>

@@ -10,6 +10,7 @@ import {
   MessageSquarePlus,
   Minimize2,
   PanelRightClose,
+  PenLine,
   RefreshCw,
   Square,
   X,
@@ -27,7 +28,9 @@ import CapabilitySelector from './components/CapabilitySelector.vue'
 import AssistantExecution from './components/AssistantExecution.vue'
 import DataQueryHome from './components/DataQueryHome.vue'
 import DataQueryUserAdmin from './components/DataQueryUserAdmin.vue'
-import { sendChatMessage, stopChatMessage, streamChatMessage } from './services/chatApi'
+import PromptStarters from './components/PromptStarters.vue'
+import WorkflowActionCard from './components/WorkflowActionCard.vue'
+import { sendMasterChatMessage, stopChatMessage } from './services/chatApi'
 import { checkDataQueryAccess } from './services/dataQueryAccessApi'
 import {
   clearCurrentConversation,
@@ -67,10 +70,10 @@ import {
 const DataQueryResult = defineAsyncComponent(() => import('./components/DataQueryResult.vue'))
 
 const MODE_STORAGE_KEY = 'huanbao_current_mode'
+const MODE_LOCK_STORAGE_KEY = 'huanbao_mode_locked'
 const isDataQueryAdminPage =
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).get('page') === 'data-query-users'
-const capabilityClassNames = ['capability-blue', 'capability-green', 'capability-purple', 'capability-orange']
 const normalizeModeKey = (modeKey) =>
   modeKey === 'office' || modeKey === 'general' ? 'office-ai' : modeKey
 
@@ -86,6 +89,14 @@ const getStoredModeKey = () => {
   }
 }
 
+const getStoredModeLock = () => {
+  try {
+    return localStorage.getItem(MODE_LOCK_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 const saveModeKey = (modeKey) => {
   try {
     localStorage.setItem(MODE_STORAGE_KEY, modeKey)
@@ -94,8 +105,18 @@ const saveModeKey = (modeKey) => {
   }
 }
 
+const saveModeLock = (isLocked) => {
+  try {
+    localStorage.setItem(MODE_LOCK_STORAGE_KEY, String(isLocked))
+  } catch {
+    // Ignore storage failures so the assistant remains usable.
+  }
+}
+
 const messages = ref([])
 const inputValue = ref('')
+const inputRef = ref(null)
+const inputAssistPlaceholder = ref('')
 const chatBodyRef = ref(null)
 const conversationId = ref('')
 const conversationIds = ref({})
@@ -117,13 +138,17 @@ const windowState = ref({
   iframeLoaded: false,
 })
 const currentModeKey = ref(getStoredModeKey())
+const isModeLocked = ref(getStoredModeLock())
 const currentMode = computed(() => getModeByKey(currentModeKey.value))
 const welcomeTitle = computed(() =>
   currentUser.value?.name
     ? `您好，${currentUser.value.name}，我是环宝${currentMode.value.label}助手。`
     : currentMode.value.welcomeTitle,
 )
-const hasMessages = computed(() => messages.value.length > 0)
+const hasUserMessages = computed(() =>
+  messages.value.some((message) => message.role === 'user' && message.content?.trim()),
+)
+const hasMessages = computed(() => hasUserMessages.value)
 const isStreamingMode = computed(() => currentMode.value.key === 'office-ai')
 const isChatBusy = computed(() => messages.value.some((message) => message.loading || message.streaming))
 const dataQueryAccessMessage = computed(() => {
@@ -144,6 +169,15 @@ const dataQueryInputPlaceholder = computed(() => {
   if (dataQueryAccessStatus.value === 'not-covered') return '当前暂未开放生产指标查询'
   return dataQueryAccessMessage.value
 })
+const inputPlaceholder = computed(() => {
+  if (inputAssistPlaceholder.value) return inputAssistPlaceholder.value
+  if (currentMode.value.key === 'data-query' && dataQueryAccessStatus.value !== 'covered') {
+    return dataQueryInputPlaceholder.value
+  }
+
+  if (!isModeLocked.value) return '需要环宝帮您做什么？输入 / 快速调用技能及知识库...'
+  return `当前已锁定【${currentMode.value.label}】模式，请输入相关问题...`
+})
 const conversationTitle = computed(() => createConversationTitle(sanitizeMessages(messages.value)))
 const showCapabilityMenu = ref(false)
 const historyFilters = [
@@ -153,6 +187,12 @@ const historyFilters = [
   { key: 'workflow', label: '流程' },
   { key: 'data-query', label: '问数' },
 ]
+const capabilityLabelsByMode = {
+  policy: '制度问答',
+  'office-ai': '办公智能',
+  workflow: '流程助手',
+  'data-query': '智能问数',
+}
 const assistantWindow = createIgixAssistantWindow()
 let unbindWindowEscape = null
 let unsubscribeWindowState = null
@@ -164,6 +204,47 @@ let recentSubmittedQuestion = { value: '', at: 0 }
 
 const createMessageId = () => Date.now() + Math.random()
 
+const normalizeCapabilityKeys = (keys = [], fallbackModeKey = '') =>
+  [...(Array.isArray(keys) ? keys : []), fallbackModeKey]
+    .map((key) => normalizeModeKey(key))
+    .filter((key) => capabilityLabelsByMode[key])
+    .filter((key, index, values) => values.indexOf(key) === index)
+    .slice(0, 4)
+
+const getCapabilityFields = (modeKey = '', capabilityKeys = []) => {
+  const resolvedCapabilities = normalizeCapabilityKeys(capabilityKeys, modeKey)
+  return {
+    modeKey: modeKey || '',
+    resolvedCapability: resolvedCapabilities[0] || modeKey || '',
+    resolvedCapabilities,
+    capabilityLabels: resolvedCapabilities.map((key) => capabilityLabelsByMode[key]),
+  }
+}
+
+const getCapabilityKeysFromMessage = (message = {}) =>
+  normalizeCapabilityKeys(
+    message.resolvedCapabilities || message.resolvedCapability,
+    message.modeKey || '',
+  )
+
+const getCapabilityLabelsFromConversation = (conversation) => {
+  const keys = (conversation?.messages || []).reduce((allKeys, message) => {
+    return [...allKeys, ...getCapabilityKeysFromMessage(message)]
+  }, [])
+  const fallbackKeys = keys.length ? keys : normalizeCapabilityKeys([], conversation?.modeKey || '')
+  return fallbackKeys
+    .filter((key, index, values) => values.indexOf(key) === index)
+    .map((key) => capabilityLabelsByMode[key])
+}
+
+const getCapabilityText = (message) => {
+  const labels = message?.capabilityLabels?.length
+    ? message.capabilityLabels
+    : getCapabilityKeysFromMessage(message).map((key) => capabilityLabelsByMode[key])
+  if (!labels.length) return ''
+  return labels.length > 1 ? `本次协同处理：${labels.join(' + ')}` : `本次处理：${labels[0]}`
+}
+
 const getModeConversationId = (modeKey = currentMode.value.key) =>
   conversationIds.value[modeKey] || ''
 
@@ -172,25 +253,57 @@ const setModeConversationId = (modeKey, value = '') => {
   if (modeKey === currentMode.value.key) conversationId.value = value || ''
 }
 
-const createModeSwitchMessage = (mode) => ({
+const createModeSwitchMessage = (capabilityKeys) => {
+  const fields = getCapabilityFields('', capabilityKeys)
+  const labels = fields.capabilityLabels
+
+  return {
   id: createMessageId(),
   role: 'assistant',
-  messageType: 'mode-switch',
-  content: `已切换至 ${mode.label}`,
+  messageType: 'capability-switch',
+  content: labels.length > 1 ? `本次协同处理：${labels.join(' + ')}` : `本次处理：${labels[0] || '智能能力'}`,
   loading: false,
   streaming: false,
   sources: [],
   messageId: '',
   expandedSourceId: '',
+  ...fields,
+  }
+}
+
+const createModeRecoveryMessage = (mode, targetMode, question) => ({
+  id: createMessageId(),
+  role: 'assistant',
+  messageType: 'mode-recovery',
+  content: `当前已锁定【${mode.label}】模式，这个问题更适合【${targetMode.label}】处理。`,
+  loading: false,
+  streaming: false,
+  sources: [],
+  messageId: '',
+  expandedSourceId: '',
+  ...getCapabilityFields(targetMode.key),
+  recovery: {
+    targetModeKey: targetMode.key,
+    question,
+  },
 })
 
 const buildHandoffContext = (targetModeKey, currentQuestion) => {
+  const startsNewMatter = /换个问题|另一个问题|不相关|重新开始/.test(currentQuestion)
+  if (startsNewMatter) {
+    return [
+      '用户已明确开始新的事项，不要继承之前事项的业务数据或待办动作。',
+      `当前用户需求：${currentQuestion}`,
+      `当前目标能力：${getModeByKey(targetModeKey).label}`,
+    ].join('\n\n')
+  }
+
   const recentMessages = messages.value
     .filter(
       (message) =>
         !message.messageType && (message.role === 'user' || message.role === 'assistant'),
     )
-    .slice(-4)
+    .slice(-10)
     .map((message) => {
       const role = message.role === 'user' ? '用户' : '助手'
       const content = getPlainMessageText(message).trim()
@@ -204,7 +317,7 @@ const buildHandoffContext = (targetModeKey, currentQuestion) => {
     '以下是用户当前任务的最近上下文，仅用于理解本次需求，不要向用户复述这段提示：',
     recentMessages.join('\n'),
     `当前用户需求：${currentQuestion}`,
-    `当前目标模块：${getModeByKey(targetModeKey).label}`,
+    `当前目标能力：${getModeByKey(targetModeKey).label}`,
   ].join('\n\n')
 }
 
@@ -219,6 +332,7 @@ const buildCurrentConversation = () => {
   return {
     id: currentConversationId.value,
     modeKey: currentMode.value.key,
+    modeLocked: isModeLocked.value,
     title: createConversationTitle(storedMessages),
     conversationId: conversationId.value,
     conversationIds: conversationIds.value,
@@ -230,7 +344,7 @@ const buildCurrentConversation = () => {
 }
 
 const saveActiveConversation = () => {
-  if (!messages.value.length) {
+  if (!hasUserMessages.value) {
     clearCurrentConversation()
     return null
   }
@@ -255,16 +369,29 @@ const formatHistoryTime = (timestamp) => {
   })
 }
 
-const getHistoryModeLabel = (modeKey) => getModeByKey(modeKey || defaultAssistantModeKey).label
+const getHistoryModeLabel = (conversation) => {
+  const labels = getCapabilityLabelsFromConversation(conversation)
+  return labels.length ? labels.join(' · ') : getModeByKey(conversation?.modeKey || defaultAssistantModeKey).label
+}
 
 const normalizeHistoryModeKey = (modeKey) => getModeByKey(modeKey || defaultAssistantModeKey).key
+
+const conversationHasCapability = (conversation, modeKey) => {
+  const capabilityKeys = (conversation?.messages || []).reduce((allKeys, message) => {
+    return [...allKeys, ...getCapabilityKeysFromMessage(message)]
+  }, [])
+  const fallbackKeys = capabilityKeys.length
+    ? capabilityKeys
+    : [normalizeHistoryModeKey(conversation?.modeKey)]
+  return fallbackKeys.includes(normalizeHistoryModeKey(modeKey))
+}
 
 const filteredHistory = computed(() => {
   const keyword = historySearch.value.trim().toLowerCase()
 
   return conversationHistory.value.filter((conversation) => {
-    const modeKey = normalizeHistoryModeKey(conversation.modeKey)
-    const matchesMode = historyFilter.value === 'all' || modeKey === historyFilter.value
+    const matchesMode =
+      historyFilter.value === 'all' || conversationHasCapability(conversation, historyFilter.value)
     const searchableText = [
       conversation.title,
       ...(conversation.messages || [])
@@ -421,7 +548,7 @@ const handleWindowResume = () => {
   scheduleCurrentUserRefresh()
 }
 
-const createWorkflowCardMessage = (workflowResult) => ({
+const createWorkflowCardMessage = (workflowResult, capabilityKeys = ['workflow']) => ({
   id: createMessageId(),
   role: 'assistant',
   content: `已识别事项：${workflowResult.workflowName}`,
@@ -430,6 +557,7 @@ const createWorkflowCardMessage = (workflowResult) => ({
   sources: [],
   messageId: '',
   expandedSourceId: '',
+  ...getCapabilityFields('workflow', capabilityKeys),
   workflowCard: {
     workflowName: workflowResult.workflowName,
     description: workflowResult.description,
@@ -444,7 +572,128 @@ const createWorkflowCardMessage = (workflowResult) => ({
   },
 })
 
-const appendAssistantMessage = async (content) => {
+const inputRequestPattern = /^(请|需要|请您|请将|请把).{0,24}(提供|补充|粘贴|上传|输入)/
+const businessActionNames = new Set([
+  'open_policy',
+  'query_production_data',
+  'generate_production_daily_report',
+  'open_purchase_request',
+  'send_notice',
+])
+
+const isInputRequestAction = (action) => {
+  const text = `${action?.label || ''} ${action?.prompt || ''}`.trim()
+  return (
+    inputRequestPattern.test(text) ||
+    /请提供会议内容|提交会议材料|^(提供|补充|粘贴|上传).*(会议内容|会议记录|会议材料)/.test(text)
+  )
+}
+
+const isBusinessAction = (action) =>
+  businessActionNames.has(String(action?.action || '').trim()) ||
+  action?.payload?.form === '采购请示单'
+
+const buildMissingInputRequest = (answer = '', modeKey = '', inputAction = null) => {
+  const text = String(answer || '').trim()
+  const answerRequestsInput =
+    inputRequestPattern.test(text) ||
+    /请提供会议内容|提交会议材料|^(提供|补充|粘贴|上传).*(会议内容|会议记录|会议材料)/.test(text)
+  if (!inputAction && !answerRequestsInput) return null
+
+  const isMeetingRequest = modeKey === 'office-ai' && /会议|纪要/.test(`${text} ${inputAction?.label || ''}`)
+  return isMeetingRequest
+    ? {
+        title: '需要补充会议内容',
+        description: '请把会议记录粘贴到下方输入框，我会整理成正式会议纪要。',
+        buttonLabel: '去输入会议内容',
+        placeholder: '请粘贴会议记录或会议材料',
+      }
+    : {
+        title: '需要补充处理材料',
+        description: '请把需要处理的内容粘贴到下方输入框，我会继续完成这项工作。',
+        buttonLabel: '去输入补充内容',
+        placeholder: '请粘贴需要处理的内容',
+      }
+}
+
+const createFollowUp = (label, prompt = label, id = '') => ({
+  id: id || `follow-up-${label}`,
+  label,
+  prompt,
+})
+
+const buildDefaultFollowUps = (question, answer, modeKey) => {
+  const content = `${question} ${answer}`
+  if (modeKey === 'data-query') return buildDataQueryFollowUps(question).map((item) => createFollowUp(item))
+  if (modeKey === 'policy') {
+    return [
+      createFollowUp('换一个制度问题'),
+      createFollowUp('按我的部门解释'),
+      createFollowUp('查看相关制度依据'),
+    ]
+  }
+  if (modeKey === 'office-ai') {
+    if (/通知|公告/.test(content)) {
+      return [
+        createFollowUp('改成邮件版本'),
+        createFollowUp('补充发布时间和联系人'),
+        createFollowUp('压缩成短信通知'),
+      ]
+    }
+    if (/总结|汇报/.test(content)) {
+      return [
+        createFollowUp('提炼成汇报提纲'),
+        createFollowUp('压缩到 300 字'),
+        createFollowUp('改成正式公文'),
+      ]
+    }
+    return [
+      createFollowUp('压缩到 300 字'),
+      createFollowUp('改成正式公文'),
+      createFollowUp('补充责任人和时间'),
+    ]
+  }
+  return []
+}
+
+const normalizeMessageInteractions = (result, modeKey, question) => {
+  const candidates = Array.isArray(result?.suggestedActions) ? result.suggestedActions : []
+  const inputAction = candidates.find(isInputRequestAction)
+  const missingInput = buildMissingInputRequest(result?.answer, modeKey, inputAction)
+  const actionPills = candidates.filter((action) => isBusinessAction(action) && !isInputRequestAction(action)).slice(0, 4)
+  let followUps = candidates
+    .filter((action) => !isBusinessAction(action) && !isInputRequestAction(action))
+    .map((action, index) => createFollowUp(action.label || action.prompt, action.prompt || action.label, action.id || `follow-up-${index}`))
+    .slice(0, 4)
+
+  if (!missingInput && !followUps.length) {
+    followUps = buildDefaultFollowUps(question, result?.answer, modeKey)
+  }
+
+  return { missingInput, actionPills, followUps }
+}
+
+const getMessageActionPills = (message) =>
+  (message?.actionPills || []).filter((action) => !isInputRequestAction(action))
+
+const focusInputForMissing = async (missingInput) => {
+  if (!missingInput) return
+  inputAssistPlaceholder.value = missingInput.placeholder || '请补充需要处理的内容'
+  await nextTick()
+  inputRef.value?.focus()
+}
+
+const clearInputAssistPlaceholder = () => {
+  inputAssistPlaceholder.value = ''
+}
+
+const getFollowUpLabel = (followUp) =>
+  typeof followUp === 'string' ? followUp : followUp?.label || followUp?.prompt || ''
+
+const getFollowUpPrompt = (followUp) =>
+  typeof followUp === 'string' ? followUp : followUp?.prompt || followUp?.label || ''
+
+const appendAssistantMessage = async (content, modeKey = currentMode.value.key) => {
   messages.value.push({
     id: createMessageId(),
     role: 'assistant',
@@ -452,14 +701,16 @@ const appendAssistantMessage = async (content) => {
     loading: false,
     streaming: false,
     sources: [],
-    messageId: '',
-    expandedSourceId: '',
-    chartOption: null,
-  })
+      messageId: '',
+      expandedSourceId: '',
+      chartOption: null,
+      actionPills: [],
+      ...getCapabilityFields(modeKey),
+    })
   await scrollToBottom()
 }
 
-const sendWorkflowMessage = async (content) => {
+const sendWorkflowMessage = async (content, capabilityKeys = ['workflow']) => {
   const workflowResult = detectWorkflowAction(content, { currentUser: currentUser.value })
 
   messages.value.push({
@@ -467,6 +718,7 @@ const sendWorkflowMessage = async (content) => {
     role: 'user',
     content,
     loading: false,
+    ...getCapabilityFields('workflow', capabilityKeys),
   })
 
   if (workflowResult.matched) {
@@ -480,9 +732,10 @@ const sendWorkflowMessage = async (content) => {
         sources: [],
         messageId: '',
         expandedSourceId: '',
+        ...getCapabilityFields('workflow', capabilityKeys),
       })
     } else {
-      messages.value.push(createWorkflowCardMessage(workflowResult))
+      messages.value.push(createWorkflowCardMessage(workflowResult, capabilityKeys))
     }
   } else {
     messages.value.push({
@@ -494,6 +747,7 @@ const sendWorkflowMessage = async (content) => {
       sources: [],
       messageId: '',
       expandedSourceId: '',
+      ...getCapabilityFields('workflow', capabilityKeys),
     })
   }
 
@@ -509,6 +763,7 @@ const sendDataQueryExplorationMessage = async (content, exploration) => {
     content,
     loading: false,
     modeKey: 'data-query',
+    ...getCapabilityFields('data-query'),
   })
 
   const isCompanyExploration = exploration.type === 'company'
@@ -526,6 +781,7 @@ const sendDataQueryExplorationMessage = async (content, exploration) => {
     messageId: '',
     expandedSourceId: '',
     modeKey: 'data-query',
+    ...getCapabilityFields('data-query'),
     dataExploration: isCompanyExploration ? null : exploration,
   })
 
@@ -559,6 +815,7 @@ const markMessageAsCancelled = (messageId) => {
   message.loading = false
   message.streaming = false
   message.status = ''
+  message.messageFollowUps = []
   message.followUps = []
   stopDifyExecution(message.executionProcess)
 }
@@ -591,11 +848,12 @@ const handleSendButtonClick = () => {
   sendMessage()
 }
 
-const sendMessage = async (question = inputValue.value) => {
+const sendMessage = async (question = inputValue.value, options = {}) => {
   if (isChatBusy.value) return
 
   const content = question.trim()
   if (!content) return
+  inputAssistPlaceholder.value = ''
 
   const now = Date.now()
   const hasSamePendingQuestion = messages.value.some((message, index) =>
@@ -604,24 +862,57 @@ const sendMessage = async (question = inputValue.value) => {
     messages.value[index + 1]?.loading,
   )
   if (hasSamePendingQuestion) return
-  if (recentSubmittedQuestion.value === content && now - recentSubmittedQuestion.at < 1000) return
+  if (
+    !options.bypassRecentGuard &&
+    recentSubmittedQuestion.value === content &&
+    now - recentSubmittedQuestion.at < 1000
+  ) return
   recentSubmittedQuestion = { value: content, at: now }
 
   const previousModeKey = currentMode.value.key
   const detectedIntent = detectIntent(content, { currentModeKey: previousModeKey })
   const routedMode = detectedIntent.modeKey ? getModeByKey(detectedIntent.modeKey) : currentMode.value
+  const capabilityKeys = normalizeCapabilityKeys(
+    detectedIntent.modeKeys?.length ? detectedIntent.modeKeys : [routedMode.key],
+    routedMode.key,
+  )
   const hasAutoSwitch = Boolean(detectedIntent.modeKey && routedMode.key !== previousModeKey)
-  const handoffQuestion = hasAutoSwitch ? buildHandoffContext(routedMode.key, content) : content
+  const handoffQuestion = hasAutoSwitch
+    ? [
+        buildHandoffContext(routedMode.key, content),
+        capabilityKeys.length > 1
+          ? `本次协同能力：${capabilityKeys.map((key) => capabilityLabelsByMode[key]).join(' + ')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+    : content
+
+  if (isModeLocked.value && hasAutoSwitch) {
+    messages.value.push({
+      id: createMessageId(),
+      role: 'user',
+      content,
+      loading: false,
+      ...getCapabilityFields(previousModeKey),
+    })
+    messages.value.push(createModeRecoveryMessage(currentMode.value, routedMode, content))
+    inputValue.value = ''
+    await scrollToBottom()
+    return
+  }
 
   if (hasAutoSwitch) {
     currentModeKey.value = routedMode.key
     saveModeKey(routedMode.key)
     conversationId.value = getModeConversationId(routedMode.key)
-    messages.value.push(createModeSwitchMessage(routedMode))
+    if (hasAutoSwitch || capabilityKeys.length > 1) {
+      messages.value.push(createModeSwitchMessage(capabilityKeys))
+    }
   }
 
   if (currentMode.value.key === 'workflow') {
-    await sendWorkflowMessage(content)
+    await sendWorkflowMessage(content, capabilityKeys)
     return
   }
 
@@ -629,6 +920,27 @@ const sendMessage = async (question = inputValue.value) => {
     currentMode.value.key === 'data-query' &&
     dataQueryAccessStatus.value !== 'covered'
   ) {
+    messages.value.push({
+      id: createMessageId(),
+      role: 'user',
+      content,
+      loading: false,
+      ...getCapabilityFields('data-query', capabilityKeys),
+    })
+    messages.value.push({
+      id: createMessageId(),
+      role: 'assistant',
+      content: dataQueryAccessMessage.value,
+      loading: false,
+      streaming: false,
+      sources: [],
+      messageId: '',
+      expandedSourceId: '',
+      ...getCapabilityFields('data-query', capabilityKeys),
+      errorState: { question: content },
+    })
+    inputValue.value = ''
+    await scrollToBottom()
     return
   }
 
@@ -654,13 +966,15 @@ const sendMessage = async (question = inputValue.value) => {
   const loadingMessageId = createMessageId()
   const shouldStream = requestModeKey === 'data-query' || requestModeKey === 'office-ai'
 
-  messages.value.push({
-    id: createMessageId(),
-    role: 'user',
-    content,
-    loading: false,
-    modeKey: currentMode.value.key,
-  })
+  if (!options.reuseLatestUser) {
+    messages.value.push({
+      id: createMessageId(),
+      role: 'user',
+      content,
+      loading: false,
+      ...getCapabilityFields(requestModeKey, capabilityKeys),
+    })
+  }
   messages.value.push({
     id: loadingMessageId,
     role: 'assistant',
@@ -677,8 +991,22 @@ const sendMessage = async (question = inputValue.value) => {
     messageId: '',
     expandedSourceId: '',
     chartOption: null,
-    executionProcess: shouldStream ? createDifyExecutionProcess() : null,
-    modeKey: requestModeKey,
+    actionPills: [],
+    executionProcess:
+      requestMode.apiMode === 'dify'
+        ? createDifyExecutionProcess({
+            modeKey: requestModeKey,
+            visible: requestModeKey !== 'policy',
+            capabilities: capabilityKeys.map((key) => capabilityLabelsByMode[key]),
+            stage:
+              requestModeKey === 'policy'
+                ? '正在检索制度依据...'
+                : requestModeKey === 'data-query'
+                  ? '正在分析生产指标...'
+                  : '正在拟制办公材料...',
+          })
+        : null,
+    ...getCapabilityFields(requestModeKey, capabilityKeys),
   })
 
   const requestController = new AbortController()
@@ -708,63 +1036,61 @@ const sendMessage = async (question = inputValue.value) => {
     }
     let hasStreamedAnswer = false
 
-    const result = shouldStream
-      ? await streamChatMessage(
-        requestModeKey === 'data-query' ? content : handoffQuestion,
-        {
-          ...requestOptions,
-          onMessage: (messageContent, meta = {}) => {
-            if (requestController.signal.aborted) return
-            const streamingMessage = messages.value.find(
-              (message) => message.id === loadingMessageId,
-            )
-            if (!streamingMessage) return
+    const result = await sendMasterChatMessage(
+      requestModeKey === 'data-query' ? content : handoffQuestion,
+      {
+        ...requestOptions,
+        onMessage: (messageContent, meta = {}) => {
+          if (requestController.signal.aborted) return
+          const streamingMessage = messages.value.find(
+            (message) => message.id === loadingMessageId,
+          )
+          if (!streamingMessage) return
 
-            if (meta.replace) {
-              if (messageContent?.trim()) {
-                hasStreamedAnswer = true
-                streamingMessage.status = ''
-              }
-              streamingMessage.content = messageContent || ''
-              scrollToBottom()
-              return
+          if (meta.replace) {
+            if (messageContent?.trim()) {
+              hasStreamedAnswer = true
+              streamingMessage.status = ''
             }
+            streamingMessage.content = messageContent || ''
+            scrollToBottom()
+            return
+          }
 
-            if (!messageContent) return
-            streamingMessage.content += messageContent
-            hasStreamedAnswer = true
-            streamingMessage.status = ''
-            scrollToBottom()
-          },
-          onStatus: (status) => {
-            if (requestController.signal.aborted) return
-            const streamingMessage = messages.value.find(
-              (message) => message.id === loadingMessageId,
-            )
-            if (!streamingMessage || hasStreamedAnswer) return
-            streamingMessage.status = status
-            scrollToBottom()
-          },
-          onChart: (chartOption) => {
-            if (requestController.signal.aborted) return
-            const streamingMessage = messages.value.find(
-              (message) => message.id === loadingMessageId,
-            )
-            if (!streamingMessage) return
-            streamingMessage.chartOption = chartOption
-            scrollToBottom()
-          },
-          onDifyEvent: (event) => {
-            if (requestController.signal.aborted) return
-            const streamingMessage = messages.value.find(
-              (message) => message.id === loadingMessageId,
-            )
-            if (!streamingMessage) return
-            handleDifyExecutionEvent(streamingMessage, event)
-          },
+          if (!messageContent) return
+          streamingMessage.content += messageContent
+          hasStreamedAnswer = true
+          streamingMessage.status = ''
+          scrollToBottom()
         },
-      )
-      : await sendChatMessage(handoffQuestion, requestOptions)
+        onStatus: (status) => {
+          if (requestController.signal.aborted) return
+          const streamingMessage = messages.value.find(
+            (message) => message.id === loadingMessageId,
+          )
+          if (!streamingMessage || hasStreamedAnswer) return
+          streamingMessage.status = status
+          scrollToBottom()
+        },
+        onChart: (chartOption) => {
+          if (requestController.signal.aborted) return
+          const streamingMessage = messages.value.find(
+            (message) => message.id === loadingMessageId,
+          )
+          if (!streamingMessage) return
+          streamingMessage.chartOption = chartOption
+          scrollToBottom()
+        },
+        onDifyEvent: (event) => {
+          if (requestController.signal.aborted) return
+          const streamingMessage = messages.value.find(
+            (message) => message.id === loadingMessageId,
+          )
+          if (!streamingMessage) return
+          handleDifyExecutionEvent(streamingMessage, event)
+        },
+      },
+    )
 
     if (requestController.signal.aborted) return
 
@@ -780,7 +1106,13 @@ const sendMessage = async (question = inputValue.value) => {
       loadingMessage.sources = result.sources || []
       loadingMessage.messageId = result.messageId || ''
       loadingMessage.expandedSourceId = ''
-      loadingMessage.modeKey = requestModeKey
+      const interactions = normalizeMessageInteractions(result, requestModeKey, content)
+      loadingMessage.actionPills = interactions.actionPills
+      loadingMessage.messageFollowUps = interactions.followUps
+      loadingMessage.followUps = interactions.followUps
+      loadingMessage.missingInput = interactions.missingInput
+      loadingMessage.errorState = null
+      Object.assign(loadingMessage, getCapabilityFields(requestModeKey, capabilityKeys))
       loadingMessage.chartOption =
         result.chartOption ||
         (requestModeKey === 'data-query'
@@ -816,6 +1148,11 @@ const sendMessage = async (question = inputValue.value) => {
       loadingMessage.messageId = ''
       loadingMessage.expandedSourceId = ''
       loadingMessage.status = ''
+      loadingMessage.actionPills = []
+      loadingMessage.messageFollowUps = []
+      loadingMessage.followUps = []
+      loadingMessage.missingInput = null
+      loadingMessage.errorState = { question: content }
       failDifyExecution(loadingMessage.executionProcess, loadingMessage.content)
     }
   } finally {
@@ -827,8 +1164,70 @@ const sendMessage = async (question = inputValue.value) => {
   await scrollToBottom()
 }
 
-const handleRecommendClick = (question) => {
-  sendMessage(question)
+const handleStarterSelect = (question) => {
+  sendMessage(question, { bypassRecentGuard: true })
+}
+
+const retryFailedMessage = async (message) => {
+  const question = message?.errorState?.question?.trim()
+  if (!question || isChatBusy.value) return
+
+  const messageIndex = messages.value.findIndex((item) => item.id === message.id)
+  const previousMessage = messages.value[messageIndex - 1]
+  if (messageIndex > 0 && previousMessage?.role === 'user' && previousMessage.content?.trim() === question) {
+    messages.value.splice(messageIndex - 1, 2)
+  } else if (messageIndex >= 0) {
+    messages.value.splice(messageIndex, 1)
+  }
+
+  await sendMessage(question, { bypassRecentGuard: true })
+}
+
+const handleActionPillClick = (action) => {
+  const actionName = String(action?.action || '').trim()
+
+  if (actionName === 'open_purchase_request' || action?.payload?.form === '采购请示单') {
+    const workflowCard = detectWorkflowAction('打开采购请示单', { currentUser: currentUser.value })
+    const openAction = workflowCard.actions?.find((item) => item.includes('打开'))
+    if (workflowCard.matched && openAction) {
+      handleWorkflowActionClick(workflowCard, openAction)
+      return
+    }
+  }
+
+  const actionPrompts = {
+    open_policy: action?.payload?.keyword ? `查询${action.payload.keyword}` : '查询相关制度依据',
+    query_production_data: '查询昨日生活垃圾入厂量和吨垃圾发电量',
+    generate_production_daily_report: '根据昨日生产指标生成生产日报',
+    send_notice: '生成维护通知',
+  }
+  const actionPrompt = actionPrompts[actionName]
+  const question = String(action?.prompt || action?.query || action?.label || '').trim()
+  const nextQuestion = actionPrompt || question
+  if (!nextQuestion) return
+  inputValue.value = nextQuestion
+  sendMessage(nextQuestion, { bypassRecentGuard: true })
+}
+
+const restoreAdaptiveMode = () => {
+  isModeLocked.value = false
+  saveModeLock(false)
+}
+
+const handleModeRecovery = async (message) => {
+  const recovery = message?.recovery
+  if (!recovery?.question) return
+
+  const messageIndex = messages.value.findIndex((item) => item.id === message.id)
+  if (messageIndex >= 0) messages.value.splice(messageIndex, 1)
+
+  const targetMode = getModeByKey(recovery.targetModeKey)
+  isModeLocked.value = false
+  saveModeLock(false)
+  currentModeKey.value = targetMode.key
+  saveModeKey(targetMode.key)
+  conversationId.value = getModeConversationId(targetMode.key)
+  await sendMessage(recovery.question, { bypassRecentGuard: true, reuseLatestUser: true })
 }
 
 const handleDataExplorationItem = (item, type) => {
@@ -955,18 +1354,24 @@ const updateCapabilityMenu = (open) => {
 }
 
 const switchMode = async (modeKey) => {
+  if (modeKey === 'adaptive') {
+    showCapabilityMenu.value = false
+    if (isChatBusy.value) return
+    isModeLocked.value = false
+    saveModeLock(false)
+    await scrollToBottom()
+    return
+  }
+
   const nextMode = getModeByKey(modeKey)
 
   showCapabilityMenu.value = false
   if (isChatBusy.value) return
   if (nextMode.key === currentMode.value.key) return
 
-  const activeConversation = saveActiveConversation()
-  if (activeConversation) {
-    conversationHistory.value = saveConversationToHistory(activeConversation)
-  }
-
   currentModeKey.value = nextMode.key
+  isModeLocked.value = true
+  saveModeLock(true)
   saveModeKey(nextMode.key)
   conversationId.value = getModeConversationId(nextMode.key)
   await scrollToBottom()
@@ -981,6 +1386,8 @@ const restoreConversation = async (conversation) => {
   }
 
   currentModeKey.value = getModeByKey(conversation.modeKey || defaultAssistantModeKey).key
+  isModeLocked.value = conversation.modeLocked === true
+  saveModeLock(isModeLocked.value)
   saveModeKey(currentModeKey.value)
   currentConversationId.value = conversation.id || createConversationId()
   conversationIds.value = conversation.conversationIds || {}
@@ -1013,7 +1420,10 @@ const newChat = async () => {
 
   messages.value = []
   inputValue.value = ''
+  inputAssistPlaceholder.value = ''
   currentModeKey.value = defaultAssistantModeKey
+  isModeLocked.value = false
+  saveModeLock(false)
   saveModeKey(defaultAssistantModeKey)
   conversationId.value = ''
   conversationIds.value = {}
@@ -1045,6 +1455,8 @@ onMounted(async () => {
 
   if (currentConversation?.messages?.length) {
     currentModeKey.value = getModeByKey(currentConversation.modeKey || currentModeKey.value).key
+    isModeLocked.value = currentConversation.modeLocked === true
+    saveModeLock(isModeLocked.value)
     saveModeKey(currentModeKey.value)
     currentConversationId.value = currentConversation.id || createConversationId()
     conversationIds.value = currentConversation.conversationIds || {}
@@ -1088,7 +1500,7 @@ watch(
 )
 
 watch(
-  [messages, conversationId],
+  [messages, conversationId, currentModeKey, isModeLocked],
   () => {
     saveActiveConversation()
   },
@@ -1118,6 +1530,7 @@ watch(
       <CapabilitySelector
         :modes="assistantModes"
         :current-mode-key="currentMode.key"
+        :adaptive="!isModeLocked"
         :open="showCapabilityMenu"
         :disabled="isChatBusy"
         @update:open="updateCapabilityMenu"
@@ -1190,7 +1603,7 @@ watch(
                   >
                     <span class="history-item-title">{{ conversation.title }}</span>
                     <span class="history-item-meta">
-                      <span class="history-mode">{{ getHistoryModeLabel(conversation.modeKey) }}</span>
+                        <span class="history-mode">{{ getHistoryModeLabel(conversation) }}</span>
                       <span>{{ formatHistoryTime(conversation.updatedAt) }}</span>
                       <span>{{ conversation.messages.length }} 条消息</span>
                     </span>
@@ -1263,7 +1676,11 @@ watch(
       </div>
     </header>
 
-    <main ref="chatBodyRef" class="chat-body">
+    <main
+      ref="chatBodyRef"
+      class="chat-body"
+      :class="{ 'chat-body-has-messages': hasMessages }"
+    >
       <div class="chat-content">
         <DataQueryHome
           v-if="currentMode.key === 'data-query' && dataQueryAccessStatus === 'covered'"
@@ -1333,17 +1750,38 @@ watch(
               :class="[
                 message.role === 'user' ? 'message-user' : 'message-assistant',
                 message.messageType ? `message-${message.messageType}` : '',
+                message.role === 'assistant' &&
+                message.loading &&
+                !message.content &&
+                message.executionProcess?.visible
+                  ? 'message-assistant-executing'
+                  : '',
               ]"
             >
-              <div v-if="message.messageType === 'mode-switch'" class="mode-switch-copy">
+              <div v-if="message.messageType === 'capability-switch'" class="mode-switch-copy">
                 <RefreshCw :size="14" :stroke-width="1.8" aria-hidden="true" />
                 <span>{{ message.content }}</span>
+              </div>
+              <div v-else-if="message.messageType === 'mode-recovery'" class="mode-recovery-copy">
+                <div class="mode-recovery-text">{{ message.content }}</div>
+                <button type="button" class="mode-recovery-action" @click="handleModeRecovery(message)">
+                  <span aria-hidden="true">⚡</span>
+                  一键切换为智能模式并生成
+                </button>
               </div>
               <AssistantExecution
                 v-if="message.role === 'assistant' && message.executionProcess"
                 :process="message.executionProcess"
+                :mode-key="message.modeKey"
                 @toggle="toggleDifyExecution(message)"
               />
+              <div
+                v-if="message.role === 'assistant' && !message.messageType && !message.loading && getCapabilityText(message)"
+                class="message-capability-note"
+              >
+                <span class="message-capability-note-dot" aria-hidden="true"></span>
+                <span>{{ getCapabilityText(message) }}</span>
+              </div>
               <div
                 v-if="message.role === 'assistant' && message.loading && !message.content && message.status && !message.executionProcess?.visible"
                 class="message-status"
@@ -1382,96 +1820,110 @@ watch(
                 v-if="message.role === 'assistant' && message.modeKey === 'data-query'"
                 :answer="message.content"
                 :chart-option="message.chartOption"
+                :window-view="windowState.view"
               />
 
-              <div v-if="message.workflowCard" class="workflow-card">
-                <div class="workflow-card-header">
-                  <span class="workflow-card-kicker">已识别事项</span>
-                  <strong>{{ message.workflowCard.workflowName }}</strong>
-                  <p>{{ message.workflowCard.description }}</p>
-                </div>
-
-                <div class="workflow-section">
-                  <div class="workflow-section-title">可执行操作</div>
-                  <div v-if="message.workflowCard.actions?.length" class="workflow-action-list">
-                    <button
-                      v-for="action in message.workflowCard.actions"
-                      :key="action"
-                      class="workflow-action-button"
-                      type="button"
-                      @click="handleWorkflowActionClick(message.workflowCard, action)"
-                    >
-                      {{ action }}
-                    </button>
-                  </div>
-                  <p v-else class="workflow-empty-fields">
-                    {{ message.workflowCard.unavailableReason || '该事项暂未配置可执行动作。' }}
-                  </p>
-                </div>
-
-                <div class="workflow-section">
-                  <div class="workflow-section-title">需要准备</div>
-                  <ul v-if="message.workflowCard.requiredFields?.length" class="workflow-field-list">
-                    <li
-                      v-for="field in message.workflowCard.requiredFields"
-                      :key="field"
-                    >
-                      {{ field }}
-                    </li>
-                  </ul>
-                  <p v-else class="workflow-empty-fields">暂无必填字段。</p>
-                </div>
-              </div>
+              <WorkflowActionCard
+                v-if="message.workflowCard"
+                :card="message.workflowCard"
+                @action="handleWorkflowActionClick(message.workflowCard, $event)"
+              />
 
               <div
                 v-if="message.role === 'assistant' && message.sources?.length"
-                class="message-sources"
+                class="message-source-drawer"
               >
-                <div class="sources-title">引用 · 制度来源</div>
-                <div class="source-list">
-                  <div
-                    v-for="source in message.sources.slice(0, 3)"
-                    :key="source.id"
-                    class="source-card"
-                    :title="source.documentName"
-                    @click="toggleSource(message, source.id)"
-                  >
-                    <div class="source-item">
-                      <div class="source-main">
-                        <span class="source-icon" aria-hidden="true">📄</span>
-                        <span class="source-name">{{ source.documentName }}</span>
+                <button
+                  type="button"
+                  class="source-drawer-trigger"
+                  :aria-expanded="Boolean(message.expandedSourceId)"
+                  @click="toggleSource(message, message.sources[0].id)"
+                >
+                  <span class="source-drawer-trigger-copy">
+                    <span class="source-drawer-icon" aria-hidden="true">📎</span>
+                    <span>参考依据：《{{ message.sources[0].documentName || '制度知识库' }}》</span>
+                  </span>
+                  <span class="source-toggle" aria-hidden="true">
+                    {{ message.expandedSourceId ? '⌃' : '⌄' }}
+                  </span>
+                </button>
+                <Transition name="source-drawer">
+                  <div v-if="message.expandedSourceId" class="source-drawer-panel">
+                    <div
+                      v-for="source in message.sources.slice(0, 3)"
+                      :key="source.id"
+                      class="source-drawer-source"
+                    >
+                      <div class="source-drawer-source-title">
+                        {{ source.documentName || '制度知识库' }}
                         <span v-if="source.datasetName" class="source-dataset">
                           {{ source.datasetName }}
                         </span>
                       </div>
-                      <span class="source-toggle" aria-hidden="true">
-                        {{ message.expandedSourceId === source.id ? '⌃' : '⌄' }}
-                      </span>
-                    </div>
-                    <div v-if="message.expandedSourceId === source.id" class="source-content">
                       <div class="source-content-title">知识库原文片段</div>
-                      <div>{{ source.content || '暂无可展示的原文片段。' }}</div>
+                      <div class="source-drawer-source-content">
+                        {{ source.content || '暂无可展示的原文片段。' }}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Transition>
+              </div>
+
+              <section
+                v-if="message.role === 'assistant' && message.missingInput"
+                class="message-missing-input"
+                aria-label="需要补充信息"
+              >
+                <div class="message-missing-input-title">{{ message.missingInput.title }}</div>
+                <p>{{ message.missingInput.description }}</p>
+                <button type="button" class="message-missing-input-action" @click="focusInputForMissing(message.missingInput)">
+                  <PenLine :size="14" :stroke-width="1.8" aria-hidden="true" />
+                  {{ message.missingInput.buttonLabel }}
+                </button>
+              </section>
+
+              <div
+                v-if="message.role === 'assistant' && getMessageActionPills(message).length"
+                class="message-action-pills"
+                aria-label="业务动作"
+              >
+                <span class="message-action-pills-label">可执行操作</span>
+                <button
+                    v-for="action in getMessageActionPills(message)"
+                  :key="action.id || action.prompt || action.label"
+                  type="button"
+                  class="message-action-pill"
+                  @click="handleActionPillClick(action)"
+                >
+                  <span aria-hidden="true">›</span>
+                  {{ action.label || action.prompt }}
+                </button>
               </div>
 
               <div
-                v-if="message.followUps?.length && (message.modeKey !== 'data-query' || dataQueryAccessStatus === 'covered')"
-                class="data-query-followups"
+                v-if="(message.messageFollowUps || message.followUps)?.length && (message.modeKey !== 'data-query' || dataQueryAccessStatus === 'covered')"
+                class="message-followups"
               >
-                <div class="data-query-exploration-title">你还可以继续追问</div>
-                <div class="data-query-followup-list">
+                <div class="message-followups-title">你还可以继续</div>
+                <div class="message-followup-list">
                   <button
-                    v-for="followUp in message.followUps"
-                    :key="followUp"
+                    v-for="followUp in message.messageFollowUps || message.followUps"
+                    :key="getFollowUpLabel(followUp)"
                     type="button"
-                    class="data-query-followup"
-                    @click="sendMessage(followUp)"
+                    class="message-followup"
+                    @click="sendMessage(getFollowUpPrompt(followUp))"
                   >
-                    {{ followUp }}
+                    {{ getFollowUpLabel(followUp) }}
                   </button>
                 </div>
+              </div>
+
+              <div v-if="message.errorState" class="message-error-actions" aria-label="失败后的操作">
+                <span class="message-error-actions-title">本次处理未完成</span>
+                <button type="button" @click="retryFailedMessage(message)">重试</button>
+                <button type="button" @click="focusInputForMissing({ placeholder: '请换一种方式描述您的需求' })">
+                  换一种问法
+                </button>
               </div>
 
               <div v-if="canUseMessageTools(message)" class="message-toolbar">
@@ -1508,44 +1960,32 @@ watch(
           </div>
         </section>
 
-        <div v-if="!hasMessages && currentMode.key !== 'data-query'" class="recommend-heading">为你推荐</div>
-        <div v-if="!hasMessages && currentMode.key !== 'data-query'" class="recommend-list" aria-label="推荐问法">
-          <button
-            v-for="question in currentMode.suggestions"
-            :key="question"
-            class="question-chip"
-            type="button"
-            @click="handleRecommendClick(question)"
-          >
-            <span>{{ question }}</span>
-            <span aria-hidden="true">›</span>
-          </button>
-        </div>
-
-        <div v-if="!hasMessages && currentMode.key !== 'data-query'" class="capability-list" aria-label="助手能力">
-          <span
-            v-for="(capability, index) in currentMode.capabilities"
-            :key="capability"
-            class="capability-item"
-            :class="capabilityClassNames[index] || 'capability-blue'"
-          >
-            <span aria-hidden="true">{{ ['?', '⌖', '⇄'][index] || '?' }}</span>
-            {{ capability }}
-          </span>
-        </div>
+        <PromptStarters
+          v-if="!hasMessages && currentMode.key !== 'data-query'"
+          :mode="isModeLocked ? currentMode.key : 'all'"
+          :org-name="currentUser?.orgName || currentUser?.unitName || ''"
+          :disabled="isChatBusy"
+          @select="handleStarterSelect"
+        />
 
       </div>
     </main>
 
     <footer class="assistant-footer">
+      <div v-if="isModeLocked" class="mode-lock-notice" role="status">
+        <span>当前已锁定【{{ currentMode.label }}】模式 🔒</span>
+        <button type="button" @click="restoreAdaptiveMode">点击恢复自适应</button>
+      </div>
       <form class="input-shell" @submit.prevent="sendMessage()">
         <span class="input-attach" aria-hidden="true">↵</span>
         <input
+          ref="inputRef"
           v-model="inputValue"
           type="text"
-          :placeholder="dataQueryInputPlaceholder"
-          :aria-label="dataQueryInputPlaceholder"
+          :placeholder="inputPlaceholder"
+          :aria-label="inputPlaceholder"
           :disabled="isChatBusy || (currentMode.key === 'data-query' && dataQueryAccessStatus !== 'covered')"
+          @input="clearInputAssistPlaceholder"
         />
         <button
           class="send-button"

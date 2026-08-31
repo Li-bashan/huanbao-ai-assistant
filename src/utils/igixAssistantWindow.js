@@ -1,20 +1,10 @@
+import { resolvePortalOrigin } from './actionBridge.js'
+
 const MESSAGE_TYPE = 'IGIX_ASSISTANT_WINDOW'
 const STATE_MESSAGE_TYPE = 'IGIX_ASSISTANT_WINDOW_STATE'
 
-function resolveParentOrigin() {
-  if (document.referrer) {
-    try {
-      return new URL(document.referrer).origin
-    } catch {
-      // Fall through to the known iGIX platform origin.
-    }
-  }
-
-  return 'http://172.17.3.34:5300'
-}
-
 export function createIgixAssistantWindow(options = {}) {
-  const parentOrigin = options.parentOrigin || resolveParentOrigin()
+  const parentOrigin = resolvePortalOrigin(options.parentOrigin)
   const stateListeners = new Set()
   let unbindEscape = null
 

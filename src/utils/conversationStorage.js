@@ -21,9 +21,18 @@ function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
+function removeThinkContent(text = '') {
+  return String(text || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*$/gi, '')
+    .replace(/<\/think>/gi, '')
+    .trim()
+}
+
 function sanitizeMessageContent(message) {
-  if (message?.modeKey !== 'data-query') return message?.content
-  return removeDataQueryChartPayload(message?.content)
+  const content = removeThinkContent(message?.content)
+  if (message?.modeKey !== 'data-query') return content
+  return removeDataQueryChartPayload(content)
 }
 
 function sanitizeMessageChartOption(message) {
@@ -38,13 +47,6 @@ function sanitizeMessageChartOption(message) {
 function sanitizeExecutionProcess(process) {
   if (!process) return null
 
-  const rawNodes = Array.isArray(process.nodes)
-    ? process.nodes
-    : Array.isArray(process.steps)
-      ? process.steps
-      : Array.isArray(process.tracing)
-        ? process.tracing
-        : []
   const normalizeStatus = (status) => {
     if (status === 'succeeded' || status === 'completed') return 'success'
     if (status === 'cancelled' || status === 'canceled') return 'stopped'
@@ -58,23 +60,68 @@ function sanitizeExecutionProcess(process) {
     visible: process.visible !== false,
     expanded: process.expanded === true,
     userExpanded: false,
+    modeKey: process.modeKey || '',
+    capabilities: Array.isArray(process.capabilities) ? process.capabilities.slice(0, 6) : [],
+    stage: process.stage || '',
     workflowRunId: process.workflowRunId || process.workflow_run_id || '',
     currentNodeId: '',
     startedAt: Number.isFinite(Number(process.startedAt)) ? Number(process.startedAt) : null,
     finishedAt: Number.isFinite(Number(process.finishedAt)) ? Number(process.finishedAt) : null,
-    error: process.error || '',
-    nodes: rawNodes.slice(0, 80).map((node, index) => ({
-      key: node.key || node.node_id || node.id || `execution-node-${index}`,
-      title: node.title || node.node_title || node.nodeName || '执行节点',
-      nodeType: node.nodeType || node.node_type || '',
-      status: normalizeStatus(node.status),
-      startedAt: Number.isFinite(Number(node.startedAt)) ? Number(node.startedAt) : null,
-      finishedAt: Number.isFinite(Number(node.finishedAt)) ? Number(node.finishedAt) : null,
-      elapsedTime: Number.isFinite(Number(node.elapsedTime)) ? Number(node.elapsedTime) : null,
-      error: node.error || '',
-      retryCount: Number.isFinite(Number(node.retryCount)) ? Number(node.retryCount) : 0,
-    })),
+    error: '',
+    // 历史只保留业务状态，不持久化 Dify 节点标题、节点类型或技术错误。
+    nodes: [],
     thoughts: [],
+  }
+}
+
+function sanitizeFollowUps(followUps) {
+  if (!Array.isArray(followUps)) return []
+
+  return followUps
+    .map((followUp, index) => {
+      if (typeof followUp === 'string') {
+        const label = followUp.trim()
+        return label ? { id: `follow-up-${index}`, label, prompt: label } : null
+      }
+
+      if (!followUp || typeof followUp !== 'object') return null
+      const label = String(followUp.label || followUp.title || followUp.prompt || '').trim()
+      const prompt = String(followUp.prompt || followUp.query || label).trim()
+      if (!label || !prompt) return null
+
+      return {
+        id: String(followUp.id || `follow-up-${index}`),
+        label,
+        prompt,
+      }
+    })
+    .filter(Boolean)
+    .slice(0, 4)
+}
+
+function sanitizeCapabilityMetadata(message) {
+  const resolvedCapabilities = [
+    ...(Array.isArray(message?.resolvedCapabilities) ? message.resolvedCapabilities : []),
+    message?.resolvedCapability,
+    message?.modeKey,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .slice(0, 4)
+
+  const capabilityLabels = [
+    ...(Array.isArray(message?.capabilityLabels) ? message.capabilityLabels : []),
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .slice(0, 4)
+
+  return {
+    resolvedCapability: String(message?.resolvedCapability || message?.modeKey || '').trim(),
+    resolvedCapabilities,
+    capabilityLabels,
   }
 }
 
@@ -107,6 +154,7 @@ function normalizeConversation(conversation) {
         : conversation.conversationId
           ? { [conversation.modeKey || 'policy']: conversation.conversationId }
           : {},
+    modeLocked: conversation.modeLocked === true,
     messages,
     createdAt: conversation.createdAt || timestamp,
     updatedAt: timestamp,
@@ -125,6 +173,7 @@ export function sanitizeMessages(messages = []) {
         !content &&
         !message.workflowCard &&
         !chartOption &&
+        !message.missingInput &&
         !executionProcess?.nodes?.length &&
         !executionProcess?.steps?.length
       ) return false
@@ -137,8 +186,27 @@ export function sanitizeMessages(messages = []) {
       loading: false,
       messageType: message.messageType || '',
       modeKey: message.modeKey || '',
+      ...sanitizeCapabilityMetadata(message),
       executionProcess: sanitizeExecutionProcess(message.executionProcess || message.workflowProcess),
-      followUps: Array.isArray(message.followUps) ? message.followUps.slice(0, 3) : [],
+      messageFollowUps: sanitizeFollowUps(message.messageFollowUps || message.followUps),
+      followUps: sanitizeFollowUps(message.messageFollowUps || message.followUps),
+      actionPills: Array.isArray(message.actionPills)
+        ? message.actionPills
+            .map((action, index) => {
+              const actionName = String(action?.action || '').trim()
+              return {
+                id: String(action?.id || `suggested-action-${index}`),
+                label: String(action?.label || action?.prompt || '').trim(),
+                prompt: String(action?.prompt || action?.query || action?.label || '').trim(),
+                ...(actionName ? { action: actionName } : {}),
+                ...(action?.payload && typeof action.payload === 'object'
+                  ? { payload: action.payload }
+                  : {}),
+              }
+            })
+            .filter((action) => action.label && action.prompt)
+            .slice(0, 6)
+        : [],
       dataExploration: message.dataExploration
         ? {
             type: message.dataExploration.type || '',
@@ -155,16 +223,41 @@ export function sanitizeMessages(messages = []) {
       chartOption: sanitizeMessageChartOption(message),
       messageId: message.messageId || '',
       expandedSourceId: '',
+      missingInput: message.missingInput
+        ? {
+            title: String(message.missingInput.title || '').trim(),
+            description: String(message.missingInput.description || '').trim(),
+            buttonLabel: String(message.missingInput.buttonLabel || '去输入补充内容').trim(),
+            placeholder: String(message.missingInput.placeholder || '').trim(),
+          }
+        : null,
+      errorState: message.errorState
+        ? { question: String(message.errorState.question || '').trim() }
+        : null,
       workflowCard: message.workflowCard
         ? {
             workflowName: message.workflowCard.workflowName || '',
             description: message.workflowCard.description || '',
+            status: message.workflowCard.status || '',
+            statusReason: message.workflowCard.statusReason || '',
             actions: Array.isArray(message.workflowCard.actions)
               ? message.workflowCard.actions
               : [],
+            actionPayloads:
+              message.workflowCard.actionPayloads && typeof message.workflowCard.actionPayloads === 'object'
+                ? message.workflowCard.actionPayloads
+                : {},
+            prefillFields: Array.isArray(message.workflowCard.prefillFields)
+              ? message.workflowCard.prefillFields
+              : [],
+            parsedFields:
+              message.workflowCard.parsedFields && typeof message.workflowCard.parsedFields === 'object'
+                ? message.workflowCard.parsedFields
+                : {},
             requiredFields: Array.isArray(message.workflowCard.requiredFields)
               ? message.workflowCard.requiredFields
               : [],
+            unavailableReason: message.workflowCard.unavailableReason || '',
           }
         : null,
       sources: Array.isArray(message.sources)

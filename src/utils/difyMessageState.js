@@ -125,11 +125,21 @@ const hasError = (data) => Boolean(getValue(data, 'error', 'message'))
 const isFailedData = (data) =>
   normalizeStatus(getValue(data, 'status', 'state', 'result'), '') === 'failed' || hasError(data)
 
-export const createDifyExecutionProcess = () => ({
+const getBusinessCapabilities = (modeKey) => {
+  if (modeKey === 'data-query') return ['智能问数']
+  if (modeKey === 'office' || modeKey === 'office-ai' || modeKey === 'general') return ['办公智能']
+  if (modeKey === 'policy') return ['制度问答']
+  return []
+}
+
+export const createDifyExecutionProcess = (options = {}) => ({
   status: 'pending',
-  visible: false,
+  visible: options.visible === true,
   expanded: true,
   userExpanded: false,
+  modeKey: options.modeKey || '',
+  capabilities: options.capabilities || getBusinessCapabilities(options.modeKey),
+  stage: options.stage || '',
   workflowRunId: '',
   currentNodeId: '',
   startedAt: null,

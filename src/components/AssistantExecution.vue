@@ -8,125 +8,105 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle'])
 
-const processTitle = computed(() =>
-  props.process.status === 'running' || props.process.status === 'pending'
-    ? '正在执行的节点'
-    : props.process.nodes?.at(-1)?.title || '执行节点',
-)
+const isActive = computed(() => ['pending', 'running'].includes(props.process.status))
 
 const processStatusLabel = computed(() => {
   const labels = {
     pending: '准备中',
-    running: '正在执行',
+    running: '进行中',
     success: '已完成',
-    failed: '执行失败',
+    failed: '未完成',
     stopped: '已停止',
     paused: '等待继续',
   }
   return labels[props.process.status] || '准备中'
 })
 
-const nodeStatusLabel = (status) => ({
-  waiting: '等待',
-  running: '执行中',
-  retrying: '重试中',
-  success: '已完成',
-  failed: '失败',
-  stopped: '已停止',
-  paused: '已暂停',
-}[status] || '等待')
+const capabilities = computed(() => {
+  if (Array.isArray(props.process.capabilities) && props.process.capabilities.length) {
+    return props.process.capabilities
+  }
 
-const formatElapsed = (value) => {
-  const seconds = Number(value)
-  if (!Number.isFinite(seconds)) return ''
-  return seconds >= 1 ? `${seconds.toFixed(3)} s` : `${(seconds * 1000).toFixed(3)} ms`
-}
+  const modeKey = props.process.modeKey
+  if (modeKey === 'data-query') return ['智能问数']
+  if (['office', 'office-ai', 'general'].includes(modeKey)) return ['办公智能']
+  if (modeKey === 'policy') return ['制度问答']
+  return []
+})
 
-const nodeIcon = (status) => {
-  if (status === 'failed') return CircleAlert
-  if (status === 'stopped') return PauseCircle
-  if (status === 'paused') return PauseCircle
-  if (status === 'running' || status === 'retrying') return LoaderCircle
+const stageLabel = computed(() => {
+  if (props.process.status === 'failed') return '这次处理未完成'
+  if (props.process.status === 'stopped') return '本次处理已停止'
+  if (props.process.status === 'paused') return '等待继续处理'
+  if (props.process.status === 'success') return '处理完成'
+  if (isActive.value) {
+    if (capabilities.value.includes('制度问答')) return '正在检索制度依据'
+    if (capabilities.value.includes('智能问数')) return '正在查询生产数据'
+    if (capabilities.value.includes('办公智能')) return '正在整理办公材料'
+    return '正在处理您的需求'
+  }
+  if (props.process.stage) return props.process.stage
+  if (capabilities.value.includes('制度问答')) return '正在检索制度依据...'
+  if (capabilities.value.includes('智能问数')) return '正在分析生产指标...'
+  if (capabilities.value.includes('办公智能')) return '正在拟制办公材料...'
+  return '正在处理您的需求...'
+})
+
+const statusIcon = computed(() => {
+  if (props.process.status === 'failed') return CircleAlert
+  if (props.process.status === 'stopped' || props.process.status === 'paused') return PauseCircle
+  if (props.process.status === 'running' || props.process.status === 'pending') return LoaderCircle
   return CircleCheck
-}
+})
 </script>
 
 <template>
   <section
     v-if="process.visible"
-    class="dify-execution"
-    :class="[`dify-execution-${process.status}`, { 'dify-execution-expanded': process.expanded }]"
-    aria-label="正在执行的节点"
+    class="status-capsule"
+    :class="[`status-capsule-${process.status}`, { 'status-capsule-expanded': process.expanded }]"
+    aria-label="助手处理状态"
   >
     <button
       type="button"
-      class="dify-execution-header"
-      :aria-expanded="process.expanded"
+      class="status-capsule-header"
+      :aria-expanded="isActive ? undefined : process.expanded"
+      :aria-label="isActive ? `${stageLabel}，请稍候` : `${stageLabel}，${processStatusLabel}`"
+      :disabled="isActive"
       @click="emit('toggle')"
     >
-      <LoaderCircle
-        v-if="process.status === 'running' || process.status === 'pending'"
-        class="dify-execution-header-icon dify-execution-icon-spinning"
-        :size="16"
+      <span
+        class="status-capsule-dot"
+        :class="{ 'status-capsule-dot-pulsing': process.status === 'running' || process.status === 'pending' }"
+        aria-hidden="true"
+      ></span>
+      <component
+        :is="statusIcon"
+        class="status-capsule-icon"
+        :class="{ 'status-capsule-icon-spinning': process.status === 'running' || process.status === 'pending' }"
+        :size="15"
         :stroke-width="2"
         aria-hidden="true"
       />
-      <CircleAlert
-        v-else-if="process.status === 'failed'"
-        class="dify-execution-header-icon"
-        :size="16"
-        :stroke-width="2"
-        aria-hidden="true"
-      />
-      <PauseCircle
-        v-else-if="process.status === 'stopped' || process.status === 'paused'"
-        class="dify-execution-header-icon"
-        :size="16"
-        :stroke-width="2"
-        aria-hidden="true"
-      />
-      <CircleCheck
-        v-else
-        class="dify-execution-header-icon"
-        :size="16"
-        :stroke-width="2"
-        aria-hidden="true"
-      />
-      <span class="dify-execution-title">{{ processTitle }}</span>
-      <span class="dify-execution-status">{{ processStatusLabel }}</span>
+      <span class="status-capsule-title">{{ stageLabel }}</span>
+      <span class="status-capsule-status">{{ isActive ? '请稍候' : processStatusLabel }}</span>
       <ChevronRight
-        class="dify-execution-chevron"
-        :class="{ 'dify-execution-chevron-expanded': process.expanded }"
+        v-if="!isActive"
+        class="status-capsule-chevron"
+        :class="{ 'status-capsule-chevron-expanded': process.expanded }"
         :size="16"
         :stroke-width="2"
         aria-hidden="true"
       />
     </button>
 
-    <Transition name="dify-execution-collapse">
-      <div v-if="process.expanded" class="dify-execution-body">
-        <div v-if="!process.nodes.length" class="dify-execution-empty">正在准备执行节点…</div>
-        <div v-for="node in process.nodes" :key="node.key" class="dify-execution-node">
-          <div class="dify-execution-node-row">
-            <component
-              :is="nodeIcon(node.status)"
-              class="dify-execution-node-icon"
-              :class="[
-                `dify-execution-node-icon-${node.status}`,
-                { 'dify-execution-icon-spinning': node.status === 'running' || node.status === 'retrying' },
-              ]"
-              :size="15"
-              :stroke-width="2"
-              :title="nodeStatusLabel(node.status)"
-              aria-hidden="true"
-            />
-            <span class="dify-execution-node-title" :title="node.title">{{ node.title }}</span>
-            <span class="dify-execution-node-status">{{ nodeStatusLabel(node.status) }}</span>
-            <span v-if="node.elapsedTime !== null" class="dify-execution-node-time">
-              {{ formatElapsed(node.elapsedTime) }}
-            </span>
-          </div>
-          <div v-if="node.error" class="dify-execution-node-error">{{ node.error }}</div>
+    <Transition name="status-capsule-collapse">
+      <div v-if="process.expanded && !isActive" class="status-capsule-body">
+        <div class="status-capsule-capability-label">已调用能力</div>
+        <div v-if="capabilities.length" class="status-capsule-capabilities">
+          <span v-for="capability in capabilities" :key="capability" class="status-capsule-capability">
+            {{ capability }}
+          </span>
         </div>
       </div>
     </Transition>

@@ -1,11 +1,50 @@
 import { isProxy, isRef, toRaw } from 'vue'
 
-function createActionId() {
-  if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID()
+const DEFAULT_PORTAL_ORIGIN = 'http://172.17.3.34:5300'
+
+function normalizeOrigin(value) {
+  if (!value || typeof value !== 'string') return ''
+
+  try {
+    const origin = new URL(value).origin
+    return origin === 'null' ? '' : origin
+  } catch {
+    return ''
+  }
+}
+
+export function resolvePortalOrigin(explicitOrigin = '') {
+  const configuredOrigin = normalizeOrigin(
+    explicitOrigin || import.meta.env?.VITE_IGIX_PORTAL_ORIGIN || '',
+  )
+  if (configuredOrigin) return configuredOrigin
+
+  const referrerOrigin = normalizeOrigin(
+    typeof document !== 'undefined' ? document.referrer : '',
+  )
+  return referrerOrigin || DEFAULT_PORTAL_ORIGIN
+}
+
+function createFallbackUuid() {
+  const bytes = new Uint8Array(16)
+
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes)
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256)
+    }
   }
 
-  return `igix_action_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+export function createActionId() {
+  return globalThis.crypto?.randomUUID?.() || createFallbackUuid()
 }
 
 function isPlainObject(value) {
@@ -51,11 +90,13 @@ export function sanitizePayload(value) {
 
 export function sendIgixAction(payload = {}, meta = {}) {
   const cleanPayload = sanitizePayload(payload) || {}
+  const { actionId: _ignoredActionId, ...payloadWithoutActionId } = cleanPayload
   const actionPayload = {
-    ...cleanPayload,
-    actionId: cleanPayload.actionId || createActionId(),
+    ...payloadWithoutActionId,
+    actionId: createActionId(),
   }
   const sentAt = new Date().toISOString()
+  const targetOrigin = resolvePortalOrigin()
 
   if (import.meta.env?.DEV) {
     console.info('IGIX ACTION SEND', {
@@ -80,13 +121,12 @@ export function sendIgixAction(payload = {}, meta = {}) {
     }
   }
 
-  // TODO: 生产环境应限制父页面 origin，避免向非 iGIX 页面发送业务动作。
   window.parent.postMessage(
     {
       type: 'IGIX_AI_ACTION',
       payload: actionPayload,
     },
-    '*',
+    targetOrigin,
   )
 
   return actionPayload
