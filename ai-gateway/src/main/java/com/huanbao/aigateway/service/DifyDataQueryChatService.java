@@ -19,6 +19,11 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -36,6 +41,9 @@ import org.springframework.web.client.RestClientResponseException;
 public class DifyDataQueryChatService {
     private static final Logger log = LoggerFactory.getLogger(DifyDataQueryChatService.class);
     private static final String PROTOCOL_VERSION = "2.0";
+    private static final long SSE_HEARTBEAT_INTERVAL_MS = 10_000L;
+    private static final ScheduledExecutorService SSE_HEARTBEAT_EXECUTOR =
+        Executors.newScheduledThreadPool(2, new DaemonThreadFactory());
     private static final Pattern ANALYSIS_STATE_MARKER = Pattern.compile(
         "<!--HUANBAO_ANALYSIS_STATE:([\\s\\S]*?)-->", Pattern.CASE_INSENSITIVE
     );
@@ -80,6 +88,7 @@ public class DifyDataQueryChatService {
     ) {
         Instant startedAt = Instant.now();
         StreamState state = new StreamState(request.requestId(), request.conversationId(), mapping.difyConversationId());
+        ScheduledFuture<?> heartbeat = startSseHeartbeat(output, request.requestId());
         try {
             emit(output, "analysis_started", Map.of(
                 "requestId", request.requestId(),
@@ -134,7 +143,28 @@ public class DifyDataQueryChatService {
                 startedAt, Instant.now()
             );
             return false;
+        } finally {
+            heartbeat.cancel(false);
         }
+    }
+
+    /**
+     * Dify workflows can be quiet while an LLM or SQL node is running. A
+     * comment frame keeps the browser and any reverse proxy from treating the
+     * otherwise healthy streaming response as an idle connection. Comments
+     * are deliberately not application events and are ignored by SSE clients.
+     */
+    private ScheduledFuture<?> startSseHeartbeat(OutputStream output, String requestId) {
+        return SSE_HEARTBEAT_EXECUTOR.scheduleAtFixedRate(() -> {
+            try {
+                synchronized (output) {
+                    output.write(": heartbeat\n\n".getBytes(StandardCharsets.UTF_8));
+                    output.flush();
+                }
+            } catch (IOException ex) {
+                log.debug("DATA_QUERY_SSE_HEARTBEAT_STOPPED requestId={}", requestId);
+            }
+        }, SSE_HEARTBEAT_INTERVAL_MS, SSE_HEARTBEAT_INTERVAL_MS, TimeUnit.MILLISECONDS);
     }
 
     private Map<String, Object> buildDifyBody(
@@ -480,9 +510,11 @@ public class DifyDataQueryChatService {
     }
 
     private void emit(OutputStream output, String event, Object data) throws IOException {
-        output.write(("event: " + event + "\n").getBytes(StandardCharsets.UTF_8));
-        output.write(("data: " + objectMapper.writeValueAsString(data) + "\n\n").getBytes(StandardCharsets.UTF_8));
-        output.flush();
+        synchronized (output) {
+            output.write(("event: " + event + "\n").getBytes(StandardCharsets.UTF_8));
+            output.write(("data: " + objectMapper.writeValueAsString(data) + "\n\n").getBytes(StandardCharsets.UTF_8));
+            output.flush();
+        }
     }
 
     private BusinessException toBusinessException(Exception error) {
@@ -619,6 +651,15 @@ public class DifyDataQueryChatService {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException ignored) {
             return "";
+        }
+    }
+
+    private static final class DaemonThreadFactory implements ThreadFactory {
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "data-query-sse-heartbeat");
+            thread.setDaemon(true);
+            return thread;
         }
     }
 }
