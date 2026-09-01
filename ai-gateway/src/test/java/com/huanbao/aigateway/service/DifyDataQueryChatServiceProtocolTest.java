@@ -16,6 +16,7 @@ import com.huanbao.aigateway.security.DataQueryIdentity;
 import java.io.ByteArrayOutputStream;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -88,6 +89,32 @@ class DifyDataQueryChatServiceProtocolTest {
         assertFalse(output.contains("event: completed"));
     }
 
+    @Test
+    void intermediateLlmOutputDoesNotCorruptFinalWorkflowProtocol() throws Exception {
+        String response = "{"
+            + "\"protocolVersion\":\"2.0\",\"requestId\":\"\",\"conversationId\":\"\","
+            + "\"status\":\"SUCCESS_WITH_DATA\",\"messageType\":\"analysis\","
+            + "\"analysisType\":\"FACT\",\"content\":{"
+            + "\"title\":\"发电量\",\"summary\":\"查询完成\",\"metrics\":[],"
+            + "\"table\":null,\"chart\":null,\"insights\":[],\"evidence\":[],"
+            + "\"dataInfo\":{},\"followUps\":[]},\"clarification\":null,\"meta\":{}}";
+        String difySse = workflowEvent("node_finished", "llm", Map.of(
+            "text", "{\"analysis_type\":\"FACT\"}"
+        )) + workflowEvent("workflow_finished", "workflow", Map.of("answer", response));
+        TestContext context = context(difySse);
+
+        boolean success = context.service.stream(
+            context.request, context.identity, context.authorization, context.mapping,
+            "127.0.0.1", "test", context.output
+        );
+
+        String output = context.output.toString();
+        assertTrue(success);
+        assertTrue(output.contains("event: analysis_result"));
+        assertTrue(output.contains("SUCCESS_WITH_DATA"));
+        assertFalse(output.contains("PROTOCOL_VALIDATION_FAILED"));
+    }
+
     private TestContext context(String difySse) throws Exception {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -129,6 +156,13 @@ class DifyDataQueryChatServiceProtocolTest {
     private String difyEvent(String answer) throws Exception {
         return "event: message\n"
             + "data: " + OBJECT_MAPPER.writeValueAsString(Map.of("answer", answer)) + "\n\n";
+    }
+
+    private String workflowEvent(String event, String nodeType, Map<String, Object> outputs) throws Exception {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("node_type", nodeType);
+        data.put("outputs", outputs);
+        return "data: " + OBJECT_MAPPER.writeValueAsString(Map.of("event", event, "data", data)) + "\n\n";
     }
 
     private record TestContext(

@@ -309,7 +309,7 @@ public class DifyDataQueryChatService {
             emit(output, "analysis_started", Map.of("requestId", state.requestId, "stage", "querying"));
         }
 
-        String answer = extractAnswer(data);
+        String answer = extractAnswer(event, data);
         if (StringUtils.hasText(answer)) {
             String previous = state.finalAnswer;
             state.finalAnswer = mergeAnswer(previous, answer);
@@ -538,7 +538,17 @@ public class DifyDataQueryChatService {
         return new BusinessException("DIFY_ERROR", "Dify request failed");
     }
 
-    private String extractAnswer(JsonNode data) {
+    private String extractAnswer(String event, JsonNode data) {
+        String eventName = firstNonBlank(event, data.path("event").asText(""));
+        if ("workflow_finished".equals(eventName)) {
+            return extractText(data.path("data").path("outputs").path("answer"), 0);
+        }
+        if ("node_finished".equals(eventName)) {
+            String nodeType = data.path("data").path("node_type").asText("");
+            return "answer".equalsIgnoreCase(nodeType)
+                ? extractText(data.path("data").path("outputs").path("answer"), 0)
+                : "";
+        }
         for (JsonNode candidate : List.of(
             data.path("answer"), data.path("text"), data.path("data").path("answer"),
             data.path("data").path("text"), data.path("data").path("outputs"), data.path("outputs"),
