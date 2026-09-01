@@ -9,10 +9,24 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class RestClientConfig {
 
-    @Bean
-    public RestClient difyRestClient(DifyPolicyProperties properties) {
+    @Bean("difyPolicyRestClient")
+    public RestClient difyPolicyRestClient(DifyPolicyProperties properties) {
+        return buildClient(properties.timeoutMs());
+    }
+
+    @Bean("difyDataQueryRestClient")
+    public RestClient difyDataQueryRestClient(DataQueryProperties properties) {
+        return buildClient(properties.safeTimeoutMs());
+    }
+
+    @Bean("difyOfficeRestClient")
+    public RestClient difyOfficeRestClient(DifyOfficeProperties properties) {
+        return buildClient(properties.timeoutMs());
+    }
+
+    private RestClient buildClient(int configuredTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        int timeout = properties.timeoutMs() > 0 ? properties.timeoutMs() : (int) Duration.ofSeconds(30).toMillis();
+        int timeout = configuredTimeout > 0 ? configuredTimeout : (int) Duration.ofSeconds(30).toMillis();
         requestFactory.setConnectTimeout(timeout);
         requestFactory.setReadTimeout(timeout);
 

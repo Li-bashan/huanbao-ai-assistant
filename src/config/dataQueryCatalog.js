@@ -1,5 +1,3 @@
-const runtimeEnv = typeof import.meta.env === 'object' ? import.meta.env : {}
-
 const DEFAULT_CAPABILITIES = {
   yearly: true,
   yoy: true,
@@ -244,7 +242,7 @@ export const DATA_QUERY_ANALYSIS_OPTIONS = [
   { key: 'monthly', label: '月度趋势' },
 ]
 
-export const DATA_QUERY_DEFAULT_PERIOD = runtimeEnv.VITE_DATA_QUERY_DEFAULT_PERIOD || '今年'
+export const DATA_QUERY_DEFAULT_PERIOD = import.meta.env.VITE_DATA_QUERY_DEFAULT_PERIOD || '今年'
 export const DATA_QUERY_UNSUPPORTED_DOMAINS = ['合同', '预算', '科研', '财务', '人力资源', '采购全域', '全域经营']
 
 export function flattenDataQueryIndicators() {

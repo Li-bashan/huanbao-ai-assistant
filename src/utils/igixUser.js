@@ -4,9 +4,12 @@ const USER_FIELD_KEYS = [
   'name',
   'mobilePhone',
   'orgId',
+  'orgCode',
   'orgName',
   'unitId',
+  'unitCode',
   'unitName',
+  'tenantId',
   'tenantName',
 ]
 
@@ -49,10 +52,16 @@ export function normalizeIgixUser(rawUser) {
     name: normalizeText(rawUser.name),
     mobilePhone: normalizeText(rawUser.mobilePhone),
     orgId: normalizeText(rawUser.orgId),
+    orgCode: normalizeText(rawUser.orgCode || rawUser.org?.code || rawUser.organizationCode),
     orgName: normalizeText(rawUser.orgName),
     unitId: normalizeText(rawUser.unitId),
+    unitCode: normalizeText(rawUser.unitCode || rawUser.unit?.code),
     unitName: normalizeText(rawUser.unitName),
+    tenantId: normalizeText(rawUser.tenantId || rawUser.tenantCode),
     tenantName: normalizeText(rawUser.tenantName),
+    portalIdentity: normalizeText(rawUser.portalIdentity || rawUser.signedIdentity || rawUser.identityToken),
+    portalIdentityTimestamp: normalizeText(rawUser.portalIdentityTimestamp || rawUser.identityTimestamp),
+    portalIdentitySignature: normalizeText(rawUser.portalIdentitySignature || rawUser.identitySignature),
   }
 
   const hasValue = USER_FIELD_KEYS.some((key) => Boolean(normalizedUser[key]))
@@ -97,6 +106,18 @@ function findUserInfosService() {
   }
 
   return null
+}
+
+export function getPortalIdentityHeaders(user = null) {
+  const identity = normalizeText(user?.portalIdentity || user?.signedIdentity)
+  const timestamp = normalizeText(user?.portalIdentityTimestamp || user?.identityTimestamp)
+  const signature = normalizeText(user?.portalIdentitySignature || user?.identitySignature)
+  if (!identity || !timestamp || !signature) return {}
+  return {
+    'X-Portal-Identity': identity,
+    'X-Portal-Identity-Timestamp': timestamp,
+    'X-Portal-Identity-Signature': signature,
+  }
 }
 
 function requestUserFromParent() {

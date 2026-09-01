@@ -1,26 +1,67 @@
 package com.huanbao.aigateway.controller;
 
 import com.huanbao.aigateway.common.ApiResponse;
+import com.huanbao.aigateway.dto.ConversationMapping;
 import com.huanbao.aigateway.dto.PolicyChatRequest;
 import com.huanbao.aigateway.dto.PolicyChatResponse;
+import com.huanbao.aigateway.security.DataQueryIdentity;
+import com.huanbao.aigateway.security.DataQueryIdentityService;
+import com.huanbao.aigateway.service.ConversationMappingService;
+import com.huanbao.aigateway.service.DataQueryRateLimiter;
 import com.huanbao.aigateway.service.PolicyChatService;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.util.StringUtils;
 
 @RestController
 @RequestMapping("/api/ai/policy")
 public class PolicyChatController {
     private final PolicyChatService policyChatService;
+    private final DataQueryIdentityService identityService;
+    private final ConversationMappingService mappingService;
+    private final DataQueryRateLimiter rateLimiter;
 
-    public PolicyChatController(PolicyChatService policyChatService) {
+    public PolicyChatController(
+        PolicyChatService policyChatService,
+        DataQueryIdentityService identityService,
+        ConversationMappingService mappingService,
+        DataQueryRateLimiter rateLimiter
+    ) {
         this.policyChatService = policyChatService;
+        this.identityService = identityService;
+        this.mappingService = mappingService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/chat")
-    public ApiResponse<PolicyChatResponse> chat(@Valid @RequestBody PolicyChatRequest request) {
-        return ApiResponse.ok(policyChatService.chat(request));
+    public ApiResponse<PolicyChatResponse> chat(
+        @RequestHeader(value = DataQueryIdentityService.IDENTITY_HEADER, required = false) String signedIdentity,
+        @RequestHeader(value = DataQueryIdentityService.TIMESTAMP_HEADER, required = false) String timestamp,
+        @RequestHeader(value = DataQueryIdentityService.SIGNATURE_HEADER, required = false) String signature,
+        @Valid @RequestBody PolicyChatRequest request
+    ) {
+        DataQueryIdentity identity = identityService.resolve(request, signedIdentity, timestamp, signature);
+        if (!rateLimiter.tryAcquire(identity.userId())) {
+            throw new com.huanbao.aigateway.exception.BusinessException("RATE_LIMITED", "request rate limit exceeded");
+        }
+        String requestId = UUID.randomUUID().toString();
+        String clientConversationId = StringUtils.hasText(request.conversationId())
+            ? request.conversationId().trim()
+            : "hb_" + UUID.randomUUID();
+        PolicyChatRequest serverRequest = request.withConversationId(clientConversationId);
+        ConversationMapping mapping = mappingService.claim(identity, "policy", clientConversationId, requestId);
+        boolean success = false;
+        try {
+            PolicyChatResponse response = policyChatService.chat(serverRequest, identity, mapping, requestId);
+            success = true;
+            return ApiResponse.ok(response);
+        } finally {
+            mappingService.release(mapping, requestId, success);
+        }
     }
 }

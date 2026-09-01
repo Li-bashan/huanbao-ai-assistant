@@ -13,43 +13,37 @@ import org.springframework.util.StringUtils;
 @Service
 public class DataQueryUserService {
     private final DataQueryUserRepository repository;
-    private final DataQueryAccessService accessService;
 
-    public DataQueryUserService(
-        DataQueryUserRepository repository,
-        DataQueryAccessService accessService
-    ) {
+    public DataQueryUserService(DataQueryUserRepository repository) {
         this.repository = repository;
-        this.accessService = accessService;
     }
 
     public List<DataQueryUserResponse> list(String keyword, Boolean enabled) {
-        String normalizedKeyword = keyword == null ? null : accessService.normalize(keyword);
-        return repository.findAll(
-            StringUtils.hasText(normalizedKeyword) ? normalizedKeyword : null,
-            enabled
-        );
+        String normalized = keyword == null ? null : keyword.trim();
+        if (normalized != null && normalized.length() > 120) {
+            throw new BusinessException("VALIDATION_ERROR", "keyword is too long");
+        }
+        return repository.findAll(StringUtils.hasText(normalized) ? normalized : null, enabled);
     }
 
     public DataQueryUserResponse create(DataQueryUserCreateRequest request) {
-        String userName = requireUserName(request.userName());
-        return repository.insert(userName, request.enabled() == null || request.enabled(), normalizeRemark(request.remark()));
+        validate(request.userId(), request.userName(), request.tenantId());
+        try {
+            return repository.insert(request);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new BusinessException("DATA_QUERY_USER_CONFLICT", "tenantId and userId must be unique");
+        }
     }
 
     public DataQueryUserResponse update(long id, DataQueryUserUpdateRequest request) {
-        if (id <= 0) {
-            throw new BusinessException("INVALID_ID", "id must be positive");
-        }
-        String userName = requireUserName(request.userName());
+        if (id <= 0) throw new BusinessException("INVALID_ID", "id must be positive");
+        validate(request.userId(), request.userName(), request.tenantId());
         try {
-            return repository.update(
-                id,
-                userName,
-                request.enabled(),
-                normalizeRemark(request.remark())
-            );
+            return repository.update(id, request);
         } catch (EmptyResultDataAccessException ex) {
             throw new BusinessException("DATA_QUERY_USER_NOT_FOUND", "data query user not found");
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new BusinessException("DATA_QUERY_USER_CONFLICT", "tenantId and userId must be unique");
         }
     }
 
@@ -59,17 +53,9 @@ public class DataQueryUserService {
         }
     }
 
-    private String requireUserName(String value) {
-        String userName = accessService.normalize(value);
-        if (!StringUtils.hasText(userName)) {
-            throw new BusinessException("USER_NAME_REQUIRED", "userName must not be blank");
-        }
-        return userName;
-    }
-
-    private String normalizeRemark(String value) {
-        if (value == null) return null;
-        String remark = value.trim();
-        return remark.isEmpty() ? null : remark;
+    private void validate(String userId, String userName, String tenantId) {
+        if (!StringUtils.hasText(userId)) throw new BusinessException("USER_ID_REQUIRED", "userId must not be blank");
+        if (!StringUtils.hasText(userName)) throw new BusinessException("USER_NAME_REQUIRED", "userName must not be blank");
+        if (!StringUtils.hasText(tenantId)) throw new BusinessException("TENANT_ID_REQUIRED", "tenantId must not be blank");
     }
 }

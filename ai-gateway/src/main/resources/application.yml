@@ -22,9 +22,27 @@ dify:
     api-base: ${DIFY_POLICY_API_BASE:http://localhost/v1}
     api-key: ${DIFY_POLICY_API_KEY:}
     timeout-ms: ${DIFY_POLICY_TIMEOUT_MS:30000}
+  office:
+    api-base: ${DIFY_OFFICE_API_BASE:http://localhost/v1}
+    api-key: ${DIFY_OFFICE_API_KEY:}
+    timeout-ms: ${DIFY_OFFICE_TIMEOUT_MS:60000}
 
 data-query:
   admin-token: ${DATA_QUERY_ADMIN_TOKEN:}
+  api-base: ${DIFY_DATA_QUERY_API_BASE:http://localhost/v1}
+  api-key: ${DIFY_DATA_QUERY_API_KEY:}
+  timeout-ms: ${DIFY_DATA_QUERY_TIMEOUT_MS:60000}
+  dify-user-hmac-secret: ${DIFY_USER_HMAC_SECRET:}
+  identity-mode: ${DATA_QUERY_IDENTITY_MODE:SIGNED_HEADER}
+  identity-secret: ${DATA_QUERY_IDENTITY_SECRET:}
+  identity-clock-skew-seconds: ${DATA_QUERY_IDENTITY_CLOCK_SKEW_SECONDS:300}
+  allow-body-identity-trial: ${DATA_QUERY_ALLOW_BODY_IDENTITY_TRIAL:false}
+  max-requests-per-minute: ${DATA_QUERY_MAX_REQUESTS_PER_MINUTE:30}
+  max-concurrent-per-user: ${DATA_QUERY_MAX_CONCURRENT_PER_USER:1}
+  default-organization-scope: ${DATA_QUERY_DEFAULT_ORGANIZATION_SCOPE:USER_AUTHORIZED}
+  allow-group-ranking: ${DATA_QUERY_ALLOW_GROUP_RANKING:false}
+  allowed-indicator-codes: ${DATA_QUERY_ALLOWED_INDICATOR_CODES:}
+  audit-enabled: ${DATA_QUERY_AUDIT_ENABLED:true}
 
 logging:
   level:

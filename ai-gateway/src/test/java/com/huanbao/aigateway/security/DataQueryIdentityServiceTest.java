@@ -1,0 +1,87 @@
+package com.huanbao.aigateway.security;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.huanbao.aigateway.config.DataQueryProperties;
+import com.huanbao.aigateway.dto.DataQueryChatRequest;
+import com.huanbao.aigateway.dto.DataQueryUserContext;
+import com.huanbao.aigateway.exception.BusinessException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import org.junit.jupiter.api.Test;
+
+class DataQueryIdentityServiceTest {
+    private static final String SECRET = "test-secret";
+
+    @Test
+    void bodyIdentityIsRejectedUnlessTrialModeIsExplicitlyEnabled() {
+        DataQueryChatRequest request = request();
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> service("SIGNED_HEADER", false).resolve(request, "", "", "")
+        );
+
+        assertEquals("IDENTITY_UNVERIFIED", exception.getCode());
+        DataQueryIdentity trial = service("BODY_TRIAL", true).resolve(request, "", "", "");
+        assertFalse(trial.verified());
+        assertEquals("BODY_TRIAL", trial.source());
+        assertEquals("user-1", trial.userId());
+    }
+
+    @Test
+    void signedIdentityMustHaveValidHmacAndTimestamp() throws Exception {
+        long timestamp = Instant.now().getEpochSecond();
+        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(
+            "{\"userId\":\"user-1\",\"userName\":\"张三\",\"orgCode\":\"ORG-1\",\"tenantId\":\"tenant-1\"}"
+                .getBytes(StandardCharsets.UTF_8)
+        );
+        String signature = hmac(timestamp + "." + encoded);
+
+        DataQueryIdentity identity = service("SIGNED_HEADER", false)
+            .resolve(request(), encoded, String.valueOf(timestamp), signature);
+
+        assertTrue(identity.verified());
+        assertEquals("SIGNED_HEADER", identity.source());
+        assertEquals("tenant-1", identity.tenantId());
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> service("SIGNED_HEADER", false).resolve(request(), encoded, String.valueOf(timestamp), "bad")
+        );
+        assertEquals("IDENTITY_UNVERIFIED", exception.getCode());
+    }
+
+    private DataQueryChatRequest request() {
+        return new DataQueryChatRequest(
+            "查询发电量", "", "request-1",
+            new DataQueryUserContext("user-1", "U1", "张三", "ORG-1", "组织一", "tenant-1"),
+            java.util.Map.of(), null
+        );
+    }
+
+    private DataQueryIdentityService service(String mode, boolean allowTrial) {
+        return new DataQueryIdentityService(
+            new ObjectMapper(),
+            new DataQueryProperties("http://dify", "key", 1000, mode, SECRET, 300,
+                allowTrial, 30, "USER_AUTHORIZED", false, "", false)
+        );
+    }
+
+    private String hmac(String value) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        StringBuilder hex = new StringBuilder();
+        for (byte item : mac.doFinal(value.getBytes(StandardCharsets.UTF_8))) {
+            hex.append(String.format("%02x", item));
+        }
+        return hex.toString();
+    }
+}

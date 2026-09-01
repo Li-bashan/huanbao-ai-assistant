@@ -2,7 +2,7 @@
 
 环宝 AI 智能助手是一个基于 Vue 3 + Vite 的企业门户右侧智能助手前端项目，用于嵌入公司办公门户，为员工提供查制度、写材料、办流程、问生产数据的一站式入口。
 
-当前版本是可演示、可使用的前端 V1：制度问答、办公智能和智能问数已接入 Dify 应用，流程助手为前端动作卡片演示版，后续通过 postMessage、门户父页面、iGIX 菜单/表单能力完成真实办理。
+当前版本是可演示、可使用的前端 V1：制度问答、办公智能和智能问数统一经 AI Gateway 接入 Dify，流程助手为前端动作卡片演示版，后续通过 postMessage、门户父页面、iGIX 菜单/表单能力完成真实办理。
 
 项目整体最新状态见[项目现状总览](./docs/项目现状总览.md)；Dify 全部应用、已发布工作流、草稿和其他节点见[Dify 全部应用与工作流现状](./docs/Dify全部应用与工作流现状.md)，服务器和模型配置见[Dify 服务器部署与模型配置](./docs/Dify服务器部署与模型配置.md)。
 
@@ -14,7 +14,7 @@
   - 制度问答：查询制度依据，使用 Dify blocking。
   - 办公智能：办公材料处理，使用 Dify Agent streaming。
   - 流程助手：流程办理辅助，当前为前端动作卡片，不接真实业务系统。
-  - 智能问数：查询生产指标数据，按当前接入的 Dify 问数应用返回真实结果；当前工作流直接使用 Kingbase SQL 插件，尚未接入 AI Gateway。详见 [Dify 智能问数工作流现状](./docs/Dify智能问数工作流现状.md) 和 [Dify 全部应用与工作流现状](./docs/Dify全部应用与工作流现状.md)。
+  - 智能问数：查询生产指标数据，前端只持有用户专属会话句柄，由 AI Gateway 负责身份、DataScope、会话归属和 Dify SSE 代理；详见 [智能问数一体化升级交付报告](./docs/智能问数一体化升级交付报告.md)。
 - 标题栏智能能力选择器，数量和菜单来自 `assistantModes` 配置。
 - 自动意图识别与模式分发。
 - Markdown 渲染与 DOMPurify 安全过滤。
@@ -30,7 +30,7 @@
 - Vite
 - JavaScript
 - CSS
-- Dify API
+  - AI Gateway / Dify
 - markdown-it
 - DOMPurify
 - localStorage
@@ -46,7 +46,9 @@ src/
     assistantModes.js             四种智能能力配置
     workflowActions.js            流程助手动作卡片配置
   services/
-    chatApi.js                    Dify blocking / streaming / Mock 调用
+    chatApi.js                    Gateway 路由与 Mock 调用
+    dataQueryApi.js               智能问数 Gateway SSE 客户端
+    gatewayChatApi.js             制度/办公 Gateway 客户端
   utils/
     conversationStorage.js        localStorage 会话历史
     intentRouter.js               自动意图识别
@@ -81,14 +83,13 @@ npm run build
 前端环境变量只放非敏感配置。Dify API Key 在 AI Gateway 版本中只能放后端环境变量，不能放进 `VITE_` 变量，因为 `VITE_` 会被打进浏览器产物。
 
 ```env
-VITE_DIFY_USER=your-user-id
-VITE_USE_DIFY=true
 VITE_AI_GATEWAY_BASE_URL=http://localhost:8088
+VITE_DATA_QUERY_DEFAULT_PERIOD=今年
 ```
 
 说明：
-- `VITE_AI_GATEWAY_BASE_URL` 用于后续前端切换到 AI Gateway。
-- 旧版前端直连 Dify 变量仅作为历史兼容，不应用于企业级部署。
+- `VITE_AI_GATEWAY_BASE_URL` 是智能问数当前生产入口；Gateway 的 Dify Key 只放后端环境变量。
+- 旧版前端直连 Dify 变量已从运行链路移除，不要再写入 `.env.local`。
 - Vite 只能读取 `VITE_` 开头的变量。
 
 ## 服务器部署
@@ -204,5 +205,5 @@ mvn spring-boot:run
 注意：
 
 - 真实 Dify API Key 只能放后端环境变量或后端配置，不能提交到代码和文档。
-- 当前前端还未切换到 AI Gateway，后续需要将制度问答请求从前端直连 Dify 改为调用 `/api/ai/policy/chat`。
+- 制度问答和办公智能当前通过 AI Gateway 代理，分别调用 `/api/ai/policy/chat` 和 `/api/ai/office/chat`；Dify Key 只允许存在 Gateway 后端环境。
 - 操作审计表 SQL 位于 `docs/sql/ai_action_audit.sql`。

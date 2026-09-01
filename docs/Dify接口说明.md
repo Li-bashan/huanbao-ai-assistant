@@ -1,8 +1,8 @@
 # Dify 接口说明
 
-更新时间：2026-08-28
+更新时间：2026-08-31
 
-> 当前实现仍由前端直连 Dify。AI Gateway 代理代码已存在但尚未接入当前 Dify 智能问数工作流；生产环境应完成网关切换后移除浏览器可见的 Dify API Key。智能问数工作流的实际节点和版本状态见[《Dify 智能问数工作流现状》](./Dify智能问数工作流现状.md)。
+> 智能问数已由环宝前端通过 AI Gateway 代理，浏览器不再读取 `VITE_DATA_QUERY_DIFY_API_KEY`。本文件中关于智能问数前端直连的内容属于历史接口记录；当前 Dify 控制台发布状态仍以部署环境实测为准。
 
 ## Dify 在项目中的作用
 
@@ -36,13 +36,13 @@ Dify 提供三类智能能力，产品层共展示四项能力（流程助手由
 ## 智能问数接口
 
 - 模式：`data-query`
-- 方法：当前代码使用 `POST /chat-messages`。
-- `response_mode`：`streaming`。
-- 环境变量：`VITE_DATA_QUERY_DIFY_API_BASE`、`VITE_DATA_QUERY_DIFY_API_KEY`。
+- 环宝入口：`POST /api/ai/data-query/chat`，`response_mode` 由 Gateway 固定为 `streaming`。
+- Dify 上游：仅 Gateway 服务端调用 `POST /chat-messages`。
+- 环宝只配置 `VITE_AI_GATEWAY_BASE_URL`；Dify Key 使用 Gateway 的 `DIFY_DATA_QUERY_API_KEY`，不能配置在 `VITE_` 变量中。
 - 当前应用：`智慧办公—智能问数`，Dify 地址为 `http://121.237.178.23:9002`，应用 ID 为 `200bb456-20bf-48ab-af38-c7b9e59ff070`，模式为 `advanced-chat`。
-- 请求输入：`query` 为用户问题；前端仍会传 `inputs.current_user_name`，但截至 2026-08-28，已发布工作流和最新草稿都没有引用 `current_user_name`、`userName` 或 `AI_GATEWAY`。
-- 当前实际链路：Dify 工作流通过 `rookie_text2data / rookie_excute_sql` 插件直接连接 KingbaseES，不经过仓库内的 AI Gateway；连接参数来自 Dify 环境变量。
-- 返回处理：优先读取 `data.outputs.answer/text/result/response/output`；空结果和 workflow failed 统一提示，不在前端生成业务数据。
+- 请求输入：Gateway 注入已校验身份、组织范围、指标范围和分析上下文；前端不再发送 Dify 内部节点字段。
+- 当前产品协议：Dify 结果组装为 `Data Query Response Protocol v2`，由环宝原生渲染摘要、KPI、表格、图表、洞察、数据说明和追问入口。
+- 旧版纯文本仍由 Gateway 和前端转换成 `LEGACY_RESPONSE`，以摘要文本降级，不阻断整个聊天。
 
 ## blocking 请求格式
 
@@ -120,4 +120,4 @@ Dify 提供三类智能能力，产品层共展示四项能力（流程助手由
 - 不要写真实 API Key。
 - `.env.local` 不提交。
 - 生产建议走后端代理隐藏 Key。
-- 智能问数人员开放范围见[智能问数人员开放范围说明](./智能问数人员开放范围说明.md)。但当前线上 Dify 工作流尚未把 `current_user_name` 放进 Gateway 请求体，仓库内的 Gateway 权限检查目前没有被该工作流调用。
+- 智能问数当前由 Gateway 统一校验身份和开放范围；人员配置与迁移说明见[智能问数一体化升级交付报告](./智能问数一体化升级交付报告.md)。

@@ -31,6 +31,7 @@ import DataQueryUserAdmin from './components/DataQueryUserAdmin.vue'
 import PromptStarters from './components/PromptStarters.vue'
 import WorkflowActionCard from './components/WorkflowActionCard.vue'
 import { sendMasterChatMessage, stopChatMessage } from './services/chatApi'
+import { streamDataQueryMessage } from './services/dataQueryApi.js'
 import { checkDataQueryAccess } from './services/dataQueryAccessApi'
 import {
   clearCurrentConversation,
@@ -39,10 +40,12 @@ import {
   clearConversationHistory,
   deleteConversationFromHistory,
   getConversationHistory,
+  getUserStorageKey,
   getCurrentConversation,
   sanitizeMessages,
   saveConversationToHistory,
   saveCurrentConversation,
+  setConversationStorageUser,
 } from './utils/conversationStorage'
 import { detectIntent } from './utils/intentRouter'
 import { sendIgixAction } from './utils/actionBridge'
@@ -69,8 +72,6 @@ import {
 
 const DataQueryResult = defineAsyncComponent(() => import('./components/DataQueryResult.vue'))
 
-const MODE_STORAGE_KEY = 'huanbao_current_mode'
-const MODE_LOCK_STORAGE_KEY = 'huanbao_mode_locked'
 const isDataQueryAdminPage =
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).get('page') === 'data-query-users'
@@ -82,7 +83,7 @@ const getModeByKey = (modeKey) =>
 
 const getStoredModeKey = () => {
   try {
-    const storedModeKey = localStorage.getItem(MODE_STORAGE_KEY)
+    const storedModeKey = localStorage.getItem(getUserStorageKey('current_mode'))
     return getModeByKey(storedModeKey).key
   } catch {
     return defaultAssistantModeKey
@@ -91,7 +92,7 @@ const getStoredModeKey = () => {
 
 const getStoredModeLock = () => {
   try {
-    return localStorage.getItem(MODE_LOCK_STORAGE_KEY) === 'true'
+    return localStorage.getItem(getUserStorageKey('mode_locked')) === 'true'
   } catch {
     return false
   }
@@ -99,7 +100,7 @@ const getStoredModeLock = () => {
 
 const saveModeKey = (modeKey) => {
   try {
-    localStorage.setItem(MODE_STORAGE_KEY, modeKey)
+    localStorage.setItem(getUserStorageKey('current_mode'), modeKey)
   } catch {
     // Ignore storage failures so the assistant remains usable.
   }
@@ -107,7 +108,7 @@ const saveModeKey = (modeKey) => {
 
 const saveModeLock = (isLocked) => {
   try {
-    localStorage.setItem(MODE_LOCK_STORAGE_KEY, String(isLocked))
+    localStorage.setItem(getUserStorageKey('mode_locked'), String(isLocked))
   } catch {
     // Ignore storage failures so the assistant remains usable.
   }
@@ -128,6 +129,7 @@ const historyFilter = ref('all')
 const copiedMessageId = ref('')
 const currentUser = ref(null)
 const currentUserReady = ref(false)
+const dataQueryAnalysisState = ref('')
 const dataQueryAccessStatus = ref('idle')
 const dataQueryAccessErrorKind = ref('')
 let dataQueryAccessRequestId = 0
@@ -337,6 +339,7 @@ const buildCurrentConversation = () => {
     conversationId: conversationId.value,
     conversationIds: conversationIds.value,
     messages: storedMessages,
+    analysisState: dataQueryAnalysisState.value,
     createdAt:
       currentConversation?.id === currentConversationId.value ? currentConversation.createdAt : now,
     updatedAt: now,
@@ -441,10 +444,10 @@ const refreshDataQueryAccess = async () => {
   if (currentMode.value.key !== 'data-query' || !currentUserReady.value) return
 
   const requestId = ++dataQueryAccessRequestId
-  const userName = currentUser.value?.name?.trim()
+  const userId = currentUser.value?.userId?.trim()
   dataQueryAccessErrorKind.value = ''
 
-  if (!userName) {
+  if (!userId) {
     dataQueryAccessStatus.value = 'error'
     dataQueryAccessErrorKind.value = 'current-user-missing'
     return
@@ -452,14 +455,19 @@ const refreshDataQueryAccess = async () => {
 
   dataQueryAccessStatus.value = 'checking'
   try {
-    const result = await checkDataQueryAccess(userName)
+    const result = await checkDataQueryAccess(currentUser.value)
     if (requestId !== dataQueryAccessRequestId) return
     dataQueryAccessStatus.value = result?.covered ? 'covered' : 'not-covered'
     dataQueryAccessErrorKind.value = ''
   } catch (error) {
     if (requestId !== dataQueryAccessRequestId) return
-    dataQueryAccessStatus.value = 'error'
-    dataQueryAccessErrorKind.value = error?.code === 'CURRENT_USER_MISSING' ? 'current-user-missing' : 'api'
+    if (error?.code === 'DATA_QUERY_NOT_COVERED' || error?.code === 'ACCESS_DENIED') {
+      dataQueryAccessStatus.value = 'not-covered'
+      dataQueryAccessErrorKind.value = ''
+    } else {
+      dataQueryAccessStatus.value = 'error'
+      dataQueryAccessErrorKind.value = error?.code === 'CURRENT_USER_MISSING' ? 'current-user-missing' : 'api'
+    }
   }
 }
 
@@ -499,8 +507,33 @@ const refreshCurrentUser = async ({ retry = false } = {}) => {
 
     if (refreshToken !== currentUserRefreshToken) return user
 
+    const previousUserStorageKey = setConversationStorageUser(currentUser.value)
+    const nextUserStorageKey = setConversationStorageUser(user)
     currentUser.value = user
-    if (!wasReady) currentUserReady.value = true
+    if (!wasReady) {
+      currentModeKey.value = getStoredModeKey()
+      isModeLocked.value = getStoredModeLock()
+      currentUserReady.value = true
+    }
+
+    if (wasReady && previousUserStorageKey !== nextUserStorageKey) {
+      activeChatRequest?.controller.abort()
+      activeChatRequest = null
+      messages.value = []
+      conversationId.value = ''
+      conversationIds.value = {}
+      currentConversationId.value = createConversationId()
+      currentModeKey.value = getStoredModeKey()
+      isModeLocked.value = getStoredModeLock()
+      conversationHistory.value = getConversationHistory()
+      const nextConversation = getCurrentConversation()
+      if (nextConversation?.messages?.length) {
+        currentModeKey.value = getModeByKey(nextConversation.modeKey || currentModeKey.value).key
+        isModeLocked.value = nextConversation.modeLocked === true
+        currentConversationId.value = nextConversation.id || createConversationId()
+        messages.value = sanitizeMessages(nextConversation.messages)
+      }
+    }
 
     if (wasReady && currentMode.value.key === 'data-query') {
       await refreshDataQueryAccess()
@@ -521,7 +554,7 @@ const refreshCurrentUser = async ({ retry = false } = {}) => {
 }
 
 const retryDataQueryAccess = async () => {
-  if (dataQueryAccessErrorKind.value === 'current-user-missing' || !currentUser.value?.name?.trim()) {
+  if (dataQueryAccessErrorKind.value === 'current-user-missing' || !currentUser.value?.userId?.trim()) {
     await refreshCurrentUser({ retry: true })
     return
   }
@@ -1027,6 +1060,8 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
       apiMode: requestMode.apiMode,
       modeKey: requestModeKey,
       currentUserName: currentUser.value?.name || '',
+      currentUser: currentUser.value,
+      analysisState: dataQueryAnalysisState.value,
       signal: requestController.signal,
       onTask: (taskId) => {
         if (activeChatRequest?.controller === requestController && taskId) {
@@ -1036,10 +1071,16 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
     }
     let hasStreamedAnswer = false
 
-    const result = await sendMasterChatMessage(
+    const chatRequest = requestModeKey === 'data-query'
+      ? streamDataQueryMessage
+      : sendMasterChatMessage
+    const result = await chatRequest(
       requestModeKey === 'data-query' ? content : handoffQuestion,
       {
         ...requestOptions,
+        ...(requestModeKey === 'data-query' && options.dataQueryClarification
+          ? { clarification: options.dataQueryClarification }
+          : {}),
         onMessage: (messageContent, meta = {}) => {
           if (requestController.signal.aborted) return
           const streamingMessage = messages.value.find(
@@ -1094,6 +1135,10 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
 
     if (requestController.signal.aborted) return
 
+    if (requestModeKey === 'data-query') {
+      dataQueryAnalysisState.value =
+        result.analysisState || result.protocol?.meta?.analysisState || ''
+    }
     setModeConversationId(requestModeKey, result.conversationId)
 
     const loadingMessage = messages.value.find((message) => message.id === loadingMessageId)
@@ -1106,13 +1151,22 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
       loadingMessage.sources = result.sources || []
       loadingMessage.messageId = result.messageId || ''
       loadingMessage.expandedSourceId = ''
-      const interactions = normalizeMessageInteractions(result, requestModeKey, content)
+      const isStructuredDataQuery =
+        requestModeKey === 'data-query' &&
+        result.protocol?.protocolVersion === '2.0' &&
+        result.protocol?.protocolValid
+      const interactions = isStructuredDataQuery
+        ? { missingInput: null, actionPills: [], followUps: [] }
+        : normalizeMessageInteractions(result, requestModeKey, content)
       loadingMessage.actionPills = interactions.actionPills
       loadingMessage.messageFollowUps = interactions.followUps
       loadingMessage.followUps = interactions.followUps
       loadingMessage.missingInput = interactions.missingInput
       loadingMessage.errorState = null
       Object.assign(loadingMessage, getCapabilityFields(requestModeKey, capabilityKeys))
+      loadingMessage.protocol = result.protocol || null
+      loadingMessage.messageType = result.protocol?.messageType || ''
+      loadingMessage.analysisType = result.protocol?.analysisType || ''
       loadingMessage.chartOption =
         result.chartOption ||
         (requestModeKey === 'data-query'
@@ -1120,8 +1174,11 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
           : null) ||
         loadingMessage.chartOption ||
         null
-      loadingMessage.followUps =
-        requestModeKey === 'data-query' ? buildDataQueryFollowUps(content) : []
+      loadingMessage.followUps = isStructuredDataQuery
+        ? []
+        : requestModeKey === 'data-query'
+          ? buildDataQueryFollowUps(content)
+          : []
     }
   } catch (error) {
     if (isCancelledChatError(error, requestController)) {
@@ -1237,6 +1294,27 @@ const handleDataExplorationItem = (item, type) => {
       ? `查询${DATA_QUERY_DEFAULT_PERIOD}${label}生产指标`
       : `查询${DATA_QUERY_DEFAULT_PERIOD}${label}`
   sendMessage(question)
+}
+
+const handleDataQueryFollowUp = (followUp) => {
+  const query = String(followUp?.query || followUp?.prompt || followUp?.label || '').trim()
+  if (query) sendMessage(query, { bypassRecentGuard: true })
+}
+
+const handleDataQueryClarification = (message, candidate) => {
+  const clarification = message?.protocol?.clarification
+  const selectedValue = String(candidate?.id || '').trim()
+  const selectedLabel = String(candidate?.label || '').trim()
+  if (!clarification?.slot || !selectedValue || !selectedLabel) return
+
+  sendMessage(selectedLabel, {
+    bypassRecentGuard: true,
+    dataQueryClarification: {
+      slot: clarification.slot,
+      selectedValue,
+      selectedLabel,
+    },
+  })
 }
 
 const canUseMessageTools = (message) =>
@@ -1396,6 +1474,7 @@ const restoreConversation = async (conversation) => {
   }
   conversationId.value = getModeConversationId(currentModeKey.value)
   messages.value = sanitizeMessages(conversation.messages || [])
+  dataQueryAnalysisState.value = conversation.analysisState || ''
   showHistory.value = false
   showCapabilityMenu.value = false
 
@@ -1427,6 +1506,7 @@ const newChat = async () => {
   saveModeKey(defaultAssistantModeKey)
   conversationId.value = ''
   conversationIds.value = {}
+  dataQueryAnalysisState.value = ''
   currentConversationId.value = createConversationId()
   showHistory.value = false
   showCapabilityMenu.value = false
@@ -1465,6 +1545,7 @@ onMounted(async () => {
     }
     conversationId.value = getModeConversationId(currentModeKey.value)
     messages.value = sanitizeMessages(currentConversation.messages)
+    dataQueryAnalysisState.value = currentConversation.analysisState || ''
     await scrollToBottom()
   }
 })
@@ -1819,8 +1900,11 @@ watch(
               <DataQueryResult
                 v-if="message.role === 'assistant' && message.modeKey === 'data-query'"
                 :answer="message.content"
+                :protocol="message.protocol"
                 :chart-option="message.chartOption"
                 :window-view="windowState.view"
+                @follow-up="handleDataQueryFollowUp"
+                @clarification="handleDataQueryClarification(message, $event)"
               />
 
               <WorkflowActionCard

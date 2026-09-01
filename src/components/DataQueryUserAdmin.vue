@@ -21,7 +21,24 @@ const authenticated = computed(() => Boolean(adminToken.value))
 const showEditor = ref(false)
 const errorMessage = ref('')
 const notice = ref('')
-const editor = reactive({ id: null, userName: '', enabled: true, remark: '' })
+const editor = reactive({
+  id: null,
+  userId: '',
+  userCode: '',
+  userName: '',
+  tenantId: 'default',
+  tenantName: '',
+  orgId: '',
+  orgCode: '',
+  orgName: '',
+  enabled: true,
+  remark: '',
+  scopeType: 'COMPANY',
+  allowedOrgCodes: '',
+  allowedIndicatorCodes: '',
+  allowGroupRanking: false,
+  allowAllOrganizations: false,
+})
 
 const clearFeedback = () => {
   errorMessage.value = ''
@@ -74,9 +91,21 @@ const signOut = () => {
 
 const resetEditor = () => {
   editor.id = null
+  editor.userId = ''
+  editor.userCode = ''
   editor.userName = ''
+  editor.tenantId = 'default'
+  editor.tenantName = ''
+  editor.orgId = ''
+  editor.orgCode = ''
+  editor.orgName = ''
   editor.enabled = true
   editor.remark = ''
+  editor.scopeType = 'COMPANY'
+  editor.allowedOrgCodes = ''
+  editor.allowedIndicatorCodes = ''
+  editor.allowGroupRanking = false
+  editor.allowAllOrganizations = false
 }
 
 const openCreate = () => {
@@ -88,9 +117,21 @@ const openCreate = () => {
 const openEdit = (user) => {
   clearFeedback()
   editor.id = user.id
+  editor.userId = user.userId || ''
+  editor.userCode = user.userCode || ''
   editor.userName = user.userName
+  editor.tenantId = user.tenantId || 'default'
+  editor.tenantName = user.tenantName || ''
+  editor.orgId = user.orgId || ''
+  editor.orgCode = user.orgCode || ''
+  editor.orgName = user.orgName || ''
   editor.enabled = user.enabled
   editor.remark = user.remark || ''
+  editor.scopeType = user.scopeType || 'COMPANY'
+  editor.allowedOrgCodes = (user.allowedOrgCodes || []).join(', ')
+  editor.allowedIndicatorCodes = (user.allowedIndicatorCodes || []).join(', ')
+  editor.allowGroupRanking = Boolean(user.allowGroupRanking)
+  editor.allowAllOrganizations = Boolean(user.allowAllOrganizations)
   showEditor.value = true
 }
 
@@ -100,7 +141,13 @@ const closeEditor = () => {
 }
 
 const saveUser = async () => {
+  const userId = editor.userId.trim()
   const userName = editor.userName.trim()
+  const tenantId = editor.tenantId.trim()
+  if (!userId) {
+    errorMessage.value = '用户 ID 不能为空，必须与门户可信身份一致。'
+    return
+  }
   if (!userName) {
     errorMessage.value = '姓名不能为空。'
     return
@@ -113,11 +160,32 @@ const saveUser = async () => {
     errorMessage.value = '备注不能超过 255 个字符。'
     return
   }
+  if (!tenantId) {
+    errorMessage.value = '租户 ID 不能为空。'
+    return
+  }
 
   saving.value = true
   clearFeedback()
   try {
-    const payload = { userName, enabled: editor.enabled, remark: editor.remark.trim() }
+    const toList = (value) => value.split(/[,，\s]+/).map((item) => item.trim()).filter(Boolean)
+    const payload = {
+      userId,
+      userCode: editor.userCode.trim(),
+      userName,
+      tenantId,
+      tenantName: editor.tenantName.trim(),
+      orgId: editor.orgId.trim(),
+      orgCode: editor.orgCode.trim(),
+      orgName: editor.orgName.trim(),
+      enabled: editor.enabled,
+      remark: editor.remark.trim(),
+      scopeType: editor.scopeType,
+      allowedOrgCodes: toList(editor.allowedOrgCodes),
+      allowedIndicatorCodes: toList(editor.allowedIndicatorCodes),
+      allowGroupRanking: editor.allowGroupRanking,
+      allowAllOrganizations: editor.allowAllOrganizations,
+    }
     if (editor.id) {
       await updateDataQueryUser(editor.id, payload)
       notice.value = '人员信息已更新。'
@@ -137,11 +205,11 @@ const saveUser = async () => {
 const toggleUser = async (user) => {
   clearFeedback()
   try {
-    await updateDataQueryUser(user.id, {
-      userName: user.userName,
-      enabled: !user.enabled,
-      remark: user.remark || '',
-    })
+    if (!user.userId || !user.tenantId) {
+      errorMessage.value = '该旧名单还没有完成可信身份映射，请编辑后补齐用户 ID 和租户 ID。'
+      return
+    }
+    await updateDataQueryUser(user.id, { ...user, enabled: !user.enabled })
     notice.value = user.enabled ? '人员已停用。' : '人员已启用。'
     await loadUsers()
   } catch (error) {
@@ -214,12 +282,13 @@ onMounted(() => {
         <div v-else-if="!users.length" class="data-query-admin-empty">暂无匹配人员。</div>
         <div v-else class="data-query-admin-table-wrap">
           <table class="data-query-admin-table">
-            <thead><tr><th>姓名</th><th>状态</th><th>备注</th><th>更新时间</th><th>操作</th></tr></thead>
+            <thead><tr><th>用户 ID</th><th>姓名 / 组织</th><th>范围</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
             <tbody>
               <tr v-for="user in users" :key="user.id">
-                <td>{{ user.userName }}</td>
+                <td>{{ user.userId || '待迁移' }}</td>
+                <td>{{ user.userName }}<small v-if="user.orgName"> · {{ user.orgName }}</small></td>
+                <td>{{ user.scopeType || 'NONE' }}</td>
                 <td><span class="data-query-admin-status" :class="user.enabled ? 'enabled' : 'disabled'">{{ user.enabled ? '已启用' : '已停用' }}</span></td>
-                <td>{{ user.remark || '-' }}</td>
                 <td>{{ formatTime(user.updatedAt) }}</td>
                 <td class="data-query-admin-row-actions">
                   <button type="button" class="link" @click="openEdit(user)">编辑</button>
@@ -239,7 +308,20 @@ onMounted(() => {
     <div v-if="showEditor" class="data-query-admin-modal-backdrop" @click.self="closeEditor">
       <form class="data-query-admin-modal" @submit.prevent="saveUser">
         <h2>{{ editor.id ? '编辑人员' : '新增人员' }}</h2>
-        <label>姓名 *<input v-model="editor.userName" type="text" maxlength="80" autofocus /></label>
+        <label>用户 ID *<input v-model="editor.userId" type="text" maxlength="120" autofocus /></label>
+        <label>用户编码<input v-model="editor.userCode" type="text" maxlength="120" /></label>
+        <label>姓名 *<input v-model="editor.userName" type="text" maxlength="80" /></label>
+        <label>租户 ID *<input v-model="editor.tenantId" type="text" maxlength="120" /></label>
+        <label>租户名称<input v-model="editor.tenantName" type="text" maxlength="160" /></label>
+        <label>组织编码<input v-model="editor.orgCode" type="text" maxlength="120" /></label>
+        <label>组织名称<input v-model="editor.orgName" type="text" maxlength="160" /></label>
+        <label>组织范围
+          <select v-model="editor.scopeType"><option value="NONE">无</option><option value="ORG">指定组织</option><option value="COMPANY">公司范围</option><option value="GROUP">集团范围</option></select>
+        </label>
+        <label>允许组织编码<input v-model="editor.allowedOrgCodes" type="text" placeholder="多个编码用逗号分隔" /></label>
+        <label>允许指标编码<input v-model="editor.allowedIndicatorCodes" type="text" placeholder="多个编码用逗号分隔，留空表示不限制" /></label>
+        <label class="data-query-admin-checkbox"><input v-model="editor.allowGroupRanking" type="checkbox" />允许集团排名</label>
+        <label class="data-query-admin-checkbox"><input v-model="editor.allowAllOrganizations" type="checkbox" />允许全部组织</label>
         <label>备注<input v-model="editor.remark" type="text" maxlength="255" /></label>
         <label class="data-query-admin-checkbox"><input v-model="editor.enabled" type="checkbox" />启用</label>
         <div class="data-query-admin-modal-actions">

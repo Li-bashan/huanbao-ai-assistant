@@ -19,7 +19,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.fail(ex.getCode(), ex.getMessage()));
+        return ResponseEntity.status(statusFor(ex.getCode()))
+            .body(ApiResponse.fail(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -51,5 +52,27 @@ public class GlobalExceptionHandler {
 
     private String formatFieldError(FieldError error) {
         return error.getField() + " " + error.getDefaultMessage();
+    }
+
+    private HttpStatus statusFor(String code) {
+        if ("UNAUTHENTICATED".equals(code)
+            || "IDENTITY_UNTRUSTED".equals(code)
+            || "IDENTITY_UNVERIFIED".equals(code)
+            || "IDENTITY_CONFIG_MISSING".equals(code)
+            || "CURRENT_USER_MISSING".equals(code)) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        if ("DATA_QUERY_NOT_COVERED".equals(code)
+            || "ACCESS_DENIED".equals(code)
+            || "DATA_SCOPE_DENIED".equals(code)
+            || "CONVERSATION_OWNERSHIP_MISMATCH".equals(code)) {
+            return HttpStatus.FORBIDDEN;
+        }
+        if ("RATE_LIMITED".equals(code)) return HttpStatus.TOO_MANY_REQUESTS;
+        if (code != null && code.startsWith("DIFY_TIMEOUT")) return HttpStatus.GATEWAY_TIMEOUT;
+        if (code != null && (code.startsWith("DIFY_") || "ANALYSIS_FAILED".equals(code))) {
+            return HttpStatus.BAD_GATEWAY;
+        }
+        return HttpStatus.BAD_REQUEST;
     }
 }

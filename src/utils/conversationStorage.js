@@ -3,10 +3,59 @@ import {
   extractDataQueryChartOption,
   removeDataQueryChartPayload,
 } from './dataQueryChart.js'
+import { stripDataQueryAnalysisMetadata } from './dataQueryAnalysis.js'
+import { normalizeDataQueryResponse } from './dataQueryProtocol.js'
 
-const CURRENT_CONVERSATION_KEY = 'huanbao_current_conversation'
-const CONVERSATION_HISTORY_KEY = 'huanbao_conversation_history'
 const MAX_HISTORY_COUNT = 50
+
+let activeUserNamespace = 'guest'
+
+function stableHash(value) {
+  let hash = 2166136261
+  for (const character of String(value || '')) {
+    hash ^= character.charCodeAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+function getTabNamespace() {
+  try {
+    const existing = sessionStorage.getItem('huanbao_tab_namespace')
+    if (existing) return existing
+    const created = `tab_${stableHash(`${Date.now()}_${Math.random()}`)}`
+    sessionStorage.setItem('huanbao_tab_namespace', created)
+    return created
+  } catch {
+    return `tab_${stableHash(`${Date.now()}_${Math.random()}`)}`
+  }
+}
+
+const tabNamespace = getTabNamespace()
+
+function getUserIdentitySeed(user = {}) {
+  const userId = String(user.userId || user.id || '').trim()
+  const tenantId = String(user.tenantId || user.tenantName || '').trim()
+  const userCode = String(user.code || user.userCode || '').trim()
+  return [tenantId, userId || userCode].join(':')
+}
+
+export function getConversationStorageUserKey(user = null) {
+  const seed = getUserIdentitySeed(user)
+  return seed.replace(/:/g, '').trim() ? `u_${stableHash(seed)}` : 'guest'
+}
+
+export function setConversationStorageUser(user = null) {
+  activeUserNamespace = getConversationStorageUserKey(user)
+  return activeUserNamespace
+}
+
+export function getUserStorageKey(name) {
+  return `huanbao:${activeUserNamespace}:${name}`
+}
+
+const getCurrentConversationKey = () => getUserStorageKey(`current_conversation:${tabNamespace}`)
+const getConversationHistoryKey = () => getUserStorageKey('conversation_history')
 
 function readJson(key, fallback) {
   try {
@@ -30,8 +79,9 @@ function removeThinkContent(text = '') {
 }
 
 function sanitizeMessageContent(message) {
-  const content = removeThinkContent(message?.content)
-  if (message?.modeKey !== 'data-query') return content
+  const rawContent = removeThinkContent(message?.content)
+  if (message?.modeKey !== 'data-query') return rawContent
+  const content = stripDataQueryAnalysisMetadata(rawContent)
   return removeDataQueryChartPayload(content)
 }
 
@@ -42,6 +92,37 @@ function sanitizeMessageChartOption(message) {
   if (chartOption) return chartOption
   if (message?.modeKey !== 'data-query') return null
   return createDataQueryChartOptionFromAnswer(sanitizeMessageContent(message))
+}
+
+function sanitizeDataQueryProtocol(message) {
+  if (message?.modeKey !== 'data-query' || !message?.protocol) return null
+
+  const protocol = normalizeDataQueryResponse(message.protocol, {
+    fallbackText: sanitizeMessageContent(message),
+  })
+  if (!protocol || protocol.protocolVersion !== '2.0') return null
+
+  const table = protocol.content?.table
+  if (table?.rows?.length) {
+    protocol.content.table = {
+      ...table,
+      rows: table.rows.slice(0, 200),
+    }
+  }
+
+  try {
+    if (JSON.stringify(protocol).length > 180000) {
+      protocol.content.chart = null
+      protocol.content.evidence = []
+      protocol.content.table = protocol.content.table
+        ? { ...protocol.content.table, rows: protocol.content.table.rows.slice(0, 80) }
+        : null
+    }
+  } catch {
+    return null
+  }
+
+  return protocol
 }
 
 function sanitizeExecutionProcess(process) {
@@ -126,7 +207,8 @@ function sanitizeCapabilityMetadata(message) {
 }
 
 export function createConversationId() {
-  return `conv_${Date.now()}`
+  if (globalThis.crypto?.randomUUID) return `conv_${globalThis.crypto.randomUUID()}`
+  return `conv_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
 export function createConversationTitle(messages = []) {
@@ -147,15 +229,26 @@ function normalizeConversation(conversation) {
     id: conversation.id || `conv_${timestamp}`,
     title: conversation.title || createConversationTitle(messages),
     modeKey: conversation.modeKey || 'policy',
-    conversationId: conversation.conversationId || '',
-    conversationIds:
-      conversation.conversationIds && typeof conversation.conversationIds === 'object'
-        ? conversation.conversationIds
-        : conversation.conversationId
-          ? { [conversation.modeKey || 'policy']: conversation.conversationId }
-          : {},
+    // These ids are local product conversation ids only. Dify conversation ids
+    // are held by the Gateway mapping table and never persisted in browser
+    // history or used as the restore contract.
+    conversationId: typeof conversation.conversationId === 'string'
+      ? conversation.conversationId.slice(0, 120)
+      : '',
+    conversationIds: conversation.conversationIds && typeof conversation.conversationIds === 'object'
+      ? Object.fromEntries(
+          Object.entries(conversation.conversationIds)
+            .filter(([key, value]) => key && typeof value === 'string' && value.trim())
+            .slice(0, 8)
+            .map(([key, value]) => [key, value.slice(0, 120)]),
+        )
+      : {},
     modeLocked: conversation.modeLocked === true,
     messages,
+    analysisState:
+      typeof conversation.analysisState === 'string'
+        ? conversation.analysisState.slice(0, 12000)
+        : '',
     createdAt: conversation.createdAt || timestamp,
     updatedAt: timestamp,
   }
@@ -185,6 +278,7 @@ export function sanitizeMessages(messages = []) {
       content: sanitizeMessageContent(message),
       loading: false,
       messageType: message.messageType || '',
+      analysisType: message.analysisType || message.protocol?.analysisType || '',
       modeKey: message.modeKey || '',
       ...sanitizeCapabilityMetadata(message),
       executionProcess: sanitizeExecutionProcess(message.executionProcess || message.workflowProcess),
@@ -221,6 +315,7 @@ export function sanitizeMessages(messages = []) {
           }
         : null,
       chartOption: sanitizeMessageChartOption(message),
+      protocol: sanitizeDataQueryProtocol(message),
       messageId: message.messageId || '',
       expandedSourceId: '',
       missingInput: message.missingInput
@@ -284,21 +379,21 @@ export function sanitizeMessages(messages = []) {
 }
 
 export function getCurrentConversation() {
-  return readJson(CURRENT_CONVERSATION_KEY, null)
+  return readJson(getCurrentConversationKey(), null)
 }
 
 export function saveCurrentConversation(conversation) {
   const normalizedConversation = normalizeConversation(conversation)
   if (!normalizedConversation) return
-  writeJson(CURRENT_CONVERSATION_KEY, normalizedConversation)
+  writeJson(getCurrentConversationKey(), normalizedConversation)
 }
 
 export function clearCurrentConversation() {
-  localStorage.removeItem(CURRENT_CONVERSATION_KEY)
+  localStorage.removeItem(getCurrentConversationKey())
 }
 
 export function getConversationHistory() {
-  const history = readJson(CONVERSATION_HISTORY_KEY, [])
+  const history = readJson(getConversationHistoryKey(), [])
   if (!Array.isArray(history)) return []
 
   return history
@@ -320,16 +415,16 @@ export function saveConversationToHistory(conversation) {
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .slice(0, MAX_HISTORY_COUNT)
 
-  writeJson(CONVERSATION_HISTORY_KEY, nextHistory)
+  writeJson(getConversationHistoryKey(), nextHistory)
   return nextHistory
 }
 
 export function deleteConversationFromHistory(conversationId) {
   const nextHistory = getConversationHistory().filter((item) => item.id !== conversationId)
-  writeJson(CONVERSATION_HISTORY_KEY, nextHistory)
+  writeJson(getConversationHistoryKey(), nextHistory)
   return nextHistory
 }
 
 export function clearConversationHistory() {
-  localStorage.removeItem(CONVERSATION_HISTORY_KEY)
+  localStorage.removeItem(getConversationHistoryKey())
 }

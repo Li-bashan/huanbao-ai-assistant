@@ -250,7 +250,29 @@ def _terms(value):
 def _literal(value):
     return "'" + str(value).replace("'", "''")[:80] + "'"
 
-def _lookup_sql(indicator_input, organization_input):
+def _auth_list(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value or "[]")
+        except Exception:
+            value = [item.strip() for item in value.split(",")]
+    if not isinstance(value, list):
+        return []
+    return list(dict.fromkeys(str(item).strip()[:120] for item in value if str(item).strip()))[:1000]
+
+def _auth_context(value):
+    try:
+        parsed = json.loads(value or "{}") if isinstance(value, str) else (value or {})
+    except Exception:
+        parsed = {}
+    return {
+        "allowed_org_codes": _auth_list(parsed.get("allowedOrgCodes")),
+        "allowed_indicator_codes": _auth_list(parsed.get("allowedIndicatorCodes")),
+        "allow_all_organizations": bool(parsed.get("allowAllOrganizations")),
+        "allow_group_ranking": bool(parsed.get("allowGroupRanking")),
+    }
+
+def _lookup_sql(indicator_input, organization_input, auth):
     iterms = _terms(indicator_input)
     iconditions = []
     for term in iterms:
@@ -262,6 +284,9 @@ def _lookup_sql(indicator_input, organization_input):
     if str(indicator_input or '').strip().isdigit():
         iconditions.append('"newcode" = ' + _literal(str(indicator_input).strip()))
     indicator_where = " OR ".join(iconditions) if iconditions else "1=0"
+    allowed_indicators = auth.get("allowed_indicator_codes") or []
+    if allowed_indicators:
+        indicator_where = "(" + indicator_where + ") AND \"newcode\" IN (" + ",".join(_literal(item) for item in allowed_indicators) + ")"
 
     oterms = _terms(organization_input)
     oconditions = []
@@ -271,6 +296,11 @@ def _lookup_sql(indicator_input, organization_input):
         if re.match(r"^[A-Za-z0-9-]{5,40}$", term):
             oconditions.append('"Code" = ' + lit)
     org_where = " OR ".join(oconditions) if oconditions else "1=0"
+    allowed_orgs = auth.get("allowed_org_codes") or []
+    if allowed_orgs and not auth.get("allow_all_organizations"):
+        org_where = "(" + org_where + ") AND \"Code\" IN (" + ",".join(_literal(item) for item in allowed_orgs) + ")"
+    elif not auth.get("allow_all_organizations"):
+        org_where = "1=0"
     indicator_sql = (
         'SELECT "newcode" AS code, "newIndicatorname" AS name, '
         'COALESCE("IndicatorUnit", \'\') AS unit, '
@@ -285,7 +315,7 @@ def _lookup_sql(indicator_input, organization_input):
     )
     return indicator_sql, organization_sql
 
-def main(intent_text: str, question: str) -> dict:
+def main(intent_text: str, question: str, auth_context_json: str) -> dict:
     intent = _json(intent_text)
     original_question = str(question or "").strip()
     indicator_input = str(intent.get("indicator_input") or "").strip()
@@ -325,7 +355,8 @@ def main(intent_text: str, question: str) -> dict:
             normalized_indicator = formal
             break
 
-    indicator_sql, organization_sql = _lookup_sql(normalized_indicator, organization_input)
+    auth = _auth_context(auth_context_json)
+    indicator_sql, organization_sql = _lookup_sql(normalized_indicator, organization_input, auth)
     base = {
         "original_question": original_question,
         "current_date": today.isoformat(),
@@ -341,6 +372,11 @@ def main(intent_text: str, question: str) -> dict:
         "formula": None,
         "formula_source": "",
         "authorized_indicator_codes": [],
+        "allowed_org_codes": auth.get("allowed_org_codes", []),
+        "allowed_indicator_codes": auth.get("allowed_indicator_codes", []),
+        "allow_all_organizations": auth.get("allow_all_organizations", False),
+        "allow_group_ranking": auth.get("allow_group_ranking", False),
+        "has_indicator_scope": bool(auth.get("allowed_indicator_codes")),
         "status": status,
         "request_type": str(intent.get("request_type") or "aggregate"),
     }
@@ -438,12 +474,20 @@ def main(base_json: str, indicator_data, indicator_error: str, organization_data
             else:
                 status = "AGGREGATION_NOT_CONFIRMED"
             base["authorized_indicator_codes"] = [chosen["code"]]
+            allowed_indicator_codes = base.get("allowed_indicator_codes") or []
+            if allowed_indicator_codes and chosen["code"] not in allowed_indicator_codes:
+                status = "DATA_SCOPE_DENIED"
+                base["indicator"]["status"] = "DENIED"
 
     org_input = str(base.get("organization", {}).get("input_name") or "").strip()
     if status == "READY" and org_input:
         if len(organizations) == 0:
-            status = "ORGANIZATION_NOT_FOUND"
-            base["organization"]["status"] = "NOT_FOUND"
+            if not base.get("allow_all_organizations"):
+                status = "DATA_SCOPE_DENIED"
+                base["organization"]["status"] = "DENIED"
+            else:
+                status = "ORGANIZATION_NOT_FOUND"
+                base["organization"]["status"] = "NOT_FOUND"
         elif len(organizations) > 1:
             status = "ORGANIZATION_AMBIGUOUS"
             base["organization"]["status"] = "AMBIGUOUS"
@@ -452,6 +496,8 @@ def main(base_json: str, indicator_data, indicator_error: str, organization_data
             base["organization"].update({"standard_name": chosen_org["name"], "code": chosen_org["code"], "status": "RESOLVED"})
     elif status == "READY":
         base["organization"].update({"standard_name": "全部组织", "status": "ALL"})
+        if not base.get("allow_all_organizations") and not base.get("allowed_org_codes"):
+            status = "DATA_SCOPE_DENIED"
 
     request_type = str(base.get("request_type") or "")
     if status == "READY" and (request_type == "calculation" or re.search(r"(?:同比|环比|率|效率|占比|平均)", input_name)):
@@ -495,6 +541,13 @@ def _build(context):
     start = str(context.get("query_start_date") or "")
     end = str(context.get("query_end_date") or "")
     aggregation = str(indicator.get("aggregation") or "")
+    allowed_org_codes = [str(item).strip() for item in (context.get("allowed_org_codes") or []) if re.match(r"^[A-Za-z0-9_-]{1,120}$", str(item).strip())]
+    allowed_indicator_codes = [str(item).strip() for item in (context.get("allowed_indicator_codes") or []) if re.match(r"^[A-Za-z0-9_-]{1,120}$", str(item).strip())]
+    allow_all_organizations = bool(context.get("allow_all_organizations"))
+    if allowed_indicator_codes and code not in allowed_indicator_codes:
+        return "", "DATA_SCOPE_DENIED", "当前账号无权查询该指标"
+    if not allow_all_organizations and not allowed_org_codes:
+        return "", "DATA_SCOPE_DENIED", "当前账号没有可查询的组织范围"
     if context.get("status") != "READY":
         return "", "SQL_VALIDATION_FAILED", "查询上下文状态不是 READY，禁止执行 SQL"
     if not tables or not code or not start or not end or aggregation != "SUM":
@@ -512,7 +565,11 @@ def _build(context):
         org_code = str(organization.get("code") or "")
         if not re.match(r"^[A-Za-z0-9-]{5,40}$", org_code):
             return "", "SQL_VALIDATION_FAILED", "resolved organization code 非法"
+        if not allow_all_organizations and org_code not in allowed_org_codes:
+            return "", "DATA_SCOPE_DENIED", "当前账号无权查询该组织"
         org_filter = ' AND "orgcode" = ' + _lit(org_code)
+    elif not allow_all_organizations:
+        org_filter = ' AND "orgcode" IN (' + ",".join(_lit(item) for item in allowed_org_codes) + ")"
     union = " UNION ALL ".join(selects)
     where = '"newIndicator" = ' + _lit(code) + ' AND "ZBRQ" >= DATE ' + _lit(start) + ' AND "ZBRQ" < DATE ' + _lit(end) + org_filter
     granularity = str(context.get("date_granularity") or "month")
@@ -611,6 +668,8 @@ def _status_message(status, context):
         return "无法确定查询时间范围，请补充明确的日期或月份。"
     if status == "FUTURE_TIME":
         return "查询时间范围包含当前日期之后的时间，暂不能返回未来数据。"
+    if status == "DATA_SCOPE_DENIED":
+        return "当前账号无权查询该组织或指标，未执行查询。"
     if status == "FORMULA_NOT_FOUND":
         return "该查询涉及公式或派生指标，但当前没有已确认的公式定义，未执行计算。"
     if status == "AGGREGATION_NOT_CONFIRMED":
@@ -681,14 +740,37 @@ def main(context_json: str, business_status: str, execution_data, execution_erro
 
   const intentSystem = `你只负责把当前用户问题抽取成结构化意图，不查数据库，不生成 SQL，不补全业务事实，不使用历史对话。只输出一个 JSON 对象，字段必须完整：indicator_input、organization_input、date_expression、granularity、request_type。granularity 只能是 day、month、year、total、auto；request_type 只能是 aggregate、detail、trend、calculation、unknown。无法确定时留空或填 unknown，禁止猜测。`
   const intentUser = `当前用户问题：\n{{#sys.query#}}\n\n只输出 JSON 对象，不要 Markdown，不要解释。`
-  const answerSystem = `你是企业生产数据查询结果回答器。你只能根据上下文 JSON 生成答案，不能重新猜指标、组织、日期、表、公式或聚合方式，不能展示 SQL、数据库连接信息或思考过程。上下文中的 status 不是 SUCCESS_WITH_DATA 时，必须明确说明对应状态；如果上下文提供了 message，results 必须逐字复制 message，不得改写候选名称、Code、状态或错误原因；没有 message 时才可以用上下文已有字段做简短说明。ORGANIZATION_AMBIGUOUS 要列候选组织让用户选择；INDICATOR_AMBIGUOUS 要列候选指标；INDICATOR_NOT_FOUND、ORGANIZATION_NOT_FOUND、TIME_PARSE_FAILED、NO_ALLOWED_TABLE、FORMULA_NOT_FOUND、SQL_VALIDATION_FAILED、SQL_EXECUTION_FAILED、RESULT_VALIDATION_FAILED、NO_DATA_IN_PERIOD、SUCCESS_EMPTY 都不能编造数值。只有 SUCCESS_WITH_DATA 才能引用 rows 中的 value，并在有 data_cutoff_date 时说明数据更新至该日期。公式只能展示上下文中明确存在的 formula。输出严格 JSON 对象，字段固定为 results、ECharts、chartType、chartTitle、chartData、chartXAxis；ECharts 只能是 0 或 1，不能有其它字段。`
+  const answerSystem = `你是企业生产数据查询结果回答器。你只能根据上下文 JSON 生成答案，不能重新猜指标、组织、日期、表、公式或聚合方式，不能展示 SQL、数据库连接信息或思考过程。上下文中的 status 不是 SUCCESS_WITH_DATA 时，必须明确说明对应状态；如果上下文提供了 message，results 必须逐字复制 message，不得改写候选名称、Code、状态或错误原因；没有 message 时才可以用上下文已有字段做简短说明。ORGANIZATION_AMBIGUOUS 要列候选组织让用户选择；INDICATOR_AMBIGUOUS 要列候选指标；DATA_SCOPE_DENIED、INDICATOR_NOT_FOUND、ORGANIZATION_NOT_FOUND、TIME_PARSE_FAILED、NO_ALLOWED_TABLE、FORMULA_NOT_FOUND、SQL_VALIDATION_FAILED、SQL_EXECUTION_FAILED、RESULT_VALIDATION_FAILED、NO_DATA_IN_PERIOD、SUCCESS_EMPTY 都不能编造数值。只有 SUCCESS_WITH_DATA 才能引用 rows 中的 value，并在有 data_cutoff_date 时说明数据更新至该日期。公式只能展示上下文中明确存在的 formula。输出严格 JSON 对象，字段固定为 results、ECharts、chartType、chartTitle、chartData、chartXAxis；ECharts 只能是 0 或 1，不能有其它字段。`
   const answerUser = `用户问题：\n{{#sys.query#}}\n\n请依据上下文生成中文回答。`
 
-  const start = wrapper(startTemplate, '1780919457192', startTemplate.data, 0, 0, 73)
+  const startData = cleanData(startTemplate.data)
+  startData.variables = [
+    'auth_context_json',
+    'auth_data_scope_json',
+    'auth_user_id',
+    'auth_user_code',
+    'auth_user_name',
+    'auth_org_code',
+    'auth_org_name',
+    'auth_tenant_id',
+    'auth_allowed_org_codes',
+    'auth_allowed_indicator_codes',
+    'auth_allow_group_ranking',
+    'auth_allow_all_organizations',
+  ].map(variable => ({
+    variable,
+    label: `Gateway ${variable}`,
+    type: 'text-input',
+    required: variable === 'auth_context_json',
+    max_length: 12000,
+    default: '',
+  }))
+  const start = wrapper(startTemplate, '1780919457192', startData, 0, 0, 73)
   const intent = llmNode('rebuild_intent', '用户问题结构化解析', intentSystem, intentUser, 300, 0)
   const preContext = codeNode('rebuild_pre_context', '时间范围与元数据查询准备', intentCode, [
     { variable: 'intent_text', value_selector: ['rebuild_intent', 'text'], value_type: 'string' },
     { variable: 'question', value_selector: ['sys', 'query'], value_type: 'string' },
+    { variable: 'auth_context_json', value_selector: ['1780919457192', 'auth_context_json'], value_type: 'string' },
   ], {
     base_json: { children: null, type: 'string' },
     indicator_lookup_sql: { children: null, type: 'string' },
@@ -778,49 +860,52 @@ def _number(value):
 def _text(value):
     return str(value or "").replace("|", "\\|").replace("\\n", " ").strip()
 
-def _render(audit):
+def _protocol(audit):
     status = str(audit.get("status") or "RESULT_VALIDATION_FAILED")
     message = str(audit.get("message") or "").strip()
-    if status != "SUCCESS_WITH_DATA":
-        return message or "未返回可信的查询结果。", [], []
-
     indicator = audit.get("indicator", {}) or {}
     organization = audit.get("organization", {}) or {}
     rows = [row for row in audit.get("rows", []) if isinstance(row, dict)]
     title = str(indicator.get("standard_name") or indicator.get("input_name") or "指标")
-    org_name = str(organization.get("standard_name") or organization.get("input_name") or "全部组织")
     start = str(audit.get("query_start_date") or "")
     end = str(audit.get("query_end_date") or "")
     cutoff = str(audit.get("data_cutoff_date") or "")
-    aggregation = str(indicator.get("aggregation") or "")
     unit = str(indicator.get("unit") or "")
-    lines = ["查询成功", "指标：%s" % title, "组织：%s" % org_name, "时间范围：%s 至 %s（结束日期不含）" % (start, end)]
-    if aggregation:
-        lines.append("聚合口径：%s" % aggregation)
-    if unit:
-        lines.append("单位：%s" % unit)
-    if cutoff:
-        lines.append("数据更新至：%s" % cutoff)
-    lines.extend(["", "| 周期 | 数值 | 原始行数 |", "| --- | ---: | ---: |"])
-    chart = []
-    axis = []
-    for row in rows:
-        period = _text(row.get("period"))
-        value = row.get("value")
-        value_text = _number(value)
-        lines.append("| %s | %s | %s |" % (period, value_text, _text(row.get("row_count"))))
-        if period and value is not None:
-            axis.append(period)
-            chart.append({"name": period, "value": value})
-    return "\n".join(lines), chart, axis
+    values = [row.get("value") for row in rows if row.get("value") is not None]
+    categories = [_text(row.get("period")) for row in rows if _text(row.get("period"))]
+    valid_rows = [{"period": _text(row.get("period")), "value": row.get("value"), "rowCount": row.get("row_count")} for row in rows]
+    is_success = status == "SUCCESS_WITH_DATA"
+    response = {
+        "protocolVersion": "2.0",
+        "requestId": "",
+        "conversationId": "",
+        "status": status if is_success else ("SUCCESS_EMPTY" if status == "NO_DATA_IN_PERIOD" else status),
+        "messageType": "analysis" if is_success else ("empty" if status == "NO_DATA_IN_PERIOD" else "information"),
+        "analysisType": "TREND" if len(categories) > 1 else "FACT",
+        "content": {
+            "title": title,
+            "summary": message if not is_success else "%s查询完成，共返回%s个数据点。" % (title, len(valid_rows)),
+            "metrics": ([{"label": "数据点", "value": len(values), "unit": "个"}] if is_success else []),
+            "table": ({"columns": [{"key": "period", "label": "周期", "type": "text"}, {"key": "value", "label": "数值", "type": "number", "unit": unit}, {"key": "rowCount", "label": "原始行数", "type": "number"}], "rows": valid_rows[:1000], "total": len(valid_rows), "defaultVisibleRows": 10} if is_success else None),
+            "chart": ({"type": "line", "title": title, "categories": categories, "series": [{"name": title, "type": "line", "data": [row.get("value") for row in valid_rows]}]} if len(categories) > 1 else None),
+            "insights": [],
+            "evidence": [],
+            "dataInfo": {"indicatorName": title, "unit": unit, "timeRange": {"start": start, "end": end, "endExclusive": True}, "dataCutoffDate": cutoff, "aggregation": str(indicator.get("aggregation") or ""), "organizationScope": str(organization.get("standard_name") or organization.get("input_name") or "全部组织"), "rowCount": len(rows)},
+            "followUps": [],
+        },
+        "clarification": None,
+        "meta": {"legacyWorkflow": True, "auditStatus": status},
+    }
+    return response
 
 def main(args: str, audit_json: str) -> dict:
     audit = _load(audit_json)
-    results, chart_data, chart_axis = _render(audit)
-    echarts = "1" if len(chart_data) > 1 else "0"
-    chart_type = "line" if len(chart_data) > 1 else ""
-    chart_title = str((audit.get("indicator", {}) or {}).get("standard_name") or "") if echarts == "1" else ""
-    return {"results": results, "text": results, "ECharts": echarts, "chartType": chart_type, "chartTitle": chart_title, "chartData": json.dumps(chart_data, ensure_ascii=False), "chartXAxis": json.dumps(chart_axis, ensure_ascii=False)}
+    response = _protocol(audit)
+    chart = response["content"].get("chart") or {}
+    chart_data = chart.get("series", [{}])[0].get("data", []) if chart else []
+    chart_axis = chart.get("categories", []) if chart else []
+    text = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+    return {"results": text, "text": text, "protocol_json": text, "ECharts": "1" if chart else "0", "chartType": chart.get("type", "") if chart else "", "chartTitle": chart.get("title", "") if chart else "", "chartData": json.dumps(chart_data, ensure_ascii=False), "chartXAxis": json.dumps(chart_axis, ensure_ascii=False)}
 `
   const parserData = cleanData(parserTemplate.data)
   parserData.type = 'code'
@@ -835,6 +920,7 @@ def main(args: str, audit_json: str) -> dict:
     chartTitle: { children: null, type: 'string' },
     chartData: { children: null, type: 'string' },
     chartXAxis: { children: null, type: 'string' },
+    protocol_json: { children: null, type: 'string' },
   }
   parserData.variables = [
     { variable: 'args', value_selector: ['rebuild_answer', 'text'], value_type: 'string' },
