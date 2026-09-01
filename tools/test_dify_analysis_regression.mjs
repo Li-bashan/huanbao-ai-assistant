@@ -90,6 +90,10 @@ correlation = plan({'analysis_type': 'CORRELATION', 'indicator_inputs': ['生活
 correlation_plan = json.loads(correlation['analysis_plan'])
 check('correlation-plan', correlation_plan['analysis_type'] == 'CORRELATION' and correlation_plan['time_series_requested'], json.dumps(correlation_plan, ensure_ascii=False))
 
+ranking_comparison = plan({}, '今年各项目公司发电量同比去年排名前5')
+ranking_comparison_plan = json.loads(ranking_comparison['analysis_plan'])
+check('ranking-comparison-plan', ranking_comparison_plan['analysis_type'] == 'RANKING_COMPARISON' and ranking_comparison_plan['organization_scope']['type'] == 'project_company' and ranking_comparison_plan['time']['start'].startswith('2026-01-01'), json.dumps(ranking_comparison_plan, ensure_ascii=False))
+
 resolved = resolve_ns['main'](
     json.dumps(correlation_plan, ensure_ascii=False),
     [{'code': 'M2', 'name': '全厂发电量', 'unit': '', 'old_name': '', 'object_code': 'M2', 'object_name': '电量'}, {'code': 'M1', 'name': '生活垃圾入厂量', 'unit': '', 'old_name': '', 'object_code': 'M1', 'object_name': '垃圾'}],
@@ -127,6 +131,10 @@ check(
 anomaly = plan({}, '哪些公司连续3个月发电量下降')
 anomaly_plan = json.loads(anomaly['analysis_plan'])
 check('anomaly-plan', anomaly_plan['analysis_type'] == 'ANOMALY' and anomaly_plan['time']['start'].endswith('-01'), json.dumps(anomaly_plan, ensure_ascii=False))
+check('anomaly-focus', anomaly_plan['anomaly_focus'] == 'CONSECUTIVE_DECREASE', json.dumps(anomaly_plan, ensure_ascii=False))
+anomaly_model_override = plan({'analysis_type': 'TREND', 'indicator_inputs': ['发电量'], 'organization_inputs': ['哪些公司']}, '哪些公司连续3个月发电量下降')
+anomaly_model_override_plan = json.loads(anomaly_model_override['analysis_plan'])
+check('anomaly-cue-overrides-model', anomaly_model_override_plan['analysis_type'] == 'ANOMALY' and anomaly_model_override_plan['organization_scope']['type'] == 'project_company', json.dumps(anomaly_model_override_plan, ensure_ascii=False))
 
 overview = plan({}, '看看最近生产经营有什么值得关注的问题')
 overview_plan = json.loads(overview['analysis_plan'])

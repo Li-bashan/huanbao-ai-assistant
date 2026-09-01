@@ -25,6 +25,7 @@ import {
   VisualMapComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+import { LegacyGridContainLabel } from 'echarts/features'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { adaptDataQueryChartOption } from '../utils/dataQueryChart.js'
 import { createIgixAssistantWindow } from '../utils/igixAssistantWindow.js'
@@ -50,6 +51,7 @@ use([
   TooltipComponent,
   VisualMapComponent,
   CanvasRenderer,
+  LegacyGridContainLabel,
 ])
 
 const props = defineProps({
