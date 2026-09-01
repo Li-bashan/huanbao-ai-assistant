@@ -34,6 +34,7 @@ function getTabNamespace() {
 const tabNamespace = getTabNamespace()
 
 function getUserIdentitySeed(user = {}) {
+  user = user || {}
   const userId = String(user.userId || user.id || '').trim()
   const tenantId = String(user.tenantId || user.tenantName || '').trim()
   const userCode = String(user.code || user.userCode || '').trim()

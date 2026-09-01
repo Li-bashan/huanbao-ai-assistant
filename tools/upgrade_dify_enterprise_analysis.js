@@ -207,6 +207,8 @@ def _date_range(question, today):
         return start, today.replace(day=1), "month", "previous_month"
     if "本月" in text:
         return today.replace(day=1), next_month, "month", "current_month"
+    if "今年" in text and "去年" in text:
+        return date(today.year, 1, 1), tomorrow, "month", "current_year_to_date"
     if "去年" in text:
         return date(today.year - 1, 1, 1), date(today.year, 1, 1), "month", "previous_year"
     match = re.search(r"今年(\d{1,2})月至今", text)
@@ -250,9 +252,11 @@ def _analysis_type(question, intent, previous):
     text = _compact(question)
     explicit = _text(intent.get("analysis_type") or intent.get("analysisType")).upper()
     allowed = {"FACT", "TREND", "RANKING", "COMPARISON", "RANKING_COMPARISON", "DISTRIBUTION", "ANOMALY", "CORRELATION", "DRILLDOWN", "EXECUTIVE_OVERVIEW"}
-    if explicit in allowed and explicit != "FACT":
-        detected = explicit
-    elif re.search(r"生产经营|经营情况|值得关注|整体表现", text):
+    # Hard business cues win over an occasionally over-broad model label.
+    # The model can still provide types such as CORRELATION when the user
+    # only says “compare”, but it must not turn anomaly/diagnosis language
+    # into a plain trend query.
+    if re.search(r"生产经营|经营情况|值得关注|整体表现", text):
         detected = "EXECUTIVE_OVERVIEW"
     elif re.search(r"为什么|原因|下钻|怎么回事|为何|下降原因", text):
         detected = "DRILLDOWN"
@@ -262,10 +266,14 @@ def _analysis_type(question, intent, previous):
         detected = "RANKING_COMPARISON"
     elif re.search(r"排名|排行|最高|最低|前\d+|后\d+|Top|Bottom", text, flags=re.I):
         detected = "RANKING"
+    elif explicit in ("CORRELATION", "DRILLDOWN", "DISTRIBUTION", "RANKING_COMPARISON"):
+        detected = explicit
     elif "同比" in text or "环比" in text or re.search(r"比较|对比|哪个好|分别", text):
         detected = "COMPARISON"
     elif re.search(r"趋势|走势|变化|各月|每月|逐月|每天|日度", text):
         detected = "TREND"
+    elif explicit in allowed and explicit != "FACT":
+        detected = explicit
     else:
         detected = "FACT"
 
@@ -298,7 +306,7 @@ def _clean_org_candidate(value):
     value = re.sub(r"^(?:今年|本年|去年|上年|本月|上月|本季度|近\d+个?月|近\d+天|近\d+年)+", "", value)
     value = re.sub(r"^(?:组织|公司)\s*", "", value)
     value = re.sub(r"(?:的)?(?:项目公司|各公司|每家公司|所有公司)$", "", value)
-    if _compact(value) in ("", "公司", "项目", "项目公司", "各公司", "每家公司", "所有公司"):
+    if _compact(value) in ("", "哪些", "哪些公司", "哪些项目公司", "各", "各公司", "各项目公司", "每", "每家公司", "每个公司", "每个项目公司", "所有", "所有公司", "所有项目公司", "公司", "项目", "项目公司"):
         return ""
     return _text(value)
 
@@ -525,6 +533,7 @@ def main(intent_text: str, question: str, previous_state: str = "", authorizatio
     ranking_mode = "bottom" if re.search(r"最低|最少|最差|后\d+|Bottom", text, flags=re.I) else "top"
     if "最高和最低" in text or "最高最低" in text:
         ranking_mode = "both"
+    anomaly_focus = "CONSECUTIVE_DECREASE" if re.search(r"连续.*?(下降|减少|下滑)", text) else ("MOM_DROP" if re.search(r"异常.*?(下降|减少|下滑)|下降.*?异常", text) else "THRESHOLD")
     comparison_type = "YOY" if "同比" in text else ("MOM" if "环比" in text else _text((previous or {}).get("comparison", {}).get("type")))
     comparison = {"type": comparison_type or "none", "baseline_start": "", "baseline_end": ""}
     if comparison_type == "YOY":
@@ -581,6 +590,7 @@ def main(intent_text: str, question: str, previous_state: str = "", authorizatio
         },
         "sort": {"field": "change_rate" if analysis_type == "RANKING_COMPARISON" else "value", "direction": "asc" if ranking_mode == "bottom" else "desc"},
         "ranking_mode": ranking_mode,
+        "anomaly_focus": anomaly_focus,
         "top_n": top_n,
         "comparison": comparison,
         "analysis_actions": [analysis_type.lower()],
@@ -1204,7 +1214,9 @@ def _trend_insights(rows):
             insights.append("%s的%s最近连续%s个周期下降，建议继续核查相关运行指标。" % (label, metric, negative + 1))
     return insights[:8]
 
-def _anomalies(rows):
+def _anomalies(rows, plan=None):
+    plan = plan or {}
+    focus = _text(plan.get("anomaly_focus")) or "THRESHOLD"
     anomalies = []
     groups = _group([row for row in rows if row.get("period_set") == "current" and row.get("period") and row.get("period") != "total" and row.get("value") is not None], ["org_code", "indicator_code"])
     for _, series in groups.items():
@@ -1227,9 +1239,9 @@ def _anomalies(rows):
                 "actual_value": current.get("value"),
                 "baseline_value": previous.get("value"),
             }
-            if change <= -20:
+            if focus in ("THRESHOLD", "MOM_DROP") and change <= -20:
                 anomalies.append(dict(common, anomaly_type="MOM_DROP", threshold=-20, evidence="%s较%s下降%s%%" % (current.get("period"), previous.get("period"), abs(change))))
-            elif change >= 20:
+            elif focus == "THRESHOLD" and change >= 20:
                 anomalies.append(dict(common, anomaly_type="MOM_RISE", threshold=20, evidence="%s较%s上升%s%%" % (current.get("period"), previous.get("period"), change)))
             if current.get("value") < previous.get("value"):
                 consecutive = consecutive + 1 if consecutive else 1
@@ -1237,7 +1249,7 @@ def _anomalies(rows):
             else:
                 consecutive = 0
                 streak_start = None
-            if consecutive >= 3 and (consecutive == 3 or index == len(series) - 1):
+            if focus in ("THRESHOLD", "CONSECUTIVE_DECREASE") and consecutive >= 3 and (consecutive == 3 or index == len(series) - 1):
                 anomalies.append(dict(common, anomaly_type="CONSECUTIVE_DECREASE", threshold=3, evidence="从%s开始已连续%s个周期下降" % (streak_start, consecutive + 1)))
     return anomalies[:120]
 
@@ -1392,7 +1404,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
     ranking = _ranking(rows, plan) if final_status == "SUCCESS_WITH_DATA" and kind in ("RANKING", "RANKING_COMPARISON") else []
     comparison_items = _comparison_items(rows, plan) if final_status == "SUCCESS_WITH_DATA" and kind in ("COMPARISON", "CORRELATION", "DRILLDOWN", "EXECUTIVE_OVERVIEW") else []
     distribution = _distribution(rows) if final_status == "SUCCESS_WITH_DATA" and kind == "DISTRIBUTION" else {}
-    anomalies = _anomalies(rows) if final_status == "SUCCESS_WITH_DATA" and kind in ("ANOMALY", "EXECUTIVE_OVERVIEW", "TREND", "DRILLDOWN") else []
+    anomalies = _anomalies(rows, plan) if final_status == "SUCCESS_WITH_DATA" and kind in ("ANOMALY", "EXECUTIVE_OVERVIEW", "TREND", "DRILLDOWN") else []
     correlations = _correlations(rows, plan) if final_status == "SUCCESS_WITH_DATA" and kind == "CORRELATION" else []
     insights = []
 
@@ -1404,7 +1416,10 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
             else:
                 total_count = len(_totals(rows, "current"))
                 last = ranking[-1]
-                insights.append("共统计%s个对象，%s以%s位居当前榜首，当前展示末位为%s。" % (total_count, _text(first.get("org_name")), _fmt(first.get("value")), _text(last.get("org_name"))))
+                if plan.get("ranking_mode") == "bottom":
+                    insights.append("共统计%s个对象，%s当前值最低，为%s；当前展示的后5名从低到高排列。" % (total_count, _text(first.get("org_name")), _fmt(first.get("value"))))
+                else:
+                    insights.append("共统计%s个对象，%s以%s位居当前榜首，当前展示末位为%s。" % (total_count, _text(first.get("org_name")), _fmt(first.get("value")), _text(last.get("org_name"))))
             movers = sorted([item for item in ranking if item.get("change_rate") is not None], key=lambda item: abs(item.get("change_rate")), reverse=True)
             if movers and plan.get("comparison", {}).get("type") != "none":
                 insights.append("当前展示对象中，%s同期变化幅度最大，为%s%%；这是比较线索，不直接说明原因。" % (_text(movers[0].get("org_name")), _fmt(movers[0].get("change_rate"))))
@@ -1492,14 +1507,16 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         if kind in ("RANKING", "RANKING_COMPARISON"):
             columns = [("rank", "排名", "number", ""), ("companyName", "公司名称", "text", ""), ("value", "当前值", "number", unit)]
             if kind == "RANKING_COMPARISON":
-                columns.extend([("baselineValue", "同期值", "number", unit), ("changeRate", "同比 %", "number", "%"), ("rankChange", "排名变化", "number", "位")])
+                comparison_label = _text(plan.get("comparison", {}).get("type")) or "同期"
+                columns.extend([("baselineValue", "同期值", "number", unit), ("changeRate", comparison_label + " %", "number", "%"), ("rankChange", "排名变化", "number", "位")])
             for item in ranking:
                 row = {"rank": item.get("rank"), "companyName": _text(item.get("org_name")), "value": item.get("value")}
                 if kind == "RANKING_COMPARISON":
                     row.update({"baselineValue": item.get("baseline_value"), "changeRate": item.get("change_rate"), "rankChange": item.get("rank_change")})
                 table_rows.append(row)
             table = {"columns": _columns(columns), "rows": table_rows, "total": len(_totals(rows, "current")), "defaultVisibleRows": 10}
-            metrics = [_metric("统计对象", len(_totals(rows, "current")), "家"), _metric("当前榜首", table_rows[0].get("companyName") if table_rows else "", "")]
+            lead_label = "当前最低" if plan.get("ranking_mode") == "bottom" else "当前榜首"
+            metrics = [_metric("统计对象", len(_totals(rows, "current")), "家"), _metric(lead_label, table_rows[0].get("companyName") if table_rows else "", "")]
             chart = _series_chart([row.get("companyName") for row in table_rows], [{"name": "同比变化" if kind == "RANKING_COMPARISON" else title, "type": "bar", "data": [row.get("changeRate") if kind == "RANKING_COMPARISON" else row.get("value") for row in table_rows]}], "项目公司排名", "bar")
         elif kind == "COMPARISON":
             table_rows = [{"organization": _text(item.get("org_name")), "indicator": _text(item.get("indicator_name")), "currentValue": item.get("value"), "baselineValue": item.get("baseline_value"), "changeRate": item.get("change_rate"), "difference": item.get("difference")} for item in comparison_items]
@@ -1582,6 +1599,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         "organization_scope": {"type": scope.get("type"), "inputs": scope.get("inputs"), "codes": scope.get("codes"), "names": scope.get("names"), "region_input": scope.get("region_input")},
         "sort": plan.get("sort"),
         "ranking_mode": plan.get("ranking_mode"),
+        "anomaly_focus": plan.get("anomaly_focus"),
         "top_n": plan.get("top_n"),
         "comparison": plan.get("comparison"),
         "analysis_actions": plan.get("analysis_actions"),
@@ -1610,7 +1628,11 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
     if final_status == "SUCCESS_WITH_DATA":
         if ranking:
             first = ranking[0]
-            summary = "%s共统计%s家公司，%s%s，当前值%s。" % (title, len(_totals(rows, "current")), _text(first.get("org_name")), "按同期变化排名第一" if kind == "RANKING_COMPARISON" else "排名第一", _fmt(first.get("value")))
+            if kind == "RANKING_COMPARISON":
+                lead_text = "按同期变化最小" if plan.get("ranking_mode") == "bottom" else "按同期变化排名第一"
+            else:
+                lead_text = "当前值最低" if plan.get("ranking_mode") == "bottom" else "排名第一"
+            summary = "%s共统计%s家公司，%s%s，当前值%s。" % (title, len(_totals(rows, "current")), _text(first.get("org_name")), lead_text, _fmt(first.get("value")))
         elif kind == "DISTRIBUTION":
             summary = "%s共统计%s个对象，平均值%s，中位数%s。" % (title, distribution.get("count"), _fmt(distribution.get("mean")), _fmt(distribution.get("median")))
         elif kind == "ANOMALY":
