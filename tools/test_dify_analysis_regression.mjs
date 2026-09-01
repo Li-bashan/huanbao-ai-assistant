@@ -35,6 +35,14 @@ exec(load('plan'), plan_ns)
 exec(load('resolve'), resolve_ns)
 exec(load('audit'), audit_ns)
 
+# Synthetic resolver fixtures must be registered explicitly. This keeps the
+# regression deterministic without weakening the production unknown-metric
+# aggregation gate.
+resolve_ns['SEMANTIC_REGISTRY'].update({
+    'M1': {'level': 'plant_total', 'aggregation': 'SUM', 'aggregation_source': 'test_registry', 'comparison_supported': True, 'ranking_supported': True},
+    'M2': {'level': 'plant_total', 'aggregation': 'SUM', 'aggregation_source': 'test_registry', 'comparison_supported': True, 'ranking_supported': True},
+})
+
 def plan(intent, question, previous=None):
     return plan_ns['main'](json.dumps(intent, ensure_ascii=False), question, json.dumps(previous or {}, ensure_ascii=False), '')
 
@@ -73,6 +81,10 @@ check('trend-plan', trend_plan['analysis_type'] == 'TREND' and trend_plan['time_
 fact_fallback = plan({}, '查询2024年组织10004024全厂发电量')
 fact_fallback_plan = json.loads(fact_fallback['analysis_plan'])
 check('fact-indicator-fallback', fact_fallback_plan['indicator_inputs'] == ['全厂发电量'], json.dumps(fact_fallback_plan, ensure_ascii=False))
+
+group_overview = plan({}, '请做2024年全集团发电量经营总览')
+group_overview_plan = json.loads(group_overview['analysis_plan'])
+check('group-scope-is-collection', group_overview_plan['organization_scope']['inputs'] == [], json.dumps(group_overview_plan, ensure_ascii=False))
 
 ranking = plan({}, '今年项目公司发电量排名前5')
 ranking_plan = json.loads(ranking['analysis_plan'])
@@ -128,6 +140,80 @@ check(
   comparison_resolved['query_sql'][:1600],
 )
 
+drilldown_plan = json.loads(plan(
+  {'analysis_type': 'DRILLDOWN', 'indicator_inputs': ['全厂发电量', '主设备运行时间'], 'organization_inputs': ['10004024']},
+  '为什么组织10004024近6个月全厂发电量下降，参考主设备运行时间',
+)['analysis_plan'])
+drilldown_resolved = resolve_ns['main'](
+    json.dumps(drilldown_plan, ensure_ascii=False),
+    [
+      {'code': '1001', 'name': '全厂发电量', 'unit': '', 'old_name': '', 'object_code': 'plant', 'object_name': '厂级'},
+      {'code': '1712', 'name': '主设备运行时间', 'unit': '', 'old_name': '', 'object_code': '1025', 'object_name': '主设备'},
+    ],
+    '',
+    [{'code': '10004024', 'name': '示例项目公司', 'abbreviation': '', 'full_path': '示例项目公司', 'layer': '4', 'parent_code': '', 'is_detail_company': '1', 'tree_is_detail': '1', 'enabled': '1'}],
+    '',
+)
+drilldown_resolved_plan = json.loads(drilldown_resolved['analysis_plan_json'])
+check(
+  'drilldown-unregistered-related-does-not-block',
+  drilldown_resolved['status'] == 'READY'
+    and drilldown_resolved['can_execute'] == 1
+    and drilldown_resolved_plan['indicator']['code'] == '1001'
+    and drilldown_resolved_plan['related_indicators'] == []
+    and drilldown_resolved_plan['coverage']['unresolved_indicators'][0]['code'] == '1712'
+    and '1712' not in drilldown_resolved['query_sql'],
+  json.dumps(drilldown_resolved, ensure_ascii=False),
+)
+check(
+  'drilldown-does-not-auto-expand-fuzzy-metrics',
+  drilldown_plan['indicator_search_terms'] == ['全厂发电量', '主设备运行时间']
+    and drilldown_resolved_plan['coverage']['candidates'][0]['code'] == '1712',
+  json.dumps(drilldown_plan, ensure_ascii=False) + json.dumps(drilldown_resolved_plan, ensure_ascii=False),
+)
+
+overview = plan({}, '看看最近生产经营有什么值得关注的问题')
+overview_plan = json.loads(overview['analysis_plan'])
+overview_resolved = resolve_ns['main'](
+    json.dumps(overview_plan, ensure_ascii=False),
+    [
+      {'code': '1001', 'name': '全厂发电量', 'unit': '', 'old_name': '', 'object_code': 'plant', 'object_name': '厂级'},
+      {'code': '1700', 'name': '生活垃圾入厂量', 'unit': '', 'old_name': '', 'object_code': 'waste', 'object_name': '垃圾'},
+      {'code': '1701', 'name': '全厂上网电量', 'unit': '', 'old_name': '', 'object_code': 'grid', 'object_name': '上网'},
+    ],
+    '',
+    [{'code': '10004024', 'name': '示例项目公司', 'abbreviation': '', 'full_path': '示例项目公司', 'layer': '4', 'parent_code': '', 'is_detail_company': '1', 'tree_is_detail': '1', 'enabled': '1'}],
+    '',
+)
+overview_resolved_plan = json.loads(overview_resolved['analysis_plan_json'])
+overview_state = json.loads(overview_resolved['analysis_state'])
+check(
+  'overview-unregistered-defaults-are-coverage-only',
+  overview_resolved['status'] == 'READY'
+    and overview_resolved_plan['indicator']['code'] == '1001'
+    and overview_resolved_plan['related_indicators'] == []
+    and len(overview_resolved_plan['coverage']['unresolved_indicators']) == 2
+    and overview_state['analysis_steps'][0] == 'EXECUTIVE_OVERVIEW',
+  json.dumps(overview_resolved, ensure_ascii=False),
+)
+
+unregistered_main_plan = json.loads(plan(
+  {'analysis_type': 'FACT', 'indicator_inputs': ['主设备运行时间'], 'organization_inputs': ['10004024']},
+  '查询组织10004024近6个月主设备运行时间',
+)['analysis_plan'])
+unregistered_main = resolve_ns['main'](
+    json.dumps(unregistered_main_plan, ensure_ascii=False),
+    [{'code': '1712', 'name': '主设备运行时间', 'unit': '', 'old_name': '', 'object_code': '1025', 'object_name': '主设备'}],
+    '',
+    [{'code': '10004024', 'name': '示例项目公司', 'abbreviation': '', 'full_path': '示例项目公司', 'layer': '4', 'parent_code': '', 'is_detail_company': '1', 'tree_is_detail': '1', 'enabled': '1'}],
+    '',
+)
+check(
+  'unregistered-primary-still-blocks',
+  unregistered_main['status'] == 'AGGREGATION_NOT_CONFIRMED' and unregistered_main['can_execute'] == 0,
+  json.dumps(unregistered_main, ensure_ascii=False),
+)
+
 anomaly = plan({}, '哪些公司连续3个月发电量下降')
 anomaly_plan = json.loads(anomaly['analysis_plan'])
 check('anomaly-plan', anomaly_plan['analysis_type'] == 'ANOMALY' and anomaly_plan['time']['start'].endswith('-01'), json.dumps(anomaly_plan, ensure_ascii=False))
@@ -136,9 +222,18 @@ anomaly_model_override = plan({'analysis_type': 'TREND', 'indicator_inputs': ['�
 anomaly_model_override_plan = json.loads(anomaly_model_override['analysis_plan'])
 check('anomaly-cue-overrides-model', anomaly_model_override_plan['analysis_type'] == 'ANOMALY' and anomaly_model_override_plan['organization_scope']['type'] == 'project_company', json.dumps(anomaly_model_override_plan, ensure_ascii=False))
 
-overview = plan({}, '看看最近生产经营有什么值得关注的问题')
-overview_plan = json.loads(overview['analysis_plan'])
 check('overview-plan', overview_plan['analysis_type'] == 'EXECUTIVE_OVERVIEW' and overview_plan['time']['start'] != overview_plan['time']['end'], json.dumps(overview_plan, ensure_ascii=False))
+
+compound = plan({}, '请做最近生产经营总览，包含发电量排名、近6个月趋势和异常，再分析原因')
+compound_plan = json.loads(compound['analysis_plan'])
+check(
+    'compound-overview-plan',
+    compound_plan['analysis_type'] == 'EXECUTIVE_OVERVIEW'
+      and compound_plan['analysis_steps'][0] == 'EXECUTIVE_OVERVIEW'
+      and all(item in compound_plan['analysis_steps'] for item in ['RANKING', 'TREND', 'ANOMALY', 'DRILLDOWN']),
+    json.dumps(compound_plan, ensure_ascii=False),
+)
+check('overview-primary-default', compound_plan['indicator_inputs'] == ['全厂发电量'], json.dumps(compound_plan, ensure_ascii=False))
 
 trend_rows = [row('2026-01', 100), row('2026-02', 90), row('2026-03', 70), row('2026-04', 60)]
 check('trend-audit', audit('TREND', trend_rows)['status'] == 'SUCCESS_WITH_DATA' and audit('TREND', trend_rows)['chart'], 'trend audit did not create chart')

@@ -1,0 +1,2794 @@
+app:
+  description: ''
+  icon: grinning
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: advanced-chat
+  name: 智慧办公—智能问数
+  use_icon_as_answer_icon: true
+dependencies:
+- current_identifier: null
+  type: package
+  value:
+    plugin_unique_identifier: langgenius/openai_api_compatible:0.0.53@a0dfb462961a03c6a6415d4185043185b01017c64da93cf82a9e5ecaf59f8ed0
+    version: null
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: jaguarliuu/rookie_text2data:1.0.3@3041f4cfe193deb03f716fedfd2e7dae1601021cf39f94c462af8d6babd1e3fd
+    version: null
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: 数据库类型
+    id: id-msimqvrr-y08tutiz
+    name: DB_TYPE
+    selector:
+    - env
+    - DB_TYPE
+    value: kingbase
+    value_type: string
+  - description: 数据库IP
+    id: id-msimqvrr-ohtqzer5
+    name: DB_HOST
+    selector:
+    - env
+    - DB_HOST
+    value: 172.18.10.2
+    value_type: string
+  - description: 数据库端口
+    id: id-msimqvrr-y2io3akz
+    name: DB_PORT
+    selector:
+    - env
+    - DB_PORT
+    value: '54321'
+    value_type: string
+  - description: 数据库名
+    id: id-msimqvrr-aue0l2iw
+    name: DB_NAME
+    selector:
+    - env
+    - DB_NAME
+    value: MSOKFPT
+    value_type: string
+  - description: Schema
+    id: id-msimqvrr-p8w3s7vi
+    name: DB_SCHEMA
+    selector:
+    - env
+    - DB_SCHEMA
+    value: MSOKFPT
+    value_type: string
+  - description: 只读账号
+    id: id-msimqvrr-4l17a6pe
+    name: DB_USER
+    selector:
+    - env
+    - DB_USER
+    value: Ai
+    value_type: string
+  - description: 只读账号密码
+    id: id-msimqvrr-rm9wwfnb
+    name: DB_PASSWORD
+    selector:
+    - env
+    - DB_PASSWORD
+    value: ''
+    value_type: secret
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: iteration
+      id: 1780921133248-source-1780921817315-target
+      selected: false
+      source: '1780921133248'
+      sourceHandle: source
+      target: '1780921817315'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: iteration
+        targetType: code
+      id: 1780921817315-source-1781000000001-target
+      selected: false
+      source: '1780921817315'
+      sourceHandle: source
+      target: '1781000000001'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1780921817315'
+        sourceType: iteration-start
+        targetType: code
+      id: 1780921817315start-source-1780921883266-target
+      source: 1780921817315start
+      sourceHandle: source
+      target: '1780921883266'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1780921817315'
+        sourceType: code
+        targetType: tool
+      id: 1780921883266-source-1784715296667-target
+      source: '1780921883266'
+      sourceHandle: source
+      target: '1784715296667'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: 1780922361536-source-1780922485769-target
+      selected: false
+      source: '1780922361536'
+      sourceHandle: source
+      target: '1780922485769'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1780922485769-source-1780923024622-target
+      selected: false
+      source: '1780922485769'
+      sourceHandle: source
+      target: '1780923024622'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: answer
+      id: 1780923024622-source-final_answer-target
+      selected: false
+      source: '1780923024622'
+      sourceHandle: source
+      target: final_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: if-else
+      id: 1781000000001-source-1781000000010-target
+      source: '1781000000001'
+      sourceHandle: source
+      target: '1781000000010'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1781000000002-source-1781000000003-target
+      selected: false
+      source: '1781000000002'
+      sourceHandle: source
+      target: '1781000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: iteration
+      id: 1781000000003-source-1781000000004-target
+      selected: false
+      source: '1781000000003'
+      sourceHandle: source
+      target: '1781000000004'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: iteration
+        targetType: code
+      id: 1781000000004-source-1781000000008-target
+      selected: false
+      source: '1781000000004'
+      sourceHandle: source
+      target: '1781000000008'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1781000000004'
+        sourceType: iteration-start
+        targetType: code
+      id: 1781000000004start-source-1781000000005-target
+      selected: false
+      source: 1781000000004start
+      sourceHandle: source
+      target: '1781000000005'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1781000000004'
+        sourceType: code
+        targetType: tool
+      id: 1781000000005-source-1781000000006-target
+      selected: false
+      source: '1781000000005'
+      sourceHandle: source
+      target: '1781000000006'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1781000000004'
+        sourceType: tool
+        targetType: code
+      id: 1781000000006-fail-branch-1781000000007-target
+      source: '1781000000006'
+      sourceHandle: fail-branch
+      target: '1781000000007'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1781000000004'
+        sourceType: tool
+        targetType: code
+      id: 1781000000006-source-1781000000007-target
+      source: '1781000000006'
+      sourceHandle: source
+      target: '1781000000007'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1781000000008-source-1780922361536-target
+      selected: false
+      source: '1781000000008'
+      sourceHandle: source
+      target: '1780922361536'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1781000000008-source-1781000000012-target
+      selected: false
+      source: '1781000000008'
+      sourceHandle: source
+      target: '1781000000012'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: code
+      id: 1781000000010-false-1781000000012-target
+      selected: false
+      source: '1781000000010'
+      sourceHandle: 'false'
+      target: '1781000000012'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1781000000010-true-1781000000002-target
+      selected: false
+      source: '1781000000010'
+      sourceHandle: 'true'
+      target: '1781000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1781000000012-source-1781000000017-target
+      selected: false
+      source: '1781000000012'
+      sourceHandle: source
+      target: '1781000000017'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: 1781000000016-source-llm-target
+      selected: false
+      source: '1781000000016'
+      sourceHandle: source
+      target: llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1781000000017-source-1780922361536-target
+      selected: false
+      source: '1781000000017'
+      sourceHandle: source
+      target: '1780922361536'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1780921817315'
+        sourceType: tool
+        targetType: code
+      id: 1784715296667-fail-branch-1780999999001-target
+      source: '1784715296667'
+      sourceHandle: fail-branch
+      target: '1780999999001'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1780921817315'
+        sourceType: tool
+        targetType: code
+      id: 1784715296667-source-1780999999001-target
+      source: '1784715296667'
+      sourceHandle: source
+      target: '1780999999001'
+      targetHandle: target
+      type: custom
+      zIndex: 1001
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: llm-source-1780921133248-target
+      selected: false
+      source: llm
+      sourceHandle: source
+      target: '1780921133248'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: knowledge-retrieval
+      id: 1780919457192-source-1787827566589-target
+      source: '1780919457192'
+      sourceHandle: source
+      target: '1787827566589'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: knowledge-retrieval
+      id: 1780919457192-source-1787827877222-target
+      source: '1780919457192'
+      sourceHandle: source
+      target: '1787827877222'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: code
+      id: 1787827566589-source-1781000000014-target
+      source: '1787827566589'
+      sourceHandle: source
+      target: '1781000000014'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: code
+      id: 1787827877222-source-1781000000016-target
+      source: '1787827877222'
+      sourceHandle: source
+      target: '1781000000016'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: edge-1781000000014-llm
+      source: '1781000000014'
+      sourceHandle: source
+      sourceType: code
+      target: llm
+      targetHandle: target
+      targetType: llm
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户问题
+        type: start
+        variables: []
+      height: 73
+      id: '1780919457192'
+      position:
+        x: 1629.2504049726986
+        y: -177.43808483152807
+      positionAbsolute:
+        x: 1629.2504049726986
+        y: -177.43808483152807
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：解析SQL列表（安全校验层）\n# 作用：解析大模型输出的JSON数组，并对每条SQL做安全校验\n# =====================================================================\n\
+          \nimport re\nimport json\n\n\nALLOWED_TABLE_RE = re.compile(r'^CGXTAPPMISDate_\\\
+          d{4}_\\d{2}$')\n\nALLOWED_TABLES = (\n    'CGXTAPPMISNewIndicator',\n  \
+          \  'BFAdminOrganization',\n    'enterprise_equipment_info',\n)\n\nDANGEROUS\
+          \ = [\n    'insert ',\n    'update ',\n    'delete ',\n    'drop ',\n  \
+          \  'truncate ',\n    'alter ',\n    'create ',\n    'grant ',\n    'revoke\
+          \ ',\n    'copy ',\n]\n\n\ndef repair_json_quotes(text):\n    lines = text.split('\\\
+          n')\n    out_lines = []\n\n    for line in lines:\n        m = re.match(\n\
+          \            r'^(\\s*\"(?:sql|title)\"\\s*:\\s*\")(.*)(\"\\s*,?\\s*)$',\n\
+          \            line,\n            re.DOTALL,\n        )\n\n        if m:\n\
+          \            val = re.sub(r'(?<!\\\\)\"', '\\\\\"', m.group(2))\n      \
+          \      out_lines.append(m.group(1) + val + m.group(3))\n        else:\n\
+          \            out_lines.append(line)\n\n    return '\\n'.join(out_lines)\n\
+          \n\ndef validate_sql(sql):\n    s = str(sql).strip()\n\n    if not s.lower().startswith('select'):\n\
+          \        raise ValueError('SQL 不是 SELECT 查询，已拦截')\n\n    lower = s.lower()\n\
+          \n    for kw in DANGEROUS:\n        if kw in lower:\n            raise ValueError('SQL\
+          \ 包含危险关键字：' + kw.strip())\n\n    body = s.rstrip().rstrip(';')\n\n    if\
+          \ ';' in body:\n        raise ValueError('检测到多语句 SQL，已拦截')\n\n    # 同时支持\
+          \ \"MSOKFPT\".表 和 MSOKFPT.表 两种合法写法。\n    # 只在 FROM/JOIN 后解析真实表名，避免把 t.\"\
+          ZBZ\" 这类列限定符误判成 schema。\n    for m in re.finditer(\n        r'(?:from|join)\\\
+          s+'\n        r'(?:(?:\"?([A-Za-z0-9_]+)\"?)\\s*\\.\\s*)?'\n        r'\"\
+          ?([A-Za-z_][A-Za-z0-9_]*)',\n        s,\n        re.IGNORECASE,\n    ):\n\
+          \        schema_name = m.group(1)\n        table_name = m.group(2)\n\n \
+          \       if schema_name and schema_name.upper() != 'MSOKFPT':\n         \
+          \   raise ValueError('引用了非白名单 schema：' + schema_name)\n\n        if table_name\
+          \ in ALLOWED_TABLES:\n            continue\n\n        if ALLOWED_TABLE_RE.match(table_name):\n\
+          \            continue\n\n        raise ValueError('引用了白名单外的表：' + table_name)\n\
+          \n    if not re.search(r'\\blimit\\s+\\d+', s, re.IGNORECASE):\n       \
+          \ s = body + ' LIMIT 1000'\n\n    return s\n\n\ndef main(input_string: str)\
+          \ -> dict:\n    if not input_string or not input_string.strip():\n     \
+          \   raise ValueError('输入内容为空，无法解析 JSON')\n\n    text = input_string.strip()\n\
+          \n    # 去掉模型思考内容，避免思考区里的示例 JSON 干扰解析\n    text = re.sub(\n        r'<think>[\\\
+          s\\S]*?</think>',\n        '',\n        text,\n        flags=re.IGNORECASE,\n\
+          \    ).strip()\n\n    # 找出所有 Markdown JSON 代码块\n    fenced_blocks = re.findall(\n\
+          \        r'```(?:json)?\\s*([\\s\\S]*?)\\s*```',\n        text,\n      \
+          \  re.IGNORECASE,\n    )\n\n    # 优先从最后一个代码块开始尝试\n    json_candidates =\
+          \ list(reversed(fenced_blocks))\n\n    # 没有代码块时，再尝试寻找 JSON 数组\n    array_matches\
+          \ = re.findall(\n        r'(\\[\\s*[\\s\\S]*\\s*\\])',\n        text,\n\
+          \    )\n\n    json_candidates.extend(reversed(array_matches))\n\n    parsed_json\
+          \ = None\n    parse_errors = []\n\n    for candidate in json_candidates:\n\
+          \        try:\n            candidate_json = json.loads(candidate.strip())\n\
+          \n            if isinstance(candidate_json, list):\n                parsed_json\
+          \ = candidate_json\n                break\n\n        except json.JSONDecodeError\
+          \ as err:\n            parse_errors.append(str(err))\n\n    if parsed_json\
+          \ is None:\n        detail = ': ' + parse_errors[-1] if parse_errors else\
+          \ ''\n        raise ValueError('未找到有效的 JSON 数组' + detail)\n\n    result\
+          \ = []\n\n    for index, item in enumerate(parsed_json):\n        if not\
+          \ isinstance(item, dict):\n            raise ValueError('第 ' + str(index\
+          \ + 1) + ' 项不是对象')\n\n        title = item.get('title')\n        sql = item.get('sql')\n\
+          \n        if not title:\n            raise ValueError('第 ' + str(index +\
+          \ 1) + ' 项缺少 title 字段')\n\n        if not sql:\n            raise ValueError('第\
+          \ ' + str(index + 1) + ' 项缺少 sql 字段')\n\n        sql_text = validate_sql(sql)\n\
+          \n        result.append({\n            'title': str(title).strip(),\n  \
+          \          'sql': sql_text,\n        })\n\n    return {\n        'result':\
+          \ result,\n        'count': len(result),\n        'first_title': result[0]['title']\
+          \ if result else '',\n        'first_sql': result[0]['sql'] if result else\
+          \ '',\n    }"
+        code_language: python3
+        outputs:
+          count:
+            children: null
+            type: number
+          first_sql:
+            children: null
+            type: string
+          first_title:
+            children: null
+            type: string
+          result:
+            children: null
+            type: array[object]
+        selected: false
+        title: 解析SQL列表
+        type: code
+        variables:
+        - value_selector:
+          - llm
+          - text
+          value_type: string
+          variable: input_string
+      height: 52
+      id: '1780921133248'
+      position:
+        x: 1629.2504049726986
+        y: 396.31502173698345
+      positionAbsolute:
+        x: 1629.2504049726986
+        y: 396.31502173698345
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        error_handle_mode: continue-on-error
+        flatten_output: true
+        height: 226
+        is_parallel: true
+        iterator_input_type: array[object]
+        iterator_selector:
+        - '1780921133248'
+        - result
+        output_selector:
+        - '1780999999001'
+        - result
+        output_type: array[object]
+        parallel_nums: 5
+        selected: false
+        start_node_id: 1780921817315start
+        title: 逐条执行SQL
+        type: iteration
+        width: 1038
+      height: 226
+      id: '1780921817315'
+      position:
+        x: 1966.807316773573
+        y: -156.43808483152807
+      positionAbsolute:
+        x: 1966.807316773573
+        y: -156.43808483152807
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 1038
+      zIndex: 0
+    - data:
+        desc: ''
+        isInIteration: true
+        selected: false
+        title: ''
+        type: iteration-start
+      draggable: false
+      height: 48
+      id: 1780921817315start
+      parentId: '1780921817315'
+      position:
+        x: 60
+        y: 80
+      positionAbsolute:
+        x: 2026.807316773573
+        y: -76.43808483152807
+      selectable: false
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-iteration-start
+      width: 44
+      zIndex: 1001
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：组装SQL参数（迭代1内部）\n# 作用：把迭代中的每一项（title + sql）整理成执行工具需要的参数。\n# 输入：args\
+          \ = 迭代当前项 {\"title\": \"...\", \"sql\": \"...\"}\n# 输出：{\"title\": \"...\"\
+          , \"sql\": \"...\"}\n# 维护：执行工具新增参数时在此同步补充。\n# =====================================================================\n\
+          def main(args: dict) -> dict:\n    title = args.get(\"title\", \"\")\n \
+          \   sql = args.get(\"sql\", \"\")\n    return {\n        \"title\": title,\n\
+          \        \"sql\": sql\n    }"
+        code_language: python3
+        isInIteration: true
+        isInLoop: false
+        iteration_id: '1780921817315'
+        outputs:
+          sql:
+            children: null
+            type: string
+          title:
+            children: null
+            type: string
+        selected: false
+        title: 组装SQL参数
+        type: code
+        variables:
+        - value_selector:
+          - '1780921817315'
+          - item
+          value_type: object
+          variable: args
+      height: 52
+      id: '1780921883266'
+      parentId: '1780921817315'
+      position:
+        x: 200
+        y: 80
+      positionAbsolute:
+        x: 2166.807316773573
+        y: -76.43808483152807
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 1001
+    - data:
+        code: "# 节点：汇总查询结果\n# 作用：只把最终回答需要的结果摘要传给模型，删除 SQL、连接信息和重复包装。\nimport json\n\
+          \ndef _clean_row(row):\n    if not isinstance(row, dict):\n        return\
+          \ row\n    return {str(k): v for k, v in row.items() if v is not None and\
+          \ v != \"\"}\n\ndef _compact(data):\n    rows = []\n    status = \"success\"\
+          \n    if isinstance(data, dict):\n        if isinstance(data.get(\"result\"\
+          ), list):\n            rows = data[\"result\"]\n        else:\n        \
+          \    return {str(k): v for k, v in data.items() if k not in (\"sql\", \"\
+          query\") and v is not None}\n    elif isinstance(data, list):\n        for\
+          \ item in data:\n            if isinstance(item, dict):\n              \
+          \  if item.get(\"status\"):\n                    status = str(item.get(\"\
+          status\"))\n                if isinstance(item.get(\"result\"), list):\n\
+          \                    rows.extend(item[\"result\"])\n                elif\
+          \ item.get(\"result\") is not None:\n                    rows.append(item.get(\"\
+          result\"))\n            else:\n                rows.append(item)\n    else:\n\
+          \        return data\n    rows = [_clean_row(row) for row in rows]\n   \
+          \ total = len(rows)\n    truncated = total > 500\n    if truncated:\n  \
+          \      rows = rows[:250] + rows[-250:]\n    return {\"status\": status,\
+          \ \"row_count\": total, \"truncated\": truncated, \"rows\": rows}\n\ndef\
+          \ main(args: list) -> dict:\n    if not isinstance(args, list) or not args:\n\
+          \        return {\"result\": \"没有查询到结果。\"}\n    parts = []\n    for idx,\
+          \ item in enumerate(args, 1):\n        if not isinstance(item, dict):\n\
+          \            continue\n        title = str(item.get(\"title\") or \"\")\n\
+          \        if item.get(\"ok\") is False:\n            parts.append(\"第 \"\
+          \ + str(idx) + \" 条查询失败（\" + title + \"）：\" + str(item.get(\"error\") or\
+          \ \"未知错误\"))\n            continue\n        payload = _compact(item.get(\"\
+          data\"))\n        parts.append(\"第 \" + str(idx) + \" 条查询（\" + title + \"\
+          ）：\" + json.dumps(payload, ensure_ascii=False, separators=(\",\", \":\"\
+          )))\n    return {\"result\": \"\\n\".join(parts) if parts else \"没有查询到结果。\"\
+          }"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 汇总查询结果
+        type: code
+        variables:
+        - value_selector:
+          - '1781000000017'
+          - items
+          value_type: array[object]
+          variable: args
+      height: 52
+      id: '1780922361536'
+      position:
+        x: 3519.986473128312
+        y: 234.95972245130707
+      positionAbsolute:
+        x: 3519.986473128312
+        y: 234.95972245130707
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - '1780922361536'
+          - result
+        model:
+          completion_params:
+            enable_thinking: false
+            temperature: 0.2
+          mode: chat
+          name: Qwen3-32B-Int4
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: ac001161-2bd8-458a-af5b-eb961b86cd54
+          role: system
+          text: '你是生产运行指标查询结果的中文回答生成器。只能依据查询结果回答，不能展示 SQL、连接信息、推理过程，也不能补造数据。先给核心结论；时间序列或分类对比用
+            Markdown 表格；数值保留两位小数并加千分位，空值写 -。无结果就直接说明未查询到相关数据。
+
+
+            只输出合法 JSON，不要 Markdown 围栏。固定字段：results（Markdown 中文回答）、ECharts（1 或 0）、chartType（bar/line/area/pie/donut/radar
+            等，无图表为空）、chartTitle、chartData、chartXAxis。只有结果确实适合趋势或分类展示时才生成图表，单值不要用 gauge。若计算引擎有结果，直接使用其中的公式、参数和结果；计算指标回答要注明公式和数据截止日期。'
+        - id: 19b242f7-a7d5-4c89-8070-2c04bbc6ff0b
+          role: user
+          text: '用户问题：
+
+            {{#sys.query#}}
+
+
+            压缩后的查询结果：
+
+            {{#context#}}
+
+
+            相关计算规则：
+
+            {{#1781000000016.result#}}
+
+
+            数据截止日期：{{#1781000000016.cutoff#}}
+
+
+            计算引擎结果：
+
+            {{#1781000000017.calc_detail#}}
+
+
+            请按固定 JSON 字段输出。'
+        selected: false
+        title: 生成回答与图表参数
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1780922485769'
+      position:
+        x: 3519.986473128312
+        y: 307.56299064189125
+      positionAbsolute:
+        x: 3519.986473128312
+        y: 307.56299064189125
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "import re\nimport json\n\n\ndef _num(value):\n    try:\n        return\
+          \ float(value)\n    except Exception:\n        return None\n\n\ndef _remove_think(text):\n\
+          \    text = re.sub(\n        r\"<think\\b[^>]*>[\\s\\S]*?</think>\",\n \
+          \       \"\",\n        text,\n        flags=re.IGNORECASE\n    )\n\n   \
+          \ # 防止只有开始标签、没有结束标签\n    text = re.sub(\n        r\"<think\\b[^>]*>[\\s\\\
+          S]*$\",\n        \"\",\n        text,\n        flags=re.IGNORECASE\n   \
+          \ )\n\n    return text.strip()\n\n\ndef _extract_json(text):\n    \"\"\"\
+          \n    从大模型输出中提取最后一个有效 JSON 对象。\n    支持 <think>、Markdown 代码块以及前后说明文字。\n \
+          \   \"\"\"\n    text = _remove_think(str(text or \"\").strip())\n\n    if\
+          \ not text:\n        return {}\n\n    decoder = json.JSONDecoder()\n   \
+          \ candidates = []\n\n    # 先尝试整个字符串\n    try:\n        obj = json.loads(text)\n\
+          \        if isinstance(obj, dict):\n            candidates.append(obj)\n\
+          \    except Exception:\n        pass\n\n    # 再扫描所有可能的 JSON 对象\n    for\
+          \ index, char in enumerate(text):\n        if char != \"{\":\n         \
+          \   continue\n\n        try:\n            obj, _ = decoder.raw_decode(text[index:])\n\
+          \            if isinstance(obj, dict):\n                candidates.append(obj)\n\
+          \        except Exception:\n            continue\n\n    if not candidates:\n\
+          \        return {}\n\n    # 优先选择包含业务字段的对象\n    for obj in reversed(candidates):\n\
+          \        if any(\n            key in obj\n            for key in [\"results\"\
+          , \"ECharts\", \"chartType\", \"chartData\"]\n        ):\n            return\
+          \ obj\n\n    return candidates[-1]\n\n\ndef _parse_array(value):\n    if\
+          \ isinstance(value, list):\n        return value\n\n    if value is None:\n\
+          \        return []\n\n    if isinstance(value, str):\n        value = value.strip()\n\
+          \n        if not value:\n            return []\n\n        value = re.sub(r\"\
+          ^```json\\s*\", \"\", value, flags=re.IGNORECASE)\n        value = re.sub(r\"\
+          \\s*```$\", \"\", value)\n\n        try:\n            parsed = json.loads(value)\n\
+          \            return parsed if isinstance(parsed, list) else []\n       \
+          \ except Exception:\n            return []\n\n    return []\n\n\ndef build_echarts(chart_type,\
+          \ title, data, x_axis):\n    chart_type = str(chart_type or \"\").strip().lower()\n\
+          \    title = str(title or \"\")\n    data = _parse_array(data)\n    x_axis\
+          \ = _parse_array(x_axis)\n\n    title_config = {\"text\": title}\n\n   \
+          \ # 柱状图、折线图、面积图\n    if chart_type in [\"bar\", \"line\", \"area\"]:\n \
+          \       values = []\n\n        for item in data:\n            number = _num(item)\n\
+          \            if number is not None:\n                values.append(number)\n\
+          \n        if not values:\n            return None\n\n        categories\
+          \ = [str(item) for item in x_axis]\n\n        series_type = \"bar\"\n  \
+          \      if chart_type in [\"line\", \"area\"]:\n            series_type =\
+          \ \"line\"\n\n        series = [{\n            \"name\": title,\n      \
+          \      \"type\": series_type,\n            \"data\": values\n        }]\n\
+          \n        if chart_type == \"line\":\n            series[0][\"smooth\"]\
+          \ = True\n\n        if chart_type == \"area\":\n            series[0][\"\
+          smooth\"] = True\n            series[0][\"areaStyle\"] = {}\n\n        return\
+          \ {\n            \"title\": title_config,\n            \"tooltip\": {\"\
+          trigger\": \"axis\"},\n            \"xAxis\": {\n                \"type\"\
+          : \"category\",\n                \"data\": categories,\n               \
+          \ \"axisLabel\": {\n                    \"interval\": 0,\n             \
+          \       \"rotate\": 30 if len(categories) > 6 else 0\n                }\n\
+          \            },\n            \"yAxis\": {\"type\": \"value\"},\n       \
+          \     \"series\": series\n        }\n\n    # 饼图、环形图、漏斗图\n    if chart_type\
+          \ in [\"pie\", \"donut\", \"funnel\"]:\n        items = []\n\n        for\
+          \ item in data:\n            if isinstance(item, dict):\n              \
+          \  name = str(item.get(\"name\", \"\")).strip()\n                value =\
+          \ _num(item.get(\"value\"))\n\n                if name and value is not\
+          \ None:\n                    items.append({\n                        \"\
+          name\": name,\n                        \"value\": value\n              \
+          \      })\n\n            else:\n                value = _num(item)\n\n \
+          \               if value is not None:\n                    items.append({\n\
+          \                        \"name\": str(item),\n                        \"\
+          value\": value\n                    })\n\n        if not items:\n      \
+          \      return None\n\n        series = [{\n            \"name\": title,\n\
+          \            \"type\": \"funnel\" if chart_type == \"funnel\" else \"pie\"\
+          ,\n            \"data\": items\n        }]\n\n        if chart_type == \"\
+          donut\":\n            series[0][\"radius\"] = [\"40%\", \"70%\"]\n\n   \
+          \     return {\n            \"title\": title_config,\n            \"tooltip\"\
+          : {\"trigger\": \"item\"},\n            \"legend\": {\"bottom\": 0},\n \
+          \           \"series\": series\n        }\n\n    # 雷达图\n    if chart_type\
+          \ == \"radar\":\n        indicators = [{\"name\": str(item)} for item in\
+          \ x_axis]\n\n        if not indicators:\n            return None\n\n   \
+          \     radar_data = []\n\n        for item in data:\n            if isinstance(item,\
+          \ dict):\n                values = item.get(\"value\", [])\n\n         \
+          \       if isinstance(values, list):\n                    radar_data.append({\n\
+          \                        \"name\": str(item.get(\"name\", \"\")),\n    \
+          \                    \"value\": [\n                            _num(value)\
+          \ if _num(value) is not None else 0\n                            for value\
+          \ in values\n                        ]\n                    })\n       \
+          \     else:\n                value = _num(item)\n\n                if value\
+          \ is not None:\n                    radar_data.append({\n              \
+          \          \"name\": title,\n                        \"value\": [value]\n\
+          \                    })\n\n        if not radar_data:\n            return\
+          \ None\n\n        return {\n            \"title\": title_config,\n     \
+          \       \"tooltip\": {},\n            \"radar\": {\n                \"indicator\"\
+          : indicators\n            },\n            \"series\": [{\n             \
+          \   \"type\": \"radar\",\n                \"data\": radar_data\n       \
+          \     }]\n        }\n\n    # 仪表盘\n    if chart_type == \"gauge\":\n    \
+          \    value = None\n\n        if data:\n            value = _num(data[0])\n\
+          \n        if value is None:\n            return None\n\n        return {\n\
+          \            \"title\": title_config,\n            \"series\": [{\n    \
+          \            \"type\": \"gauge\",\n                \"progress\": {\"show\"\
+          : True},\n                \"data\": [{\n                    \"value\": value,\n\
+          \                    \"name\": title\n                }]\n            }]\n\
+          \        }\n\n    # 散点图\n    if chart_type == \"scatter\":\n        points\
+          \ = []\n\n        for item in data:\n            if isinstance(item, list)\
+          \ and len(item) >= 2:\n                x = _num(item[0])\n             \
+          \   y = _num(item[1])\n\n                if x is not None and y is not None:\n\
+          \                    points.append([x, y])\n\n        if not points:\n \
+          \           return None\n\n        return {\n            \"title\": title_config,\n\
+          \            \"tooltip\": {},\n            \"xAxis\": {\"type\": \"value\"\
+          },\n            \"yAxis\": {\"type\": \"value\"},\n            \"series\"\
+          : [{\n                \"type\": \"scatter\",\n                \"data\":\
+          \ points\n            }]\n        }\n\n    # 热力图\n    if chart_type == \"\
+          heatmap\":\n        cells = []\n        x_categories = []\n        y_categories\
+          \ = []\n\n        for item in data:\n            if isinstance(item, list)\
+          \ and len(item) >= 3:\n                x_value = str(item[0])\n        \
+          \        y_value = str(item[1])\n                value = _num(item[2])\n\
+          \n                if value is not None:\n                    if x_value\
+          \ not in x_categories:\n                        x_categories.append(x_value)\n\
+          \n                    if y_value not in y_categories:\n                \
+          \        y_categories.append(y_value)\n\n                    cells.append([\n\
+          \                        x_value,\n                        y_value,\n  \
+          \                      value\n                    ])\n\n        if not cells:\n\
+          \            return None\n\n        x_index = {\n            value: index\n\
+          \            for index, value in enumerate(x_categories)\n        }\n\n\
+          \        y_index = {\n            value: index\n            for index, value\
+          \ in enumerate(y_categories)\n        }\n\n        series_data = [\n   \
+          \         [x_index[item[0]], y_index[item[1]], item[2]]\n            for\
+          \ item in cells\n        ]\n\n        values = [item[2] for item in cells]\n\
+          \n        return {\n            \"title\": title_config,\n            \"\
+          tooltip\": {\"position\": \"top\"},\n            \"grid\": {\n         \
+          \       \"left\": 120,\n                \"bottom\": 80,\n              \
+          \  \"top\": 40\n            },\n            \"xAxis\": {\n             \
+          \   \"type\": \"category\",\n                \"data\": x_categories,\n \
+          \               \"splitArea\": {\"show\": True}\n            },\n      \
+          \      \"yAxis\": {\n                \"type\": \"category\",\n         \
+          \       \"data\": y_categories,\n                \"splitArea\": {\"show\"\
+          : True}\n            },\n            \"visualMap\": {\n                \"\
+          min\": min(values),\n                \"max\": max(values),\n           \
+          \     \"calculable\": True,\n                \"orient\": \"horizontal\"\
+          ,\n                \"left\": \"center\",\n                \"bottom\": 0\n\
+          \            },\n            \"series\": [{\n                \"type\": \"\
+          heatmap\",\n                \"data\": series_data\n            }]\n    \
+          \    }\n\n    # 日历图\n    if chart_type == \"calendar\":\n        cells =\
+          \ []\n\n        for item in data:\n            if isinstance(item, list)\
+          \ and len(item) >= 2:\n                date_value = str(item[0])\n     \
+          \           number = _num(item[1])\n\n                if number is not None\
+          \ and len(date_value) >= 8:\n                    cells.append([date_value,\
+          \ number])\n\n        if not cells:\n            return None\n\n       \
+          \ years = sorted(set(item[0][:4] for item in cells))\n        calendar_range\
+          \ = years[0]\n\n        if len(years) > 1:\n            calendar_range =\
+          \ years[0] + \"-\" + years[-1]\n\n        values = [item[1] for item in\
+          \ cells]\n\n        return {\n            \"title\": title_config,\n   \
+          \         \"tooltip\": {},\n            \"visualMap\": {\n             \
+          \   \"min\": min(values),\n                \"max\": max(values),\n     \
+          \           \"calculable\": True,\n                \"orient\": \"horizontal\"\
+          ,\n                \"left\": \"center\",\n                \"bottom\": 0\n\
+          \            },\n            \"calendar\": {\n                \"range\"\
+          : calendar_range,\n                \"cellSize\": [\"auto\", 16]\n      \
+          \      },\n            \"series\": [{\n                \"type\": \"heatmap\"\
+          ,\n                \"coordinateSystem\": \"calendar\",\n               \
+          \ \"data\": cells\n            }]\n        }\n\n    # 箱线图\n    if chart_type\
+          \ == \"boxplot\":\n        groups = []\n\n        for item in data:\n  \
+          \          if isinstance(item, list) and len(item) == 5:\n             \
+          \   values = [_num(value) for value in item]\n\n                if all(value\
+          \ is not None for value in values):\n                    groups.append(values)\n\
+          \n        if not groups:\n            return None\n\n        categories\
+          \ = [str(item) for item in x_axis]\n\n        if len(categories) < len(groups):\n\
+          \            categories = [\n                \"组\" + str(index + 1)\n  \
+          \              for index in range(len(groups))\n            ]\n\n      \
+          \  return {\n            \"title\": title_config,\n            \"tooltip\"\
+          : {\"trigger\": \"item\"},\n            \"xAxis\": {\n                \"\
+          type\": \"category\",\n                \"data\": categories\n          \
+          \  },\n            \"yAxis\": {\"type\": \"value\"},\n            \"series\"\
+          : [{\n                \"type\": \"boxplot\",\n                \"data\":\
+          \ groups\n            }]\n        }\n\n    # K线图\n    if chart_type == \"\
+          candlestick\":\n        kdata = []\n\n        for item in data:\n      \
+          \      if isinstance(item, list) and len(item) == 4:\n                values\
+          \ = [_num(value) for value in item]\n\n                if all(value is not\
+          \ None for value in values):\n                    kdata.append(values)\n\
+          \n        if not kdata:\n            return None\n\n        categories =\
+          \ [str(item) for item in x_axis]\n\n        if len(categories) < len(kdata):\n\
+          \            categories = [\n                str(index + 1)\n          \
+          \      for index in range(len(kdata))\n            ]\n\n        return {\n\
+          \            \"title\": title_config,\n            \"tooltip\": {\"trigger\"\
+          : \"axis\"},\n            \"xAxis\": {\n                \"type\": \"category\"\
+          ,\n                \"data\": categories\n            },\n            \"\
+          yAxis\": {\"type\": \"value\"},\n            \"series\": [{\n          \
+          \      \"type\": \"candlestick\",\n                \"data\": kdata\n   \
+          \         }]\n        }\n\n    # 矩形树图、旭日图\n    if chart_type in [\"treemap\"\
+          , \"sunburst\"]:\n        items = []\n\n        for item in data:\n    \
+          \        if isinstance(item, dict):\n                name = str(item.get(\"\
+          name\", \"\")).strip()\n                value = _num(item.get(\"value\"\
+          ))\n\n                if name and value is not None:\n                 \
+          \   items.append({\n                        \"name\": name,\n          \
+          \              \"value\": value\n                    })\n\n        if not\
+          \ items:\n            return None\n\n        return {\n            \"title\"\
+          : title_config,\n            \"tooltip\": {\"trigger\": \"item\"},\n   \
+          \         \"series\": [{\n                \"type\": chart_type,\n      \
+          \          \"data\": items\n            }]\n        }\n\n    return None\n\
+          \n\ndef main(args: str) -> dict:\n    default_output = {\n        \"results\"\
+          : \"\",\n        \"text\": \"\",\n        \"ECharts\": \"0\",\n        \"\
+          chartType\": \"\",\n        \"chartTitle\": \"\",\n        \"chartData\"\
+          : \"\",\n        \"chartXAxis\": \"\"\n    }\n\n    try:\n        result_dict\
+          \ = _extract_json(args)\n\n        if not isinstance(result_dict, dict):\n\
+          \            return default_output\n\n    except Exception:\n        return\
+          \ default_output\n\n    results_value = result_dict.get(\"results\", \"\"\
+          )\n\n    if results_value is None:\n        results = \"\"\n    elif isinstance(results_value,\
+          \ (dict, list)):\n        results = json.dumps(\n            results_value,\n\
+          \            ensure_ascii=False\n        )\n    else:\n        results =\
+          \ str(results_value).strip()\n\n    echarts = str(\n        result_dict.get(\"\
+          ECharts\", \"0\")\n    ).strip()\n\n    chart_type = str(\n        result_dict.get(\"\
+          chartType\", \"\")\n    ).strip()\n\n    chart_title = str(\n        result_dict.get(\"\
+          chartTitle\", \"\")\n    ).strip()\n\n    chart_data = _parse_array(\n \
+          \       result_dict.get(\"chartData\", [])\n    )\n\n    chart_x_axis =\
+          \ _parse_array(\n        result_dict.get(\"chartXAxis\", [])\n    )\n\n\
+          \    final_text = results\n\n    if echarts == \"1\" and chart_type:\n \
+          \       option = build_echarts(\n            chart_type,\n            chart_title,\n\
+          \            chart_data,\n            chart_x_axis\n        )\n\n      \
+          \  if option:\n            echarts_block = (\n                \"\\n\\n\"\
+          \n                + \"```\"\n                + \"echarts\\n\"\n        \
+          \        + json.dumps(option, ensure_ascii=False)\n                + \"\\\
+          n\"\n                + \"```\"\n            )\n\n            final_text\
+          \ = results + echarts_block\n\n    return {\n        \"results\": results,\n\
+          \        \"text\": final_text,\n        \"ECharts\": echarts,\n        \"\
+          chartType\": chart_type,\n        \"chartTitle\": chart_title,\n       \
+          \ \"chartData\": json.dumps(\n            chart_data,\n            ensure_ascii=False\n\
+          \        ),\n        \"chartXAxis\": json.dumps(\n            chart_x_axis,\n\
+          \            ensure_ascii=False\n        )\n    }"
+        code_language: python3
+        outputs:
+          ECharts:
+            children: null
+            type: string
+          chartData:
+            children: null
+            type: string
+          chartTitle:
+            children: null
+            type: string
+          chartType:
+            children: null
+            type: string
+          chartXAxis:
+            children: null
+            type: string
+          results:
+            children: null
+            type: string
+          text:
+            children: null
+            type: string
+        selected: false
+        title: 解析图表并生成回复
+        type: code
+        variables:
+        - value_selector:
+          - '1780922485769'
+          - text
+          value_type: string
+          variable: args
+      height: 52
+      id: '1780923024622'
+      position:
+        x: 3519.986473128312
+        y: 433.19926143689554
+      positionAbsolute:
+        x: 3519.986473128312
+        y: 433.19926143689554
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：整理查询结果（迭代1内部）\n# 作用：把单条SQL的执行结果统一包装成 {ok, title, sql, error, data}。\n\
+          #       正常分支接工具成功输出，失败分支接 error_message。\n# 输入：data = 工具 json；err = 工具 error_message；title/sql\
+          \ = 组装SQL参数\n# 注意：金仓 Oracle 兼容模式下空字符串等价于 NULL，err 判断用 str(err or \"\")。\n\
+          # =====================================================================\n\
+          def main(data: dict, err: str, title: str, sql: str) -> dict:\n    err_text\
+          \ = str(err or \"\").strip()\n    ok = err_text == \"\"\n    return {\n\
+          \        \"result\": {\n            \"ok\": ok,\n            \"title\":\
+          \ str(title or \"\"),\n            \"sql\": str(sql or \"\"),\n        \
+          \    \"error\": err_text if not ok else \"\",\n            \"data\": data\
+          \ if ok else None\n        }\n    }"
+        code_language: python3
+        isInIteration: true
+        iteration_id: '1780921817315'
+        outputs:
+          result:
+            children: null
+            type: object
+        selected: false
+        title: 整理查询结果
+        type: code
+        variables:
+        - value_selector:
+          - '1784715296667'
+          - json
+          value_type: object
+          variable: data
+        - value_selector:
+          - '1784715296667'
+          - error_message
+          value_type: string
+          variable: err
+        - value_selector:
+          - '1780921883266'
+          - title
+          value_type: string
+          variable: title
+        - value_selector:
+          - '1780921883266'
+          - sql
+          value_type: string
+          variable: sql
+      height: 52
+      id: '1780999999001'
+      parentId: '1780921817315'
+      position:
+        x: 768.9928247903536
+        y: 82.21968720023527
+      positionAbsolute:
+        x: 2735.8001415639264
+        y: -74.2183976312928
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 1001
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：提取失败项\n# 作用：从逐条执行SQL的汇总结果里筛出执行失败（ok=false）的项，\n#       输出给修复SQL大模型；同时把全部项透传给统一汇总入口。\n\
+          # 输入：args = 迭代输出数组，每项 {ok, title, sql, error, data}\n# 输出：failed_items（JSON字符串）,\
+          \ failed_count, all_items（透传全量）\n# 维护：修改失败判定条件时只动 ok 的判断。\n# =====================================================================\n\
+          import json\n\n\ndef main(args: list) -> dict:\n    if not isinstance(args,\
+          \ list):\n        args = []\n    failed = []\n    for item in args:\n  \
+          \      if isinstance(item, dict) and item.get(\"ok\") is False:\n      \
+          \      failed.append({\n                \"title\": str(item.get(\"title\"\
+          ) or \"\"),\n                \"sql\": str(item.get(\"sql\") or \"\"),\n\
+          \                \"error\": str(item.get(\"error\") or \"\")\n         \
+          \   })\n    return {\n        \"failed_items\": json.dumps(failed, ensure_ascii=False),\n\
+          \        \"failed_count\": len(failed),\n        \"all_items\": args\n \
+          \   }"
+        code_language: python3
+        outputs:
+          all_items:
+            children: null
+            type: array[object]
+          failed_count:
+            children: null
+            type: number
+          failed_items:
+            children: null
+            type: string
+        selected: false
+        title: 提取失败项
+        type: code
+        variables:
+        - value_selector:
+          - '1780921817315'
+          - output
+          value_type: array[object]
+          variable: args
+      height: 52
+      id: '1781000000001'
+      position:
+        x: 1953.8200575548253
+        y: 124.43242557266967
+      positionAbsolute:
+        x: 1953.8200575548253
+        y: 124.43242557266967
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: 用户问题：{{#sys.query#}}
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 10
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: Qwen3.8-27B
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 9d2d8b4d-4ec0-4de4-9f7d-4f0b2d7a8c11
+          role: system
+          text: 你是SQL修复器。仅修复失败SQL中的语法、字段、别名或类型问题。只允许SELECT/WITH，不新增未提供的表。输出严格JSON：{"queries":[{"sql":"...","purpose":"...","expected_rows":"..."}]}。
+        - id: b4e9c8a2-6d11-4f3b-9c72-18d6e2a5f904
+          role: user
+          text: '用户问题：
+
+            {{#sys.query#}}
+
+
+            失败项：
+
+            {{#1781000000001.failed_items#}}
+
+
+            请逐项修复，无法安全修复的项不要猜测，输出严格JSON。'
+        selected: false
+        title: 修复失败SQL
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1781000000002'
+      position:
+        x: 2515.354254614648
+        y: 124.43242557266967
+      positionAbsolute:
+        x: 2515.354254614648
+        y: 124.43242557266967
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# 节点：解析修复SQL（安全校验层）\n# 解析修复模型返回的 JSON 数组或 {\"queries\": [...]}，并复用\
+          \ SQL 白名单。\nimport re\nimport json\n\nALLOWED_TABLE_RE = re.compile(r'^CGXTAPPMISDate_\\\
+          d{4}_\\d{2}$')\nALLOWED_TABLES = ('CGXTAPPMISNewIndicator', 'BFAdminOrganization',\
+          \ 'enterprise_equipment_info')\nDANGEROUS = ['insert ', 'update ', 'delete\
+          \ ', 'drop ', 'truncate ', 'alter ', 'create ', 'grant ', 'revoke ', 'copy\
+          \ ']\n\ndef validate_sql(sql):\n    s = str(sql).strip()\n    if not s.lower().startswith(('select',\
+          \ 'with')):\n        raise ValueError('SQL 不是 SELECT/WITH 查询，已拦截')\n   \
+          \ lower = s.lower()\n    for kw in DANGEROUS:\n        if kw in lower:\n\
+          \            raise ValueError('SQL 包含危险关键字：' + kw.strip())\n    body = s.rstrip().rstrip(';')\n\
+          \    if ';' in body:\n        raise ValueError('检测到多语句 SQL，已拦截')\n    for\
+          \ m in re.finditer(\n        r'(?:from|join)\\s+'\n        r'(?:(?:\"?([A-Za-z0-9_]+)\"\
+          ?)\\s*\\.\\s*)?'\n        r'\"?([A-Za-z_][A-Za-z0-9_]*)',\n        s,\n\
+          \        re.IGNORECASE,\n    ):\n        schema_name = m.group(1)\n    \
+          \    table_name = m.group(2)\n        if schema_name and schema_name.upper()\
+          \ != 'MSOKFPT':\n            raise ValueError('引用了非白名单 schema：' + schema_name)\n\
+          \        if table_name in ALLOWED_TABLES or ALLOWED_TABLE_RE.match(table_name):\n\
+          \            continue\n        raise ValueError('引用了白名单外的表：' + table_name)\n\
+          \    if not re.search(r'\\blimit\\s+\\d+', s, re.IGNORECASE):\n        s\
+          \ = body + ' LIMIT 1000'\n    return s\n\ndef main(input_string: str) ->\
+          \ dict:\n    if not input_string or not input_string.strip():\n        return\
+          \ {'result': [], 'count': 0}\n    text = re.sub(r'<think>[\\s\\S]*?</think>',\
+          \ '', input_string, flags=re.IGNORECASE).strip()\n    fence = chr(96) *\
+          \ 3\n    text = text.replace(fence + 'json', '').replace(fence, '').strip()\n\
+          \    candidates = [text]\n    parsed = None\n    for candidate in candidates:\n\
+          \        try:\n            value = json.loads(candidate.strip())\n     \
+          \   except Exception:\n            continue\n        if isinstance(value,\
+          \ dict) and isinstance(value.get('queries'), list):\n            parsed\
+          \ = value['queries']\n            break\n        if isinstance(value, list):\n\
+          \            parsed = value\n            break\n    if parsed is None:\n\
+          \        return {'result': [], 'count': 0}\n    result = []\n    for item\
+          \ in parsed:\n        if not isinstance(item, dict):\n            continue\n\
+          \        title = str(item.get('title') or item.get('purpose') or '').strip()\n\
+          \        sql = str(item.get('sql') or '').strip()\n        if not title\
+          \ or not sql:\n            continue\n        try:\n            sql = validate_sql(sql)\n\
+          \        except Exception:\n            continue\n        result.append({'title':\
+          \ title, 'sql': sql})\n    return {'result': result, 'count': len(result)}"
+        code_language: python3
+        outputs:
+          count:
+            children: null
+            type: number
+          result:
+            children: null
+            type: array[object]
+        selected: false
+        title: 解析修复SQL
+        type: code
+        variables:
+        - value_selector:
+          - '1781000000002'
+          - text
+          value_type: string
+          variable: input_string
+      height: 52
+      id: '1781000000003'
+      position:
+        x: 2515.354254614648
+        y: 252.79709596342283
+      positionAbsolute:
+        x: 2515.354254614648
+        y: 252.79709596342283
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        error_handle_mode: remove-abnormal-output
+        flatten_output: true
+        height: 220
+        is_parallel: false
+        iterator_input_type: array[object]
+        iterator_selector:
+        - '1781000000003'
+        - result
+        output_selector:
+        - '1781000000007'
+        - result
+        output_type: array[object]
+        parallel_nums: 10
+        selected: false
+        start_node_id: 1781000000004start
+        title: 补查执行
+        type: iteration
+        width: 1400
+      height: 220
+      id: '1781000000004'
+      position:
+        x: 1953.8200575548253
+        y: 425.0010122174384
+      positionAbsolute:
+        x: 1953.8200575548253
+        y: 425.0010122174384
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 1400
+      zIndex: 0
+    - data:
+        desc: ''
+        isInIteration: true
+        selected: false
+        title: ''
+        type: iteration-start
+      draggable: false
+      height: 48
+      id: 1781000000004start
+      parentId: '1781000000004'
+      position:
+        x: 60
+        y: 80
+      positionAbsolute:
+        x: 2013.8200575548253
+        y: 505.0010122174384
+      selectable: false
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-iteration-start
+      width: 44
+      zIndex: 1001
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：组装补查参数（迭代2内部）\n# 作用：与组装SQL参数相同，服务于修复后的补查SQL。\n# 输入：args = 迭代当前项 {\"\
+          title\": \"...\", \"sql\": \"...\"}\n# 输出：{\"title\": \"...\", \"sql\":\
+          \ \"...\"}\n# =====================================================================\n\
+          def main(args: dict) -> dict:\n    return {\n        \"title\": str(args.get(\"\
+          title\", \"\")),\n        \"sql\": str(args.get(\"sql\", \"\"))\n    }"
+        code_language: python3
+        isInIteration: true
+        iteration_id: '1781000000004'
+        outputs:
+          sql:
+            children: null
+            type: string
+          title:
+            children: null
+            type: string
+        selected: false
+        title: 组装补查参数
+        type: code
+        variables:
+        - value_selector:
+          - '1781000000004'
+          - item
+          value_type: object
+          variable: args
+      height: 52
+      id: '1781000000005'
+      parentId: '1781000000004'
+      position:
+        x: 200
+        y: 80
+      positionAbsolute:
+        x: 2153.8200575548253
+        y: 505.0010122174384
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 1001
+    - data:
+        error_strategy: fail-branch
+        isInIteration: true
+        isInLoop: false
+        is_team_authorization: true
+        iteration_id: '1781000000004'
+        paramSchemas:
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database type
+            ja_JP: Database type
+            pt_BR: Database type
+            zh_Hans: 数据库类型
+          label:
+            en_US: Database type
+            ja_JP: Database type
+            pt_BR: Database type
+            zh_Hans: 数据库类型
+          llm_description: Database type
+          max: null
+          min: null
+          name: db_type
+          options:
+          - icon: ''
+            label:
+              en_US: MySQL
+              ja_JP: MySQL
+              pt_BR: MySQL
+              zh_Hans: MySQL
+            value: mysql
+          - icon: ''
+            label:
+              en_US: PostgreSQL
+              ja_JP: PostgreSQL
+              pt_BR: PostgreSQL
+              zh_Hans: PostgreSQL
+            value: postgresql
+          - icon: ''
+            label:
+              en_US: SQL Server
+              ja_JP: SQL Server
+              pt_BR: SQL Server
+              zh_Hans: SQL Server
+            value: sqlserver
+          - icon: ''
+            label:
+              en_US: Oracle
+              ja_JP: Oracle
+              pt_BR: Oracle
+              zh_Hans: Oracle
+            value: oracle
+          - icon: ''
+            label:
+              en_US: GaussDB
+              ja_JP: GaussDB
+              pt_BR: GaussDB
+              zh_Hans: 华为高斯数据库
+            value: gaussdb
+          - icon: ''
+            label:
+              en_US: KingbaseES
+              ja_JP: KingbaseES
+              pt_BR: KingbaseES
+              zh_Hans: 人大金仓数据库
+            value: kingbase
+          - icon: ''
+            label:
+              en_US: DM Database
+              ja_JP: DM Database
+              pt_BR: DM Database
+              zh_Hans: 达梦数据库
+            value: dm
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: select
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database ip/host
+            ja_JP: Database ip/host
+            pt_BR: Database ip/host
+            zh_Hans: 数据库IP/域名
+          label:
+            en_US: Database ip/host
+            ja_JP: Database ip/host
+            pt_BR: Database ip/host
+            zh_Hans: 数据库IP/域名
+          llm_description: Database ip/host
+          max: null
+          min: null
+          name: host
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database port
+            ja_JP: Database port
+            pt_BR: Database port
+            zh_Hans: 数据库端口
+          label:
+            en_US: Database port
+            ja_JP: Database port
+            pt_BR: Database port
+            zh_Hans: 数据库端口
+          llm_description: Database port
+          max: 65535
+          min: 1
+          name: port
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: number
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database name
+            ja_JP: Database name
+            pt_BR: Database name
+            zh_Hans: 数据库名称
+          label:
+            en_US: Database name
+            ja_JP: Database name
+            pt_BR: Database name
+            zh_Hans: 数据库名称
+          llm_description: Database name
+          max: null
+          min: null
+          name: db_name
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Username
+            ja_JP: Username
+            pt_BR: Username
+            zh_Hans: 用户名
+          label:
+            en_US: Username
+            ja_JP: Username
+            pt_BR: Username
+            zh_Hans: 用户名
+          llm_description: Username
+          max: null
+          min: null
+          name: username
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Password
+            ja_JP: Password
+            pt_BR: Password
+            zh_Hans: 密码
+          label:
+            en_US: Password
+            ja_JP: Password
+            pt_BR: Password
+            zh_Hans: 密码
+          llm_description: Password
+          max: null
+          min: null
+          name: password
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: secret-input
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Schema name
+            ja_JP: Schema name
+            pt_BR: Schema name
+            zh_Hans: 数据库Schema PGSQL用户选填，默认为public
+          label:
+            en_US: Schema name
+            ja_JP: Schema name
+            pt_BR: Schema name
+            zh_Hans: 数据库Schema（PGSQL默认为public，Oracle/DM默认为用户名大写）
+          llm_description: Schema name
+          max: null
+          min: null
+          name: schema
+          options: []
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Fetching data from the database using natural language.
+            ja_JP: Fetching data from the database using natural language.
+            pt_BR: Fetching data from the database using natural language.
+            zh_Hans: Fetching data from the database using natural language.
+          label:
+            en_US: SQL string
+            ja_JP: SQL string
+            pt_BR: SQL string
+            zh_Hans: 待执行的 SQL 语句
+          llm_description: Fetching data from the database using natural language.
+          max: null
+          min: null
+          name: sql
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: json
+          form: llm
+          human_description:
+            en_US: result_format
+            ja_JP: result_format
+            pt_BR: result_format
+            zh_Hans: 返回数据格式
+          label:
+            en_US: result_format
+            ja_JP: result_format
+            pt_BR: result_format
+            zh_Hans: 返回数据格式
+          llm_description: result_format
+          max: null
+          min: null
+          name: result_format
+          options:
+          - icon: ''
+            label:
+              en_US: JSON
+              ja_JP: JSON
+              pt_BR: JSON
+              zh_Hans: JSON
+            value: json
+          - icon: ''
+            label:
+              en_US: TEXT
+              ja_JP: TEXT
+              pt_BR: TEXT
+              zh_Hans: TEXT
+            value: text
+          - icon: ''
+            label:
+              en_US: CSV
+              ja_JP: CSV
+              pt_BR: CSV
+              zh_Hans: CSV
+            value: csv
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: select
+        params:
+          db_name: ''
+          db_type: ''
+          host: ''
+          password: ''
+          port: ''
+          result_format: ''
+          schema: ''
+          sql: ''
+          username: ''
+        plugin_id: jaguarliuu/rookie_text2data
+        plugin_unique_identifier: jaguarliuu/rookie_text2data:1.0.3@3041f4cfe193deb03f716fedfd2e7dae1601021cf39f94c462af8d6babd1e3fd
+        provider_icon: /console/api/workspaces/current/plugin/icon?tenant_id=a469a2e8-60bb-407d-8561-03342c213e36&filename=9585e221a1e207d23f39a174ec40644ef73683bd5cbb96d80f0e2656a0bfc618.svg
+        provider_id: jaguarliuu/rookie_text2data/rookie_text2data
+        provider_name: jaguarliuu/rookie_text2data/rookie_text2data
+        provider_type: builtin
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        title: 执行补查SQL
+        tool_configurations: {}
+        tool_description: sql 执行器
+        tool_label: rookie_excute_sql
+        tool_name: rookie_excute_sql
+        tool_node_version: '2'
+        tool_parameters:
+          db_name:
+            type: mixed
+            value: '{{#env.DB_NAME#}}'
+          db_type:
+            type: constant
+            value: kingbase
+          host:
+            type: mixed
+            value: '{{#env.DB_HOST#}}'
+          password:
+            type: mixed
+            value: '{{#env.DB_PASSWORD#}}'
+          port:
+            type: mixed
+            value: '{{#env.DB_PORT#}}'
+          result_format:
+            type: constant
+            value: json
+          schema:
+            type: mixed
+            value: '{{#env.DB_SCHEMA#}}'
+          sql:
+            type: mixed
+            value: '{{#1781000000005.sql#}}'
+          username:
+            type: mixed
+            value: '{{#env.DB_USER#}}'
+        type: tool
+      height: 118
+      id: '1781000000006'
+      parentId: '1781000000004'
+      position:
+        x: 520
+        y: 80
+      positionAbsolute:
+        x: 2473.8200575548253
+        y: 505.0010122174384
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 1001
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：整理补查结果（迭代2内部）\n# 作用：与整理查询结果相同，包装修复后SQL的执行结果。\n# 输入：data = 工具 json；err\
+          \ = 工具 error_message；title/sql = 组装补查参数\n# =====================================================================\n\
+          def main(data: dict, err: str, title: str, sql: str) -> dict:\n    err_text\
+          \ = str(err or \"\").strip()\n    ok = err_text == \"\"\n    return {\n\
+          \        \"result\": {\n            \"ok\": ok,\n            \"title\":\
+          \ str(title or \"\"),\n            \"sql\": str(sql or \"\"),\n        \
+          \    \"error\": err_text if not ok else \"\",\n            \"data\": data\
+          \ if ok else None\n        }\n    }"
+        code_language: python3
+        isInIteration: true
+        iteration_id: '1781000000004'
+        outputs:
+          result:
+            children: null
+            type: object
+        selected: false
+        title: 整理补查结果
+        type: code
+        variables:
+        - value_selector:
+          - '1781000000006'
+          - json
+          value_type: object
+          variable: data
+        - value_selector:
+          - '1781000000006'
+          - error_message
+          value_type: string
+          variable: err
+        - value_selector:
+          - '1781000000005'
+          - title
+          value_type: string
+          variable: title
+        - value_selector:
+          - '1781000000005'
+          - sql
+          value_type: string
+          variable: sql
+      height: 52
+      id: '1781000000007'
+      parentId: '1781000000004'
+      position:
+        x: 860
+        y: 80
+      positionAbsolute:
+        x: 2813.8200575548253
+        y: 505.0010122174384
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 1001
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：合并查询结果\n# 作用：把首轮成功项与修复后补查成功的项合并；修复后仍失败的保留最新错误。\n# 输入：first = 首轮迭代输出；repaired\
+          \ = 补查迭代输出（可能为空）\n# 输出：result（合并数组）, ok_count, fail_count, failed_notes\n\
+          # =====================================================================\n\
+          def main(first: list, repaired: list) -> dict:\n    first = first if isinstance(first,\
+          \ list) else []\n    repaired = repaired if isinstance(repaired, list) else\
+          \ []\n    merged = []\n    for item in first:\n        if isinstance(item,\
+          \ dict) and item.get(\"ok\") is False:\n            title = str(item.get(\"\
+          title\") or \"\")\n            found = None\n            for r in repaired:\n\
+          \                if isinstance(r, dict) and str(r.get(\"title\") or \"\"\
+          ) == title:\n                    found = r\n                    break\n\
+          \            merged.append(found if found is not None else item)\n     \
+          \   else:\n            merged.append(item)\n    ok_count = sum(1 for x in\
+          \ merged if isinstance(x, dict) and x.get(\"ok\"))\n    fail_count = sum(1\
+          \ for x in merged if isinstance(x, dict) and not x.get(\"ok\"))\n    notes\
+          \ = []\n    for x in merged:\n        if isinstance(x, dict) and not x.get(\"\
+          ok\"):\n            notes.append(str(x.get(\"title\") or \"\") + \"：\" +\
+          \ str(x.get(\"error\") or \"\"))\n    return {\n        \"result\": merged,\n\
+          \        \"ok_count\": ok_count,\n        \"fail_count\": fail_count,\n\
+          \        \"failed_notes\": \"\\n\".join(notes)\n    }"
+        code_language: python3
+        outputs:
+          fail_count:
+            children: null
+            type: number
+          failed_notes:
+            children: null
+            type: string
+          ok_count:
+            children: null
+            type: number
+          result:
+            children: null
+            type: array[object]
+        selected: false
+        title: 合并查询结果
+        type: code
+        variables:
+        - value_selector:
+          - '1780921817315'
+          - output
+          value_type: array[object]
+          variable: first
+        - value_selector:
+          - '1781000000004'
+          - output
+          value_type: array[object]
+          variable: repaired
+      height: 52
+      id: '1781000000008'
+      position:
+        x: 3109.865120319249
+        y: 342.55222304650016
+      positionAbsolute:
+        x: 3109.865120319249
+        y: 342.55222304650016
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: '>'
+            id: cond-failed
+            value: '0'
+            variable_selector:
+            - '1781000000001'
+            - failed_count
+          id: 'true'
+          logical_operator: and
+        selected: false
+        title: 是否有失败SQL
+        type: if-else
+      height: 124
+      id: '1781000000010'
+      position:
+        x: 1953.8200575548253
+        y: 241.8917032484157
+      positionAbsolute:
+        x: 1953.8200575548253
+        y: 241.8917032484157
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：统一汇总入口\n# 作用：无失败/有失败两条分支都汇聚到这里，保证汇总查询结果节点总能拿到数据。\n#       优先使用修复后的结果；修复链路未跑时用首轮全量结果。\n\
+          # 输入：direct_items = 首轮全量；repaired_items = 修复后结果（未执行时为 None）\n# 注意：修复节点未执行时\
+          \ repaired_items 为 None，代码已兼容。\n# =====================================================================\n\
+          def main(direct_items: list, repaired_items: list) -> dict:\n    if isinstance(repaired_items,\
+          \ list) and repaired_items:\n        items = repaired_items\n    else:\n\
+          \        items = direct_items if isinstance(direct_items, list) else []\n\
+          \    return {\"items\": items}"
+        code_language: python3
+        outputs:
+          items:
+            children: null
+            type: array[object]
+        selected: false
+        title: 统一汇总入口
+        type: code
+        variables:
+        - value_selector:
+          - '1781000000001'
+          - all_items
+          value_type: array[object]
+          variable: direct_items
+        - value_selector:
+          - '1781000000008'
+          - result
+          value_type: array[object]
+          variable: repaired_items
+      height: 52
+      id: '1781000000012'
+      position:
+        x: 3103.664613066024
+        y: 234.95972245130707
+      positionAbsolute:
+        x: 3103.664613066024
+        y: 234.95972245130707
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# 节点：整理指标字典\n# 输入可以是知识检索 result，也兼容旧数据库工具的 result 包装。\n# 只保留检索命中的有效指标，去重并限制候选数量，避免把整张字典送进模型。\n\
+          def _records(value):\n    if isinstance(value, dict):\n        value = value.get(\"\
+          result\") or value.get(\"data\") or []\n    if not isinstance(value, list):\n\
+          \        return []\n    records = []\n    for item in value:\n        if\
+          \ isinstance(item, dict) and isinstance(item.get(\"result\"), list):\n \
+          \           records.extend(item[\"result\"])\n        elif isinstance(item,\
+          \ (dict, str)):\n            records.append(item)\n    return records\n\n\
+          def _content(item):\n    if isinstance(item, dict):\n        return str(item.get(\"\
+          content\") or item.get(\"text\") or item.get(\"page_content\") or \"\")\n\
+          \    return str(item or \"\")\n\ndef main(args: list) -> dict:\n    rows\
+          \ = []\n    seen = set()\n    for item in _records(args):\n        for raw\
+          \ in _content(item).splitlines():\n            parts = [part.strip() for\
+          \ part in raw.split(\"\\t\")]\n            if len(parts) < 2 or not parts[0]:\n\
+          \                continue\n            if parts[0] in (\"指标名称\", \"来源：CGXTAPPMISNewIndicator\"\
+          ) or raw.startswith(\"禁止\"):\n                continue\n            if parts[0].isdigit():\n\
+          \                code, name = parts[0], parts[1]\n                unit =\
+          \ parts[2] if len(parts) > 2 else \"\"\n            else:\n            \
+          \    name, code = parts[0], parts[1]\n                unit = parts[2] if\
+          \ len(parts) > 2 else \"\"\n            if not name or name in seen:\n \
+          \               continue\n            seen.add(name)\n            rows.append(code\
+          \ + \"\\t\" + name + (\"\\t\" + unit if unit else \"\"))\n            if\
+          \ len(rows) >= 20:\n                break\n        if len(rows) >= 20:\n\
+          \            break\n    return {\"result\": \"\\n\".join(rows), \"count\"\
+          : len(rows)}"
+        code_language: python3
+        outputs:
+          count:
+            children: null
+            type: number
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 整理指标字典
+        type: code
+        variables:
+        - value_selector:
+          - '1787827566589'
+          - result
+          value_type: array[object]
+          variable: args
+      height: 52
+      id: '1781000000014'
+      position:
+        x: 1629.2504049726986
+        y: 22.561915168471927
+      positionAbsolute:
+        x: 1629.2504049726986
+        y: 22.561915168471927
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# 节点：整理指标规则\n# 只保留知识检索命中的规则和截止日期，去重后注入 SQL/回答模型。\ndef _records(value):\n\
+          \    if isinstance(value, dict):\n        value = value.get(\"result\")\
+          \ or value.get(\"data\") or []\n    if not isinstance(value, list):\n  \
+          \      return []\n    records = []\n    for item in value:\n        if isinstance(item,\
+          \ dict) and isinstance(item.get(\"result\"), list):\n            records.extend(item[\"\
+          result\"])\n        elif isinstance(item, (dict, str)):\n            records.append(item)\n\
+          \    return records\n\ndef _content(item):\n    if isinstance(item, dict):\n\
+          \        return str(item.get(\"content\") or item.get(\"text\") or item.get(\"\
+          page_content\") or \"\")\n    return str(item or \"\")\n\ndef main(args:\
+          \ list) -> dict:\n    lines = []\n    seen = set()\n    cutoff = \"\"\n\
+          \    for item in _records(args):\n        for raw in _content(item).splitlines():\n\
+          \            parts = [part.strip() for part in raw.split(\"\\t\")]\n   \
+          \         if len(parts) < 2 or not parts[0]:\n                continue\n\
+          \            if parts[0] == \"指标名称\" or parts[0].startswith(\"来源\") or parts[0].startswith(\"\
+          规则类型\"):\n                continue\n            name, kind = parts[0], parts[1]\n\
+          \            if kind == \"C\":\n                cutoff = parts[2] if len(parts)\
+          \ > 2 else \"\"\n                continue\n            if len(parts) < 3\
+          \ or not parts[2] or name in seen:\n                continue\n         \
+          \   seen.add(name)\n            params = parts[3] if len(parts) > 3 else\
+          \ \"\"\n            unit = parts[4] if len(parts) > 4 else \"\"\n      \
+          \      line = \"指标：\" + name + \"｜公式：\" + parts[2]\n            if params:\n\
+          \                line += \"｜参数：\" + params\n            if unit:\n     \
+          \           line += \"｜单位：\" + unit\n            lines.append(line)\n  \
+          \          if len(lines) >= 10:\n                break\n        if len(lines)\
+          \ >= 10:\n            break\n    return {\"result\": \"\\n\".join(lines),\
+          \ \"count\": len(lines), \"cutoff\": cutoff}"
+        code_language: python3
+        outputs:
+          count:
+            children: null
+            type: number
+          cutoff:
+            children: null
+            type: string
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 整理指标规则
+        type: code
+        variables:
+        - value_selector:
+          - '1787827877222'
+          - result
+          value_type: array[object]
+          variable: args
+      height: 52
+      id: '1781000000016'
+      position:
+        x: 1629.2504049726986
+        y: 191.3966553985584
+      positionAbsolute:
+        x: 1629.2504049726986
+        y: 191.3966553985584
+      selected: true
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# =====================================================================\n\
+          # 节点：计算引擎\n# 作用：对计算指标按规则公式统一计算。输入为源指标查询结果+设备参数+规则表，\n#       展开子公式、替换参数、安全求值，输出计算值供回答模型展示。\n\
+          # 维护：公式维护在 indicator_formula 表；参数映射见 PARAM_MAP。\n# =====================================================================\n\
+          import ast\nimport operator\nimport re\nimport calendar\n\nALIAS = {\n \
+          \   \"总发电量\": [\"全厂发电量\"],\n    \"上网电量\": [\"全厂上网电量\"],\n    \"下网电量\": [\"\
+          全厂下网电量\"],\n    \"锅炉总运行时间\": [\"锅炉总运行小时数\"],\n    \"锅炉总停运时间\": [\"锅炉总停运小时数\"\
+          ],\n    \"汽机总运行时间\": [\"汽机总运行小时数\"],\n    \"汽机总停运时间\": [\"汽机总停运小时数\"],\n\
+          }\n\nPARAM_MAP = {\n    \"焚烧炉台数\": \"incinerator_count\",\n    \"汽轮机台数\"\
+          : \"installed_units\",\n    \"汽轮机装机\": \"installed_capacity\",\n    \"处理规模\"\
+          : \"processing_scale\",\n    \"折标系数\": \"standard_coeff\",\n    \"设计总蒸发量\"\
+          : \"total_evaporation\",\n    \"设计总进汽量\": \"total_air_volume\",\n}\n\nOPS\
+          \ = {\n    ast.Add: operator.add, ast.Sub: operator.sub,\n    ast.Mult:\
+          \ operator.mul, ast.Div: operator.truediv,\n    ast.Pow: operator.pow, ast.USub:\
+          \ operator.neg, ast.UAdd: operator.pos,\n}\n\n\ndef safe_eval(node):\n \
+          \   if isinstance(node, ast.Expression):\n        return safe_eval(node.body)\n\
+          \    if isinstance(node, ast.Constant) and isinstance(node.value, (int,\
+          \ float)):\n        return node.value\n    if isinstance(node, ast.BinOp)\
+          \ and type(node.op) in OPS:\n        return OPS[type(node.op)](safe_eval(node.left),\
+          \ safe_eval(node.right))\n    if isinstance(node, ast.UnaryOp) and type(node.op)\
+          \ in OPS:\n        return OPS[type(node.op)](safe_eval(node.operand))\n\
+          \    raise ValueError(\"不支持的表达式\")\n\n\ndef parse_rules(text):\n    rules\
+          \ = {}\n    for line in str(text or \"\").splitlines():\n        m = re.match(r\"\
+          指标：(.+?)｜公式：(.+?)(?:｜参数：(.+))?$\", line.strip())\n        if m:\n      \
+          \      rules[m.group(1).strip()] = m.group(2).strip()\n    return rules\n\
+          \n\ndef resolve(expr, rules, sources, depth=0):\n    if depth > 10:\n  \
+          \      return expr\n    for name, f in rules.items():\n        if name in\
+          \ sources:\n            continue\n        if name in expr:\n           \
+          \ return resolve(expr.replace(name, \"(\" + f + \")\"), rules, sources,\
+          \ depth + 1)\n    return expr\n\n\ndef main(items: list, rules_text: str,\
+          \ query: str) -> dict:\n    items = items if isinstance(items, list) else\
+          \ []\n    rules = parse_rules(rules_text or \"\")\n    target = \"\"\n \
+          \   period = \"\"\n    sources = {}\n    params = {}\n    for it in items:\n\
+          \        if not isinstance(it, dict):\n            continue\n        title\
+          \ = str(it.get(\"title\") or \"\")\n        data = it.get(\"data\")\n  \
+          \      rows = []\n        if isinstance(data, list) and data and isinstance(data[0],\
+          \ dict):\n            r0 = data[0].get(\"result\")\n            if isinstance(r0,\
+          \ list):\n                rows = r0\n        if title.startswith(\"计算目标\"\
+          ):\n            if rows and isinstance(rows[0], dict):\n               \
+          \ target = str(rows[0].get(\"calc_target\") or \"\").strip()\n         \
+          \       period = str(rows[0].get(\"calc_period\") or \"\").strip()\n   \
+          \     elif title == \"设备参数\":\n            if rows and isinstance(rows[0],\
+          \ dict):\n                params = rows[0]\n        elif title.startswith(\"\
+          源指标\"):\n            name = title.split(\"：\", 1)[-1].strip()\n        \
+          \    if rows:\n                for r in rows:\n                    if isinstance(r,\
+          \ dict):\n                        for k in (\"v\", \"value\"):\n       \
+          \                     if k in r and r[k] is not None:\n                \
+          \                try:\n                                    sources[name]\
+          \ = float(r[k])\n                                except Exception:\n   \
+          \                                 pass\n                               \
+          \ break\n                        break\n    if not target or not rules.get(target):\n\
+          \        return {\"items\": items, \"has_calc\": \"0\", \"calc_target\"\
+          : \"\", \"calc_value\": \"\", \"calc_formula\": \"\", \"calc_params\": \"\
+          \", \"calc_detail\": \"\"}\n\n    expr = rules[target]\n    expr = resolve(expr,\
+          \ rules, sources)\n    expr = expr.replace(\"×\", \"*\").replace(\"÷\",\
+          \ \"/\").replace(\"（\", \"(\").replace(\"）\", \")\")\n\n    param_notes\
+          \ = []\n    for cn, key in PARAM_MAP.items():\n        if cn in expr:\n\
+          \            val = params.get(key)\n            if val is None:\n      \
+          \          return {\"items\": items, \"has_calc\": \"1\", \"calc_target\"\
+          : target, \"calc_value\": \"\", \"calc_formula\": rules[target], \"calc_params\"\
+          : \"\", \"calc_detail\": \"计算引擎：缺少设备参数 \" + cn}\n            expr = expr.replace(cn,\
+          \ \"(\" + str(float(val)) + \")\")\n            param_notes.append(cn +\
+          \ \"=\" + str(float(val)))\n\n    if \"月内天数\" in expr:\n        try:\n \
+          \           y, m = period.split(\"-\")[:2]\n            days = calendar.monthrange(int(y),\
+          \ int(m))[1]\n        except Exception:\n            days = 30\n       \
+          \ expr = expr.replace(\"月内天数\", \"(\" + str(days) + \")\")\n        param_notes.append(\"\
+          月内天数=\" + str(days))\n\n    for name, val in list(sources.items()):\n  \
+          \      expr = expr.replace(name, \"(\" + str(val) + \")\")\n    for operand\
+          \ in [n for n in re.findall(r\"[\\u4e00-\\u9fa5A-Za-z#]+\", expr)]:\n  \
+          \      for alias in ALIAS.get(operand, []):\n            if alias in sources:\n\
+          \                expr = expr.replace(operand, \"(\" + str(sources[alias])\
+          \ + \")\")\n                break\n\n    left = re.findall(r\"[\\u4e00-\\\
+          u9fa5A-Za-z#]+\", expr)\n    if left:\n        uniq = list(dict.fromkeys(left))\n\
+          \        return {\"items\": items, \"has_calc\": \"1\", \"calc_target\"\
+          : target, \"calc_value\": \"\", \"calc_formula\": rules[target], \"calc_params\"\
+          : \"；\".join(param_notes), \"calc_detail\": \"计算引擎：缺少源指标数据：\" + \"、\".join(uniq)}\n\
+          \n    try:\n        tree = ast.parse(expr, mode=\"eval\")\n        value\
+          \ = safe_eval(tree.body)\n    except Exception as e:\n        return {\"\
+          items\": items, \"has_calc\": \"1\", \"calc_target\": target, \"calc_value\"\
+          : \"\", \"calc_formula\": rules[target], \"calc_params\": \"；\".join(param_notes),\
+          \ \"calc_detail\": \"计算引擎计算失败：\" + str(e)}\n\n    detail = \"计算公式：\" + rules[target]\
+          \ + \"；参数：\" + (\"；\".join(param_notes) if param_notes else \"无\") + \"\
+          ；计算结果：\" + str(round(value, 4))\n    return {\n        \"items\": items,\n\
+          \        \"has_calc\": \"1\",\n        \"calc_target\": target,\n      \
+          \  \"calc_value\": str(round(value, 4)),\n        \"calc_formula\": rules[target],\n\
+          \        \"calc_params\": \"；\".join(param_notes),\n        \"calc_detail\"\
+          : detail\n    }"
+        code_language: python3
+        outputs:
+          calc_detail:
+            children: null
+            type: string
+          calc_formula:
+            children: null
+            type: string
+          calc_params:
+            children: null
+            type: string
+          calc_target:
+            children: null
+            type: string
+          calc_value:
+            children: null
+            type: string
+          has_calc:
+            children: null
+            type: string
+          items:
+            children: null
+            type: array[object]
+        selected: false
+        title: 计算引擎
+        type: code
+        variables:
+        - value_selector:
+          - '1781000000012'
+          - items
+          value_type: array[object]
+          variable: items
+        - value_selector:
+          - '1781000000016'
+          - result
+          value_type: string
+          variable: rules_text
+        - value_selector:
+          - sys
+          - query
+          value_type: string
+          variable: query
+      height: 52
+      id: '1781000000017'
+      position:
+        x: 3103.664613066024
+        y: 138.14358738509037
+      positionAbsolute:
+        x: 3103.664613066024
+        y: 138.14358738509037
+      selected: false
+      sourcePosition: null
+      targetPosition: null
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        error_strategy: fail-branch
+        isInIteration: true
+        isInLoop: false
+        is_team_authorization: true
+        iteration_id: '1780921817315'
+        paramSchemas:
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database type
+            ja_JP: Database type
+            pt_BR: Database type
+            zh_Hans: 数据库类型
+          label:
+            en_US: Database type
+            ja_JP: Database type
+            pt_BR: Database type
+            zh_Hans: 数据库类型
+          llm_description: Database type
+          max: null
+          min: null
+          name: db_type
+          options:
+          - icon: ''
+            label:
+              en_US: MySQL
+              ja_JP: MySQL
+              pt_BR: MySQL
+              zh_Hans: MySQL
+            value: mysql
+          - icon: ''
+            label:
+              en_US: PostgreSQL
+              ja_JP: PostgreSQL
+              pt_BR: PostgreSQL
+              zh_Hans: PostgreSQL
+            value: postgresql
+          - icon: ''
+            label:
+              en_US: SQL Server
+              ja_JP: SQL Server
+              pt_BR: SQL Server
+              zh_Hans: SQL Server
+            value: sqlserver
+          - icon: ''
+            label:
+              en_US: Oracle
+              ja_JP: Oracle
+              pt_BR: Oracle
+              zh_Hans: Oracle
+            value: oracle
+          - icon: ''
+            label:
+              en_US: GaussDB
+              ja_JP: GaussDB
+              pt_BR: GaussDB
+              zh_Hans: 华为高斯数据库
+            value: gaussdb
+          - icon: ''
+            label:
+              en_US: KingbaseES
+              ja_JP: KingbaseES
+              pt_BR: KingbaseES
+              zh_Hans: 人大金仓数据库
+            value: kingbase
+          - icon: ''
+            label:
+              en_US: DM Database
+              ja_JP: DM Database
+              pt_BR: DM Database
+              zh_Hans: 达梦数据库
+            value: dm
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: select
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database ip/host
+            ja_JP: Database ip/host
+            pt_BR: Database ip/host
+            zh_Hans: 数据库IP/域名
+          label:
+            en_US: Database ip/host
+            ja_JP: Database ip/host
+            pt_BR: Database ip/host
+            zh_Hans: 数据库IP/域名
+          llm_description: Database ip/host
+          max: null
+          min: null
+          name: host
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database port
+            ja_JP: Database port
+            pt_BR: Database port
+            zh_Hans: 数据库端口
+          label:
+            en_US: Database port
+            ja_JP: Database port
+            pt_BR: Database port
+            zh_Hans: 数据库端口
+          llm_description: Database port
+          max: 65535
+          min: 1
+          name: port
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: number
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database name
+            ja_JP: Database name
+            pt_BR: Database name
+            zh_Hans: 数据库名称
+          label:
+            en_US: Database name
+            ja_JP: Database name
+            pt_BR: Database name
+            zh_Hans: 数据库名称
+          llm_description: Database name
+          max: null
+          min: null
+          name: db_name
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Username
+            ja_JP: Username
+            pt_BR: Username
+            zh_Hans: 用户名
+          label:
+            en_US: Username
+            ja_JP: Username
+            pt_BR: Username
+            zh_Hans: 用户名
+          llm_description: Username
+          max: null
+          min: null
+          name: username
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Password
+            ja_JP: Password
+            pt_BR: Password
+            zh_Hans: 密码
+          label:
+            en_US: Password
+            ja_JP: Password
+            pt_BR: Password
+            zh_Hans: 密码
+          llm_description: Password
+          max: null
+          min: null
+          name: password
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: secret-input
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Schema name
+            ja_JP: Schema name
+            pt_BR: Schema name
+            zh_Hans: 数据库Schema PGSQL用户选填，默认为public
+          label:
+            en_US: Schema name
+            ja_JP: Schema name
+            pt_BR: Schema name
+            zh_Hans: 数据库Schema（PGSQL默认为public，Oracle/DM默认为用户名大写）
+          llm_description: Schema name
+          max: null
+          min: null
+          name: schema
+          options: []
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Fetching data from the database using natural language.
+            ja_JP: Fetching data from the database using natural language.
+            pt_BR: Fetching data from the database using natural language.
+            zh_Hans: Fetching data from the database using natural language.
+          label:
+            en_US: SQL string
+            ja_JP: SQL string
+            pt_BR: SQL string
+            zh_Hans: 待执行的 SQL 语句
+          llm_description: Fetching data from the database using natural language.
+          max: null
+          min: null
+          name: sql
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: json
+          form: llm
+          human_description:
+            en_US: result_format
+            ja_JP: result_format
+            pt_BR: result_format
+            zh_Hans: 返回数据格式
+          label:
+            en_US: result_format
+            ja_JP: result_format
+            pt_BR: result_format
+            zh_Hans: 返回数据格式
+          llm_description: result_format
+          max: null
+          min: null
+          name: result_format
+          options:
+          - icon: ''
+            label:
+              en_US: JSON
+              ja_JP: JSON
+              pt_BR: JSON
+              zh_Hans: JSON
+            value: json
+          - icon: ''
+            label:
+              en_US: TEXT
+              ja_JP: TEXT
+              pt_BR: TEXT
+              zh_Hans: TEXT
+            value: text
+          - icon: ''
+            label:
+              en_US: CSV
+              ja_JP: CSV
+              pt_BR: CSV
+              zh_Hans: CSV
+            value: csv
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: select
+        params:
+          db_name: ''
+          db_type: ''
+          host: ''
+          password: ''
+          port: ''
+          result_format: ''
+          schema: ''
+          sql: ''
+          username: ''
+        plugin_id: jaguarliuu/rookie_text2data
+        plugin_unique_identifier: jaguarliuu/rookie_text2data:1.0.3@3041f4cfe193deb03f716fedfd2e7dae1601021cf39f94c462af8d6babd1e3fd
+        provider_icon: /console/api/workspaces/current/plugin/icon?tenant_id=a469a2e8-60bb-407d-8561-03342c213e36&filename=9585e221a1e207d23f39a174ec40644ef73683bd5cbb96d80f0e2656a0bfc618.svg
+        provider_id: jaguarliuu/rookie_text2data/rookie_text2data
+        provider_name: jaguarliuu/rookie_text2data/rookie_text2data
+        provider_type: builtin
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        title: 执行SQL查询
+        tool_configurations: {}
+        tool_description: sql 执行器
+        tool_label: rookie_excute_sql
+        tool_name: rookie_excute_sql
+        tool_node_version: '2'
+        tool_parameters:
+          db_name:
+            type: mixed
+            value: '{{#env.DB_NAME#}}'
+          db_type:
+            type: constant
+            value: kingbase
+          host:
+            type: mixed
+            value: '{{#env.DB_HOST#}}'
+          password:
+            type: mixed
+            value: '{{#env.DB_PASSWORD#}}'
+          port:
+            type: constant
+            value: 54321
+          result_format:
+            type: constant
+            value: json
+          schema:
+            type: mixed
+            value: '{{#env.DB_SCHEMA#}}'
+          sql:
+            type: mixed
+            value: '{{#1780921883266.sql#}}'
+          username:
+            type: mixed
+            value: '{{#env.DB_USER#}}'
+        type: tool
+      height: 118
+      id: '1784715296667'
+      parentId: '1780921817315'
+      position:
+        x: 488.924379196706
+        y: 82.21968720023528
+      positionAbsolute:
+        x: 2455.731695970279
+        y: -74.21839763129279
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 1001
+    - data:
+        answer: '{{#1780923024622.text#}}'
+        selected: false
+        title: 输出最终回答
+        type: answer
+        variables: []
+      height: 102
+      id: final_answer
+      position:
+        x: 3519.986473128312
+        y: 513.6234684128206
+      positionAbsolute:
+        x: 3519.986473128312
+        y: 513.6234684128206
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: 用户问题：{{#sys.query#}}
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 10
+        model:
+          completion_params:
+            enable_thinking: false
+            max_tokens: 2048
+            reasoning_effort: medium
+            temperature: 0.1
+          mode: chat
+          name: Qwen3.8-27B
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 9261368e-beb1-4ca4-845a-244454185470
+          role: system
+          text: '你是 KingbaseES（PostgreSQL 兼容）的生产指标 SQL 生成器。只生成安全、可执行的 SELECT，不解释。
+
+
+            固定数据库口径：所有表在 schema MSOKFPT；指标数据表按半年快照存储，表名 CGXTAPPMISDate_YYYY_MM。查询某年或某月时必须把该年
+            _06 和 _12 两张表 UNION ALL 后再过滤日期。日期使用 TO_CHAR(t."ZBRQ",''YYYY'')、''YYYY-MM''
+            或 ''YYYY-MM-DD''。指标值是 varchar，聚合必须使用 SUM(CAST(COALESCE(t."ZBZ",''0'')
+            AS NUMERIC(18,2)))。指标字段是 t."newIndicator"，日期是 t."ZBRQ"，组织字段优先 t."orgcode"；公司过滤
+            JOIN MSOKFPT."BFAdminOrganization" o ON t."orgcode"=o."Code"，再按 o."Name_CHS"
+            匹配。
+
+
+            只允许使用运行时候选指标里的精确名称和编码，禁止猜测。计算指标按运行时规则展开：为基础指标生成源查询，设备参数从 MSOKFPT."enterprise_equipment_info"
+            获取；不要生成写操作、DDL、多语句或数据库连接信息。单值查询按需要输出主值、每日明细、环比、同比；计算指标不要额外生成这些辅助查询。
+
+
+            最终只输出 JSON 数组，每项只有 title 和 sql 两个字段，不要 Markdown、解释或代码围栏。 生成 UNION ALL
+            时，每个分支必须投影外层会使用的全部字段，特别是 newIndicator；禁止在外层引用子查询未选择的列。优先在各分支内部完成指标过滤，或显式保留该字段。'
+        - id: id-msifo1h1-h2san7hm
+          role: user
+          text: '用户问题：
+
+            {{#sys.query#}}
+
+
+            候选指标（编码\t名称\t单位）：
+
+            {{#1781000000014.result#}}
+
+
+            相关计算规则：
+
+            {{#1781000000016.result#}}
+
+
+            数据截止日期：{{#1781000000016.cutoff#}}
+
+
+            严格依据上述候选和规则生成 SQL。'
+        selected: false
+        title: 生成指标SQL
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: llm
+      position:
+        x: 1629.2504049726986
+        y: 279.2561982704194
+      positionAbsolute:
+        x: 1629.2504049726986
+        y: 279.2561982704194
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        dataset_ids:
+        - zpxynWMZb5g5C9QfgBcpvCPvHAr7QTKRn3w/Rxwe8dJhsLjLNtdMW4ClUv3X32Wr
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: reranking_model
+          reranking_model:
+            model: bge-reranker-v2-m3
+            provider: langgenius/openai_api_compatible/openai_api_compatible
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1780919457192'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: 检索指标字典
+        type: knowledge-retrieval
+      height: 90
+      id: '1787827566589'
+      position:
+        x: 1628.7707552065385
+        y: 51.565169067649464
+      positionAbsolute:
+        x: 1628.7707552065385
+        y: 51.565169067649464
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        dataset_ids:
+        - ERSmgl26WOYIc3Cmw6saw7v7WKpXNQi8hy5s0ASk787NDZrVKrcE/C2m9e3nE/1B
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: reranking_model
+          reranking_model:
+            model: bge-reranker-v2-m3
+            provider: langgenius/openai_api_compatible/openai_api_compatible
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1780919457192'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: 检索指标规则
+        type: knowledge-retrieval
+      height: 90
+      id: '1787827877222'
+      position:
+        x: 1628.7707552065385
+        y: 180.56516906764946
+      positionAbsolute:
+        x: 1628.7707552065385
+        y: 180.56516906764946
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    viewport:
+      x: -1368.9950075603767
+      y: -4.347081891949301
+      zoom: 0.6535645919968481
+  rag_pipeline_variables: []
+

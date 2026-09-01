@@ -19,8 +19,8 @@ public class ConversationMappingRepository {
 
     public void lockOwner(String tenantId, String userId) {
         jdbcTemplate.queryForObject(
-            "SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))",
-            new MapSqlParameterSource("lockKey", tenantId + ":" + userId), Long.class
+            "SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))) AS advisory_lock",
+            new MapSqlParameterSource("lockKey", tenantId + ":" + userId), Integer.class
         );
     }
 

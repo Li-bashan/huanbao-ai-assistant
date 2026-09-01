@@ -256,7 +256,7 @@ def _analysis_type(question, intent, previous):
     # The model can still provide types such as CORRELATION when the user
     # only says “compare”, but it must not turn anomaly/diagnosis language
     # into a plain trend query.
-    if re.search(r"生产经营|经营情况|值得关注|整体表现", text):
+    if re.search(r"生产经营|经营情况|值得关注|整体表现|总览|概览", text):
         detected = "EXECUTIVE_OVERVIEW"
     elif re.search(r"为什么|原因|下钻|怎么回事|为何|下降原因", text):
         detected = "DRILLDOWN"
@@ -284,6 +284,39 @@ def _analysis_type(question, intent, previous):
         if "同比" in text and previous_type == "RANKING":
             detected = "RANKING_COMPARISON"
     return detected
+
+def _analysis_steps(question, analysis_type, intent):
+    text = _compact(question)
+    raw_steps = intent.get("analysis_steps") or intent.get("analysisSteps") or []
+    if isinstance(raw_steps, str):
+        raw_steps = re.split(r"[,，、]", raw_steps)
+    allowed = {"FACT", "TREND", "RANKING", "COMPARISON", "RANKING_COMPARISON", "DISTRIBUTION", "ANOMALY", "CORRELATION", "DRILLDOWN", "EXECUTIVE_OVERVIEW"}
+    steps = [ _text(item).upper() for item in raw_steps if _text(item).upper() in allowed ] if isinstance(raw_steps, list) else []
+
+    def add(step):
+        if step not in steps:
+            steps.append(step)
+
+    has_overview = bool(re.search(r"生产经营|经营情况|值得关注|整体表现|总览|概览", text))
+    if has_overview or analysis_type == "EXECUTIVE_OVERVIEW":
+        # Overview is the primary envelope for a compound management question.
+        # Other operations are retained as explicit sub-steps instead of
+        # replacing the envelope with DRILLDOWN.
+        steps = ["EXECUTIVE_OVERVIEW"]
+        for step in [_text(item).upper() for item in raw_steps] if isinstance(raw_steps, list) else []:
+            if step in allowed and step != "EXECUTIVE_OVERVIEW":
+                add(step)
+        if re.search(r"排名|排行|最高|最低|前\d+|后\d+|Top|Bottom", text, flags=re.I):
+            add("RANKING")
+        if re.search(r"趋势|走势|变化|各月|每月|逐月|每天|日度", text):
+            add("TREND")
+        if re.search(r"异常|不正常|连续[三四五六七八九十0-9]+个月|连续[三四五六七八九十0-9]+期", text):
+            add("ANOMALY")
+        if re.search(r"为什么|原因|下钻|怎么回事|为何|下降原因", text):
+            add("DRILLDOWN")
+        return steps
+
+    return steps or [analysis_type]
 
 def _top_n(question, intent, previous):
     text = _compact(question)
@@ -326,6 +359,8 @@ def _question_indicator_fallback(question):
     return value if len(value) >= 2 else ""
 
 def _org_inputs(intent, previous, question):
+    if re.search(r"全集团|集团|全部公司|所有公司|各公司|各项目公司|所有项目公司", question):
+        return []
     candidates = intent.get("organization_inputs") or intent.get("organizations") or intent.get("organization_names")
     if isinstance(candidates, str):
         candidates = re.split(r"[、,，和与及]", candidates)
@@ -387,7 +422,10 @@ def _indicator_inputs(intent, previous, question, analysis_type):
         # This is a semantic default for open-ended operating review, not a
         # test-case answer or a database code.
         if analysis_type == "EXECUTIVE_OVERVIEW":
-            values = ["生活垃圾入厂量", "全厂发电量", "全厂上网电量"]
+            # Keep the only confirmed measure as the executable primary. The
+            # broader management scorecard is recorded separately below so
+            # missing semantic coverage cannot silently become SUM metrics.
+            values = ["全厂发电量"]
         elif fallback:
             values = [fallback]
         else:
@@ -419,15 +457,27 @@ def _indicator_inputs(intent, previous, question, analysis_type):
             cleaned.append(fallback)
     return list(dict.fromkeys(cleaned))[:8]
 
+def _related_indicator_inputs(intent, previous, indicator_inputs, analysis_type):
+    values = intent.get("related_indicator_inputs") or intent.get("relatedIndicators") or intent.get("related_indicators")
+    if isinstance(values, str):
+        values = [values]
+    normalized = []
+    for item in values or []:
+        if isinstance(item, dict):
+            item = item.get("indicator_code") or item.get("metric_code") or item.get("indicator_name") or item.get("name") or item.get("code") or item.get("indicator") or ""
+        item = _text(item)
+        if item:
+            normalized.append(item)
+    if not normalized and analysis_type in ("DRILLDOWN", "EXECUTIVE_OVERVIEW") and len(indicator_inputs) > 1:
+        normalized = list(indicator_inputs[1:])
+    return list(dict.fromkeys(normalized))[:12]
+
 def _search_terms(indicator_inputs, analysis_type):
-    terms = list(indicator_inputs)
-    if analysis_type == "DRILLDOWN":
-        joined = "".join(terms)
-        if re.search(r"发电|上网|电量", joined):
-            terms.extend(["生活垃圾入厂量", "入炉量", "运行时间", "停机时间", "汽耗率", "厂用电率"])
-        elif re.search(r"垃圾|入厂", joined):
-            terms.extend(["发电量", "运行时间", "停机时间"])
-    return list(dict.fromkeys([_text(item) for item in terms if _text(item)]))[:20]
+    # Discovery must not become execution. In particular, a drilldown may
+    # search only the primary and explicitly supplied related indicators;
+    # keyword-expanding to 1712/1713-style metrics makes unknown measures look
+    # like required SQL inputs before their semantics are confirmed.
+    return list(dict.fromkeys([_text(item) for item in indicator_inputs if _text(item)]))[:20]
 
 def _build_lookup_sql(indicator_terms, org_inputs, region_input, scoped):
     indicator_where = _like(['"newIndicatorname"', '"oldIndicatorname"'], indicator_terms)
@@ -518,6 +568,8 @@ def main(intent_text: str, question: str, previous_state: str = "", authorizatio
 
     analysis_type = _analysis_type(original_question, intent, previous)
     indicator_inputs = _indicator_inputs(intent, previous, original_question, analysis_type)
+    analysis_steps = _analysis_steps(original_question, analysis_type, intent)
+    related_indicator_inputs = _related_indicator_inputs(intent, previous, indicator_inputs, analysis_type)
     org_inputs = _org_inputs(intent, previous, original_question)
     region_input = _region_input(intent, original_question, previous)
     if analysis_type in ("ANOMALY", "DRILLDOWN", "EXECUTIVE_OVERVIEW") and time_source == "default_current_month":
@@ -563,7 +615,10 @@ def main(intent_text: str, question: str, previous_state: str = "", authorizatio
     else:
         scope_type = "all"
 
-    search_terms = _search_terms(indicator_inputs, analysis_type)
+    overview_default_indicator_inputs = ["全厂发电量", "生活垃圾入厂量", "全厂上网电量"] if analysis_type == "EXECUTIVE_OVERVIEW" else []
+    search_terms = _search_terms(indicator_inputs + related_indicator_inputs, analysis_type)
+    if overview_default_indicator_inputs:
+        search_terms = list(dict.fromkeys(search_terms + overview_default_indicator_inputs))
     indicator_sql, organization_sql = _build_lookup_sql(
         search_terms,
         org_inputs,
@@ -573,10 +628,21 @@ def main(intent_text: str, question: str, previous_state: str = "", authorizatio
     plan = {
         "original_question": original_question,
         "analysis_type": analysis_type,
+        "analysis_steps": analysis_steps,
         "indicator_inputs": indicator_inputs,
+        "related_indicator_inputs": related_indicator_inputs,
+        "overview_default_indicator_inputs": overview_default_indicator_inputs,
         "indicator_search_terms": search_terms,
         "indicator": {"code": "", "name": "", "unit": "", "level": "", "aggregation": "", "aggregation_source": "", "candidates": []},
         "related_indicators": [],
+        "coverage": {
+            "semantic_registry_version": "1.0",
+            "required_indicators": indicator_inputs[:1],
+            "optional_indicators": list(dict.fromkeys(related_indicator_inputs + [item for item in overview_default_indicator_inputs if item not in indicator_inputs])),
+            "candidates": [],
+            "unresolved_indicators": [],
+            "warnings": [],
+        },
         "time": {"expression": _text(intent.get("date_expression") or intent.get("time_expression")) or time_source, "start": start.isoformat(), "end": end.isoformat(), "granularity": granularity, "comparison_period": comparison},
         "filters": [],
         "dimensions": dimensions,
@@ -593,7 +659,7 @@ def main(intent_text: str, question: str, previous_state: str = "", authorizatio
         "anomaly_focus": anomaly_focus,
         "top_n": top_n,
         "comparison": comparison,
-        "analysis_actions": [analysis_type.lower()],
+        "analysis_actions": [item.lower() for item in analysis_steps],
         "chart_preference": "bar" if "RANKING" in analysis_type or analysis_type in ("COMPARISON", "DISTRIBUTION") else "line",
         "time_series_requested": time_series_requested,
         "clarification": {"required": False, "slot": "", "candidates": []},
@@ -672,33 +738,39 @@ def _level(name):
         return "rate"
     return "base"
 
-def _semantic(row):
-    name = _text(row.get("name") or row.get("newIndicatorname"))
-    level = _level(name)
-    # The dictionary is the source of identity; this small semantic adapter
-    # only supplies safe capabilities that can be proved from the measure
-    # shape.  Rates, ratios and unregistered calculated indicators are never
-    # silently summed.
-    additive = bool(re.search(r"量|发电|供汽|供热|产渣|耗量|消耗|运行时间|停机时间", name))
-    if level == "rate" or not additive:
-        aggregation = ""
-        source = "business_rule_required"
-    else:
-        aggregation = "SUM"
-        source = "semantic_measurement_registry_v1"
-    subject = "发电" if re.search(r"发电|上网|下网|电量", name) else ("垃圾处理" if re.search(r"垃圾|入厂|入炉", name) else "生产运行")
-    return {
-        "level": level,
-        "aggregation": aggregation,
-        "aggregation_source": source,
-        "business_subject": subject,
-        "aliases": list(dict.fromkeys([name, _text(row.get("old_name"))] if _text(row.get("old_name")) else [name])),
-        "formula": _text(row.get("formula")),
-        "dependencies": row.get("dependencies") if isinstance(row.get("dependencies"), list) else [],
+SEMANTIC_REGISTRY_VERSION = "1.0"
+SEMANTIC_REGISTRY = {
+    "1001": {
+        "level": "plant_total",
+        "aggregation": "SUM",
+        "aggregation_source": "semantic_measurement_registry_v1",
+        "business_subject": "发电",
+        "aliases": ["全厂发电量", "全场发电量", "发电量", "总发电量"],
         "time_granularity": "day",
         "organization_granularity": "organization",
-        "comparison_supported": bool(aggregation),
-        "ranking_supported": bool(aggregation) and level not in ("rate", "unit"),
+        "comparison_supported": True,
+        "ranking_supported": True,
+    }
+}
+
+def _semantic(row):
+    code = _text(row.get("code"))
+    name = _text(row.get("name") or row.get("newIndicatorname"))
+    level = _level(name)
+    registered = SEMANTIC_REGISTRY.get(code) or {}
+    aliases = registered.get("aliases") or ([name] if name else [])
+    return {
+        "level": registered.get("level") or level,
+        "aggregation": registered.get("aggregation") or "",
+        "aggregation_source": registered.get("aggregation_source") or "business_rule_required",
+        "business_subject": registered.get("business_subject") or "",
+        "aliases": list(dict.fromkeys([*aliases, name] if name else aliases)),
+        "formula": _text(row.get("formula")),
+        "dependencies": row.get("dependencies") if isinstance(row.get("dependencies"), list) else [],
+        "time_granularity": registered.get("time_granularity") or "day",
+        "organization_granularity": registered.get("organization_granularity") or "organization",
+        "comparison_supported": bool(registered.get("comparison_supported")),
+        "ranking_supported": bool(registered.get("ranking_supported")),
         "description": _text(row.get("description")),
     }
 
@@ -711,7 +783,9 @@ def _choose(candidates, inputs, prefer_plant=True):
         code = _text(row.get("code"))
         name = _text(row.get("name"))
         old_name = _text(row.get("old_name"))
-        if code in normalized or name in normalized or old_name in normalized:
+        registered = SEMANTIC_REGISTRY.get(code) or {}
+        aliases = [_text(alias) for alias in (registered.get("aliases") or []) if _text(alias)]
+        if code in normalized or name in normalized or old_name in normalized or any(alias in normalized for alias in aliases):
             exact.append(row)
     pool = exact or candidates
     if prefer_plant and len(pool) > 1:
@@ -897,15 +971,48 @@ def main(analysis_plan: str, indicator_data, indicator_error: str, organization_
         main_candidates = first_matches or indicator_rows
     chosen, candidate_pool = _choose(main_candidates, [primary_input], prefer_plant=True)
     analysis_type = _text(plan.get("analysis_type"))
-    if analysis_type == "EXECUTIVE_OVERVIEW":
-        chosen = None
     if not chosen and analysis_type != "EXECUTIVE_OVERVIEW":
         plan["status"] = "INDICATOR_AMBIGUOUS" if candidate_pool else "INDICATOR_NOT_FOUND"
         plan["clarification"] = {"required": True, "slot": "indicator", "candidates": candidate_pool}
         return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
 
+    coverage = plan.get("coverage") if isinstance(plan.get("coverage"), dict) else {}
+    coverage.setdefault("semantic_registry_version", "1.0")
+    coverage.setdefault("required_indicators", inputs[:1])
+    coverage.setdefault("optional_indicators", [])
+    coverage.setdefault("candidates", [])
+    coverage.setdefault("unresolved_indicators", [])
+    coverage.setdefault("warnings", [])
+
+    def add_coverage_warning(term, row=None, reason="semantic coverage is not confirmed"):
+        code = _text((row or {}).get("code")) if isinstance(row, dict) else ""
+        name = _text((row or {}).get("name")) if isinstance(row, dict) else _text(term)
+        item = {"input": _text(term), "code": code, "name": name, "reason": reason, "required": False}
+        if item not in coverage["unresolved_indicators"]:
+            coverage["unresolved_indicators"].append(item)
+        if item not in coverage["candidates"]:
+            coverage["candidates"].append(item)
+        warning = "关联指标%s未纳入必执行查询：%s" % (name or _text(term), reason)
+        if warning not in coverage["warnings"]:
+            coverage["warnings"].append(warning)
+
+    def resolve_optional_terms(terms):
+        resolved = []
+        for term in terms or []:
+            matches = [row for row in indicator_rows if _text(term) in (_text(row.get("name")), _text(row.get("old_name")), _text(row.get("code")))]
+            item, pool = _choose(matches, [term], prefer_plant=True)
+            if not item:
+                add_coverage_warning(term, pool[0] if pool else None, "指标未找到或存在多个候选")
+                continue
+            semantic = _semantic(item)
+            if not semantic.get("aggregation"):
+                add_coverage_warning(term, item, "未在语义注册表确认聚合口径")
+                continue
+            resolved.append(item)
+        return resolved
+
     semantic_indicators = []
-    if analysis_type in ("EXECUTIVE_OVERVIEW", "COMPARISON", "CORRELATION") and len(inputs) > 1:
+    if analysis_type in ("COMPARISON", "CORRELATION") and len(inputs) > 1:
         for term in inputs:
             matches = [row for row in indicator_rows if _text(row.get("name")) == term or term in _text(row.get("name")) or term == _text(row.get("code"))]
             item, pool = _choose(matches, [term], prefer_plant=True)
@@ -916,23 +1023,38 @@ def main(analysis_plan: str, indicator_data, indicator_error: str, organization_
                 plan["clarification"] = {"required": True, "slot": "indicator", "candidates": pool}
                 return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
     elif analysis_type == "EXECUTIVE_OVERVIEW":
-        for term in inputs:
-            matches = [row for row in indicator_rows if _text(row.get("name")) == term or term in _text(row.get("name"))]
-            item, _ = _choose(matches, [term], prefer_plant=True)
-            if item:
-                semantic_indicators.append(item)
+        if chosen:
+            semantic_indicators.append(chosen)
+        optional_terms = list(dict.fromkeys(
+            list(plan.get("related_indicator_inputs") or [])
+            + [item for item in (plan.get("overview_default_indicator_inputs") or []) if item not in inputs]
+            + [item for item in inputs[1:] if item]
+        ))
+        optional_resolved = resolve_optional_terms(optional_terms)
+        # An optional/default match can enrich a confirmed primary measure,
+        # but it can never replace a missing or unregistered primary measure.
+        if chosen:
+            semantic_indicators.extend(optional_resolved)
+    elif analysis_type == "DRILLDOWN":
+        # Lookup SQL may remain broad for discovery, but only explicit related
+        # inputs with confirmed semantics can enter the executable indicator set.
+        semantic_indicators = [chosen]
+        semantic_indicators.extend(resolve_optional_terms(plan.get("related_indicator_inputs") or []))
     else:
         semantic_indicators = [chosen]
-        if analysis_type == "DRILLDOWN":
-            for row in indicator_rows:
-                if row is chosen:
-                    continue
-                name = _text(row.get("name"))
-                if any(term in name for term in ("入厂量", "入炉量", "运行时间", "停机时间", "垃圾量")):
-                    item, _ = _choose([row], [name], prefer_plant=False)
-                    if item:
-                        semantic_indicators.append(item)
     semantic_indicators = _unique(semantic_indicators, ["code", "name"])
+    if not chosen and analysis_type == "EXECUTIVE_OVERVIEW":
+        primary_missing = not indicator_rows
+        item = {"input": _text(primary_input), "code": "", "name": _text(primary_input), "reason": "主指标未找到" if primary_missing else "主指标未在语义注册表确认聚合口径", "required": True}
+        if item not in coverage["unresolved_indicators"]:
+            coverage["unresolved_indicators"].append(item)
+        warning = "主指标%s未纳入必执行查询：%s" % (_text(primary_input), item["reason"])
+        if warning not in coverage["warnings"]:
+            coverage["warnings"].append(warning)
+        plan["coverage"] = coverage
+        plan["warnings"] = list(dict.fromkeys((plan.get("warnings") or []) + coverage.get("warnings", [])))
+        plan["status"] = "INDICATOR_NOT_FOUND" if primary_missing else "AGGREGATION_NOT_CONFIRMED"
+        return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
     if not semantic_indicators:
         plan["status"] = "INDICATOR_NOT_FOUND"
         return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
@@ -963,12 +1085,20 @@ def main(analysis_plan: str, indicator_data, indicator_error: str, organization_
     primary = enriched[0]
     plan["indicator"] = primary
     plan["related_indicators"] = enriched[1:]
+    plan["coverage"] = coverage
+    plan["warnings"] = list(dict.fromkeys((plan.get("warnings") or []) + coverage.get("warnings", [])))
     if not primary.get("code"):
         plan["status"] = "INDICATOR_NOT_FOUND"
         return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
-    if not primary.get("aggregation") or any(not item.get("aggregation") for item in enriched):
+    # The primary measure remains a hard execution prerequisite. Optional
+    # related candidates are reported in coverage, never defaulted to SUM and
+    # never allowed to block a safe primary query.
+    if not primary.get("aggregation"):
         plan["status"] = "AGGREGATION_NOT_CONFIRMED"
         return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
+
+    plan["coverage"] = coverage
+    plan["warnings"] = list(dict.fromkeys((plan.get("warnings") or []) + coverage.get("warnings", [])))
 
     authorization = plan.get("authorization", {}) or {}
     if authorization.get("provided"):
@@ -1033,8 +1163,11 @@ def main(analysis_plan: str, indicator_data, indicator_error: str, organization_
         plan["status"] = query_status
         return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": "", "can_execute": 0, "status": plan["status"], "analysis_state": json.dumps(plan, ensure_ascii=False)}
     plan["status"] = "READY"
+    plan["coverage"] = coverage
+    plan["warnings"] = list(dict.fromkeys((plan.get("warnings") or []) + coverage.get("warnings", [])))
     state = {
         "analysis_type": plan.get("analysis_type"),
+        "analysis_steps": plan.get("analysis_steps") or [plan.get("analysis_type")],
         "indicator_inputs": plan.get("indicator_inputs"),
         "indicator": plan.get("indicator"),
         "indicators": [plan.get("indicator")] + (plan.get("related_indicators") or []),
@@ -1050,6 +1183,8 @@ def main(analysis_plan: str, indicator_data, indicator_error: str, organization_
         "analysis_actions": plan.get("analysis_actions"),
         "time_series_requested": plan.get("time_series_requested"),
         "pending_clarification": plan.get("clarification"),
+        "coverage": plan.get("coverage"),
+        "warnings": plan.get("warnings"),
         "current_date": plan.get("current_date"),
     }
     return {"analysis_plan_json": json.dumps(plan, ensure_ascii=False), "query_sql": query_sql, "can_execute": 1, "status": "READY", "analysis_state": json.dumps(state, ensure_ascii=False)}
@@ -1385,7 +1520,8 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
     status = _text(business_status or plan.get("status") or "RESULT_VALIDATION_FAILED")
     error = _text(execution_error)
     rows = _clean_rows(_rows(execution_data))
-    warnings = []
+    warnings = list(plan.get("warnings") or [])
+    coverage = plan.get("coverage") if isinstance(plan.get("coverage"), dict) else {}
     if status != "READY":
         final_status = status
         rows = []
@@ -1468,6 +1604,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         "status": final_status,
         "analysis_plan": plan,
         "query_context": {"analysis_type": kind, "indicator": plan.get("indicator"), "related_indicators": plan.get("related_indicators", []), "organization_scope": plan.get("organization_scope"), "time": plan.get("time"), "dimensions": plan.get("dimensions"), "filters": plan.get("filters"), "comparison": plan.get("comparison")},
+        "analysis_steps": plan.get("analysis_steps") or [kind],
         "metric": plan.get("indicator"),
         "related_metrics": plan.get("related_indicators", []),
         "organization_scope": plan.get("organization_scope"),
@@ -1485,6 +1622,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         "insights_evidence": [{"type": "deterministic_rule", "text": item} for item in insights],
         "data_cutoff_date": cutoff,
         "warnings": warnings,
+        "coverage": coverage,
         "validation": validation,
         "source_tables": plan.get("allowed_tables", []),
     }
@@ -1590,6 +1728,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
 
     state = {
         "analysis_type": kind,
+        "analysis_steps": plan.get("analysis_steps") or [kind],
         "indicator_inputs": plan.get("indicator_inputs"),
         "indicator": plan.get("indicator"),
         "indicators": [plan.get("indicator")] + (plan.get("related_indicators") or []),
@@ -1605,6 +1744,8 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         "analysis_actions": plan.get("analysis_actions"),
         "time_series_requested": plan.get("time_series_requested"),
         "pending_clarification": plan.get("clarification"),
+        "coverage": coverage,
+        "warnings": warnings,
         "current_date": plan.get("current_date"),
     }
 
@@ -1623,6 +1764,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         "comparison": plan.get("comparison"),
         "sourceTables": plan.get("allowed_tables", []),
         "warnings": warnings,
+        "coverage": coverage,
         "validation": validation,
     }
     if final_status == "SUCCESS_WITH_DATA":
@@ -1673,6 +1815,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
             "validated": final_status == "SUCCESS_WITH_DATA",
             "analysisState": state,
             "auditSummary": {"statistics": stats, "ranking": ranking, "distribution": distribution, "anomalies": anomalies, "correlations": correlations, "warnings": warnings, "validation": validation, "sourceTables": plan.get("allowed_tables", [])},
+            "analysisCoverage": coverage,
         },
     }
     if final_status in ("INDICATOR_AMBIGUOUS", "ORGANIZATION_AMBIGUOUS"):
@@ -1686,7 +1829,7 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
     return {"result_text": json.dumps(response, ensure_ascii=False, separators=(",", ":")), "audit_json": json.dumps(audit, ensure_ascii=False), "status": final_status, "analysis_state": json.dumps(state, ensure_ascii=False), "follow_ups": json.dumps(followups, ensure_ascii=False), "chart_option": json.dumps(chart, ensure_ascii=False) if chart else ""}
 `
 
-  const intentSystem = `你只负责理解当前问题和上一轮结构化分析状态，输出一个 JSON 对象。你可以识别分析意图、指标名称、组织名称列表、区域范围、时间表达、排序和 TopN，但不能查询数据库、生成 SQL、猜组织 Code、猜指标 Code、猜公式或猜数字。当前问题可能是对上一轮的补充，例如只看前5、和去年相比、秦皇岛排多少。若存在已点击的澄清候选，优先把它视为已确认的指标或组织输入。字段固定：analysis_type、indicator_inputs、organization_inputs、region_input、date_expression、granularity、top_n、sort_field、sort_direction、request_type。analysis_type 可为 FACT、TREND、RANKING、COMPARISON、RANKING_COMPARISON、DISTRIBUTION、ANOMALY、CORRELATION、DRILLDOWN、EXECUTIVE_OVERVIEW。只输出 JSON。`
+  const intentSystem = `你只负责理解当前问题和上一轮结构化分析状态，输出一个 JSON 对象。你可以识别分析意图、指标名称、组织名称列表、区域范围、时间表达、排序和 TopN，但不能查询数据库、生成 SQL、猜组织 Code、猜指标 Code、猜公式或猜数字。当前问题可能是对上一轮的补充，例如只看前5、和去年相比、秦皇岛排多少。若存在已点击的澄清候选，优先把它视为已确认的指标或组织输入。字段固定：analysis_type、analysis_steps、indicator_inputs、related_indicator_inputs、organization_inputs、region_input、date_expression、granularity、top_n、sort_field、sort_direction、request_type。一个问题同时包含经营总览、排名、趋势、异常和原因时，analysis_type 优先为 EXECUTIVE_OVERVIEW，并把其余分析保留在 analysis_steps 中；不要只输出 DRILLDOWN。analysis_type 可为 FACT、TREND、RANKING、COMPARISON、RANKING_COMPARISON、DISTRIBUTION、ANOMALY、CORRELATION、DRILLDOWN、EXECUTIVE_OVERVIEW。只输出 JSON。`
   const intentUser = `上一轮分析状态（可能为空）：\n{{#1780919457192.analysis_state#}}\n\n本轮澄清选择（可能为空）：\n{{#1780919457192.clarification_json#}}\n\n当前用户问题：\n{{#sys.query#}}\n\n只输出 JSON 对象，不要 Markdown，不要解释。`
 
   const start = wrapper(startTemplate, '1780919457192', startTemplate.data, 0, 0, 90)

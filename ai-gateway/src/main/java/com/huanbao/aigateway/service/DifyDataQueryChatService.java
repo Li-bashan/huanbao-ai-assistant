@@ -102,8 +102,8 @@ public class DifyDataQueryChatService {
                     return null;
                 });
 
-            mappingService.updateDifyConversation(mapping, state.difyConversationId);
             ObjectNode response = toProtocolResponse(state.finalAnswer, request, state);
+            mappingService.updateDifyConversation(mapping, state.difyConversationId);
             String event = "clarification".equals(response.path("messageType").asText())
                 ? "clarification" : "analysis_result";
             emit(output, event, resultPayload(request, response, state));
@@ -258,7 +258,7 @@ public class DifyDataQueryChatService {
         try {
             data = objectMapper.readTree(rawData);
         } catch (Exception ex) {
-            return;
+            throw new BusinessException("PROTOCOL_VALIDATION_FAILED", "Dify returned invalid SSE data");
         }
 
         state.difyConversationId = firstNonBlank(
@@ -292,36 +292,15 @@ public class DifyDataQueryChatService {
     }
 
     private ObjectNode toProtocolResponse(String answer, DataQueryChatRequest request, StreamState state) {
-        JsonNode parsed = null;
+        JsonNode parsed;
         try {
             parsed = StringUtils.hasText(answer) ? objectMapper.readTree(answer) : null;
-        } catch (Exception ignored) {
-            // Legacy plain text is wrapped below.
+        } catch (Exception ex) {
+            throw invalidProtocol();
         }
 
-        ObjectNode response;
-        if (parsed != null && parsed.isObject()
-            && PROTOCOL_VERSION.equals(parsed.path("protocolVersion").asText())
-            && parsed.path("content").isObject()) {
-            response = (ObjectNode) parsed.deepCopy();
-        } else {
-            response = objectMapper.createObjectNode();
-            response.put("protocolVersion", PROTOCOL_VERSION);
-            response.put("status", StringUtils.hasText(answer) ? "LEGACY_RESPONSE" : "SUCCESS_EMPTY");
-            response.put("messageType", StringUtils.hasText(answer) ? "information" : "empty");
-            response.put("analysisType", "");
-            ObjectNode content = response.putObject("content");
-            content.put("title", "");
-            content.put("summary", safe(answer));
-            content.putArray("metrics");
-            content.putNull("table");
-            content.putNull("chart");
-            content.putArray("insights");
-            content.putArray("evidence");
-            content.putObject("dataInfo");
-            content.putArray("followUps");
-            response.putObject("meta").put("legacy", true);
-        }
+        if (!isValidProtocolResponse(parsed)) throw invalidProtocol();
+        ObjectNode response = (ObjectNode) parsed.deepCopy();
 
         response.put("requestId", request.requestId());
         // Dify returns the canonical conversation id during the stream. Keep
@@ -329,6 +308,37 @@ public class DifyDataQueryChatService {
         response.put("conversationId", safe(state.clientConversationId));
         applyAnalysisMarkers(response, answer);
         return response;
+    }
+
+    private boolean isValidProtocolResponse(JsonNode response) {
+        if (response == null || !response.isObject()
+            || !PROTOCOL_VERSION.equals(response.path("protocolVersion").asText())
+            || !response.path("status").isTextual()
+            || !StringUtils.hasText(response.path("status").asText())
+            || "LEGACY_RESPONSE".equals(response.path("status").asText())
+            || !response.path("messageType").isTextual()
+            || !StringUtils.hasText(response.path("messageType").asText())
+            || !response.path("analysisType").isTextual()
+            || !response.path("content").isObject()) {
+            return false;
+        }
+
+        JsonNode content = response.path("content");
+        return content.path("title").isTextual()
+            && content.path("summary").isTextual()
+            && content.path("metrics").isArray()
+            && (content.path("table").isNull() || content.path("table").isObject())
+            && (content.path("chart").isNull() || content.path("chart").isObject())
+            && content.path("insights").isArray()
+            && content.path("evidence").isArray()
+            && content.path("dataInfo").isObject()
+            && content.path("followUps").isArray();
+    }
+
+    private BusinessException invalidProtocol() {
+        return new BusinessException(
+            "PROTOCOL_VALIDATION_FAILED", "Dify returned an invalid analysis protocol"
+        );
     }
 
     private void applyAnalysisMarkers(ObjectNode response, String answer) {
