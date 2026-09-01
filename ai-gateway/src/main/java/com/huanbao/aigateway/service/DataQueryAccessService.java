@@ -26,6 +26,9 @@ public class DataQueryAccessService {
         String tenantId = normalizeTenant(identity.tenantId());
         Optional<com.huanbao.aigateway.dto.DataQueryUserAccess> access =
             repository.findEnabledAccess(tenantId, identity.userId());
+        if (access.isEmpty() && "BODY_TRIAL".equals(identity.source())) {
+            access = repository.findEnabledAccessByUserName(identity.userName());
+        }
         if (access.isEmpty()) {
             log.info("DATA_QUERY_ACCESS_DENIED userIdHash={} tenantId={}",
                 shortHash(identity.userId()), tenantId);

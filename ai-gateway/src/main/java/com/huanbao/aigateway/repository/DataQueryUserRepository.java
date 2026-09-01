@@ -70,6 +70,33 @@ public class DataQueryUserRepository {
         ).stream().findFirst();
     }
 
+    /** Name fallback is only used by the explicitly enabled BODY_TRIAL mode. */
+    public Optional<DataQueryUserAccess> findEnabledAccessByUserName(String userName) {
+        String sql = """
+            SELECT user_id, user_code, user_name, tenant_id, tenant_name, org_id, org_code, org_name,
+                   enabled, migration_status, scope_type, allowed_org_codes, allowed_indicator_codes,
+                   allow_group_ranking, allow_all_organizations
+            FROM ai_data_query_user
+            WHERE user_name = :userName
+              AND enabled = TRUE
+              AND COALESCE(migration_status, 'UNRESOLVED') = 'RESOLVED'
+            ORDER BY id DESC
+            LIMIT 1
+            """;
+        return jdbcTemplate.query(sql,
+            new MapSqlParameterSource().addValue("userName", userName),
+            (rs, rowNum) -> new DataQueryUserAccess(
+                rs.getString("user_id"), rs.getString("user_code"), rs.getString("user_name"),
+                rs.getString("tenant_id"), rs.getString("tenant_name"), rs.getString("org_id"),
+                rs.getString("org_code"), rs.getString("org_name"), rs.getBoolean("enabled"),
+                rs.getString("migration_status"), defaultScope(rs.getString("scope_type")),
+                readTextArray(rs.getArray("allowed_org_codes")),
+                readTextArray(rs.getArray("allowed_indicator_codes")),
+                rs.getBoolean("allow_group_ranking"), rs.getBoolean("allow_all_organizations")
+            )
+        ).stream().findFirst();
+    }
+
     /** Compatibility query for the retired name-only audit endpoint. */
     public boolean existsByUserNameAndEnabled(String userName, boolean enabled) {
         Integer count = jdbcTemplate.queryForObject(
