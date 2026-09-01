@@ -953,6 +953,15 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
     currentMode.value.key === 'data-query' &&
     dataQueryAccessStatus.value !== 'covered'
   ) {
+    if (currentUserReady.value && currentUser.value?.userId?.trim()) {
+      await refreshDataQueryAccess()
+    }
+  }
+
+  if (
+    currentMode.value.key === 'data-query' &&
+    dataQueryAccessStatus.value !== 'covered'
+  ) {
     messages.value.push({
       id: createMessageId(),
       role: 'user',

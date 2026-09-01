@@ -1427,6 +1427,11 @@ button {
   white-space: nowrap;
 }
 
+.data-query-structured-table-card table {
+  table-layout: fixed;
+  white-space: normal;
+}
+
 .data-query-ranking-card th,
 .data-query-ranking-card td {
   padding: 7px 9px;
@@ -1440,23 +1445,59 @@ button {
   font-weight: 700;
 }
 
-.data-query-ranking-card th:first-child,
-.data-query-ranking-card td:first-child {
+.data-query-ranking-card:not(.data-query-structured-table-card) th:first-child,
+.data-query-ranking-card:not(.data-query-structured-table-card) td:first-child {
   width: 42px;
   text-align: center;
 }
 
-.data-query-ranking-card th:last-child,
-.data-query-ranking-card td:last-child {
+.data-query-ranking-card:not(.data-query-structured-table-card) th:last-child,
+.data-query-ranking-card:not(.data-query-structured-table-card) td:last-child {
   width: 38%;
   text-align: right;
 }
 
-.data-query-ranking-card th:nth-child(2),
-.data-query-ranking-card td:nth-child(2) {
+.data-query-ranking-card:not(.data-query-structured-table-card) th:nth-child(2),
+.data-query-ranking-card:not(.data-query-structured-table-card) td:nth-child(2) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.data-query-structured-table-card th,
+.data-query-structured-table-card td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.data-query-structured-table-card th[data-column-key="organization"],
+.data-query-structured-table-card td[data-column-key="organization"] {
+  width: 35%;
+}
+
+.data-query-structured-table-card th[data-column-key="indicator"],
+.data-query-structured-table-card td[data-column-key="indicator"] {
+  width: 23%;
+}
+
+.data-query-structured-table-card th[data-column-key="period"],
+.data-query-structured-table-card td[data-column-key="period"],
+.data-query-structured-table-card th[data-column-key="latestPeriod"],
+.data-query-structured-table-card td[data-column-key="latestPeriod"] {
+  width: 17%;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.data-query-structured-table-card th[data-column-key="value"],
+.data-query-structured-table-card td[data-column-key="value"],
+.data-query-structured-table-card th[data-column-key="latestValue"],
+.data-query-structured-table-card td[data-column-key="latestValue"] {
+  width: 18%;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .data-query-ranking-card:fullscreen {

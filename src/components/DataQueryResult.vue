@@ -99,6 +99,11 @@ const formatStructuredValue = (value, column) => {
   })
 }
 
+const formatStructuredCell = (value, column) => {
+  const formatted = formatStructuredValue(value, column)
+  return column?.key === 'organization' ? displayCompanyName(formatted) : formatted
+}
+
 const structuredTableMatrix = () => {
   const columns = structuredTable.value?.columns || []
   return [
@@ -245,12 +250,18 @@ onBeforeUnmount(() => {
       <div class="data-query-ranking-scroll">
         <table>
           <thead>
-            <tr><th v-for="column in structuredTable.columns" :key="column.key">{{ column.label }}</th></tr>
+            <tr><th v-for="column in structuredTable.columns" :key="column.key" :data-column-key="column.key">{{ column.label }}</th></tr>
           </thead>
           <tbody>
             <tr v-for="(row, rowIndex) in structuredRows" :key="row.id || rowIndex">
-              <td v-for="column in structuredTable.columns" :key="column.key" :class="{ 'data-query-number-cell': column.type === 'number' }">
-                {{ formatStructuredValue(row[column.key], column) }}
+              <td
+                v-for="column in structuredTable.columns"
+                :key="column.key"
+                :data-column-key="column.key"
+                :title="column.key === 'organization' ? String(row[column.key] || '') : undefined"
+                :class="{ 'data-query-number-cell': column.type === 'number' }"
+              >
+                {{ formatStructuredCell(row[column.key], column) }}
               </td>
             </tr>
           </tbody>

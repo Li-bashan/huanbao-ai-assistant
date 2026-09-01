@@ -22,6 +22,7 @@ const runner = String.raw`
 import base64
 import json
 import sys
+from datetime import date
 
 payload = json.load(sys.stdin)
 
@@ -82,6 +83,12 @@ fact_fallback = plan({}, '查询2024年组织10004024全厂发电量')
 fact_fallback_plan = json.loads(fact_fallback['analysis_plan'])
 check('fact-indicator-fallback', fact_fallback_plan['indicator_inputs'] == ['全厂发电量'], json.dumps(fact_fallback_plan, ensure_ascii=False))
 
+half_year_plan = json.loads(plan({}, '查询秦皇岛公司近半年的全厂发电量')['analysis_plan'])
+half_year_start = date.fromisoformat(half_year_plan['time']['start'])
+half_year_end = date.fromisoformat(half_year_plan['time']['end'])
+half_year_span = (half_year_end.year - half_year_start.year) * 12 + half_year_end.month - half_year_start.month
+check('half-year-window', half_year_plan['time']['granularity'] == 'month' and half_year_span == 6, json.dumps(half_year_plan, ensure_ascii=False))
+
 group_overview = plan({}, '请做2024年全集团发电量经营总览')
 group_overview_plan = json.loads(group_overview['analysis_plan'])
 check('group-scope-is-collection', group_overview_plan['organization_scope']['inputs'] == [], json.dumps(group_overview_plan, ensure_ascii=False))
@@ -122,6 +129,61 @@ check(
     and 'AND (t."ZBRQ" >=' in resolved['query_sql']
     and 'COALESCE(raw.metric_code' in resolved['query_sql'],
   resolved['query_sql'][:1200],
+)
+
+qhd_plan = json.loads(plan(
+  {'analysis_type': 'FACT', 'indicator_inputs': ['全厂发电量'], 'organization_inputs': ['秦皇岛公司']},
+  '查询秦皇岛公司近半年的全厂发电量',
+)['analysis_plan'])
+qhd_resolved = resolve_ns['main'](
+    json.dumps(qhd_plan, ensure_ascii=False),
+    [{'code': '1001', 'name': '全厂发电量', 'unit': '', 'old_name': '', 'object_code': '1001', 'object_name': '电量'}],
+    '',
+    [
+      {'code': '10004024', 'name': '中节能（秦皇岛）环保能源有限公司', 'full_path': '项目公司/中节能（秦皇岛）环保能源有限公司', 'is_detail_company': '1', 'tree_is_detail': '1'},
+      {'code': '10004011', 'name': '中节能（秦皇岛）环保能源有限公司10004011', 'full_path': '项目公司/中节能（秦皇岛）环保能源有限公司10004011', 'is_detail_company': '1', 'tree_is_detail': '1'},
+      {'code': '10004793', 'name': '中节能秦皇岛泰盛水务有限公司本部', 'full_path': '项目公司/中节能秦皇岛泰盛水务有限公司本部', 'is_detail_company': '1', 'tree_is_detail': '1'},
+      {'code': '10004791', 'name': '中节能泰盛秦皇岛水务有限公司', 'full_path': '项目公司/中节能泰盛秦皇岛水务有限公司', 'is_detail_company': '1', 'tree_is_detail': '1'},
+    ],
+    '',
+)
+qhd_resolved_plan = json.loads(qhd_resolved['analysis_plan_json'])
+check(
+  'qhd-generation-company-preference',
+  qhd_resolved['status'] == 'READY' and qhd_resolved_plan['organization_scope']['codes'] == ['10004024'],
+  json.dumps(qhd_resolved, ensure_ascii=False),
+)
+
+ambiguous_plan = dict(resolved_plan)
+ambiguous_plan['analysis_type'] = 'DRILLDOWN'
+ambiguous_plan['organization_scope'] = {
+    'type': 'company',
+    'inputs': ['秦皇岛'],
+    'codes': [],
+    'names': [],
+    'clarification': {
+        'required': True,
+        'slot': 'organization',
+        'candidates': [
+            {'code': '10004024', 'name': '中节能（秦皇岛）环保能源有限公司', 'full_path': '项目公司/中节能（秦皇岛）环保能源有限公司'},
+            {'code': '10004011', 'name': '中节能（秦皇岛）环保能源有限公司10004011', 'full_path': '项目公司/中节能（秦皇岛）环保能源有限公司10004011'},
+        ],
+    },
+}
+ambiguous_plan['clarification'] = {'required': False, 'slot': '', 'candidates': []}
+ambiguous_result = audit_ns['main'](
+    json.dumps(ambiguous_plan, ensure_ascii=False),
+    'ORGANIZATION_AMBIGUOUS',
+    [],
+    '',
+)
+ambiguous_protocol = json.loads(ambiguous_result['result_text'])
+check(
+  'organization-clarification-preserves-candidates',
+  ambiguous_protocol['messageType'] == 'clarification'
+    and ambiguous_protocol['clarification']['slot'] == 'organization'
+    and [item['id'] for item in ambiguous_protocol['clarification']['candidates']] == ['10004024', '10004011'],
+  ambiguous_result['result_text'],
 )
 
 comparison_plan = json.loads(plan({}, '查询今年发电量同比去年')['analysis_plan'])
@@ -265,6 +327,7 @@ print(json.dumps({'ok': True, 'checks': checks}, ensure_ascii=False))
 const result = spawnSync('python', ['-c', runner], {
   cwd: new URL('..', import.meta.url),
   encoding: 'utf8',
+  env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
   input: JSON.stringify({ plan: encode(planCode), resolve: encode(resolveCode), audit: encode(auditCode) }),
   maxBuffer: 8 * 1024 * 1024,
 })

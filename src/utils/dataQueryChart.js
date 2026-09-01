@@ -251,6 +251,15 @@ const isRankingChart = (option) => /排名|排行|top\s*\d+|前\s*\d+/i.test(get
 
 const getAxisObject = (axis) => (Array.isArray(axis) ? axis[0] : axis)
 
+const shortenSeriesName = (value) => {
+  const text = String(value || '')
+  const separator = text.indexOf(' · ')
+  if (separator >= 0) {
+    return `${getDataQueryCompanyShortName(text.slice(0, separator))} · ${text.slice(separator + 3)}`
+  }
+  return getDataQueryCompanyShortName(text)
+}
+
 const cloneChartOption = (option) => {
   try {
     return JSON.parse(JSON.stringify(option))
@@ -274,6 +283,31 @@ export function adaptDataQueryChartOption(option) {
     lineHeight: 20,
   }
   adapted.title = title
+
+  if (Array.isArray(adapted.series) && adapted.series.length) {
+    adapted.series = adapted.series.map((item) => ({
+      ...item,
+      name: shortenSeriesName(item?.name),
+    }))
+    adapted.legend = {
+      ...(isPlainObject(adapted.legend) ? adapted.legend : {}),
+      show: true,
+      type: 'scroll',
+      orient: 'horizontal',
+      bottom: 4,
+      left: 8,
+      right: 8,
+      height: 32,
+      itemWidth: 10,
+      itemHeight: 8,
+      itemGap: 6,
+      data: adapted.series.map((item) => item.name).filter(Boolean),
+      textStyle: {
+        ...(isPlainObject(adapted.legend?.textStyle) ? adapted.legend.textStyle : {}),
+        fontSize: 10,
+      },
+    }
+  }
 
   const originalGrid = isPlainObject(adapted.grid) ? adapted.grid : {}
   const categoryAxis = getAxisObject(adapted.xAxis)
@@ -345,7 +379,13 @@ export function adaptDataQueryChartOption(option) {
       containLabel: true,
     }
   } else {
-    adapted.grid = { ...originalGrid, containLabel: true }
+    adapted.grid = {
+      ...originalGrid,
+      ...(adapted.series?.length > 1
+        ? { bottom: Math.max(Number(originalGrid.bottom) || 0, 54) }
+        : {}),
+      containLabel: true,
+    }
   }
 
   return adapted

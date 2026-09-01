@@ -188,10 +188,20 @@ def _date_range(question, today):
         start = _first_day(year, month)
         return start, _add_months(start, 1), "month", "explicit_month"
 
+    match = re.search(r"(?:近|最近)(?:的)?半年", text)
+    if match:
+        month_start = today.replace(day=1)
+        if today.day == 1:
+            return _add_months(month_start, -6), month_start, "month", "relative_half_year"
+        return _add_months(month_start, -5), next_month, "month", "relative_half_year"
+
     match = re.search(r"近(\d+)个?月", text)
     if match:
         count = max(1, min(int(match.group(1)), 120))
-        return _add_months(today.replace(day=1), -count + 1), next_month, "month", "relative_months"
+        month_start = today.replace(day=1)
+        if today.day == 1:
+            return _add_months(month_start, -count), month_start, "month", "relative_months"
+        return _add_months(month_start, -count + 1), next_month, "month", "relative_months"
 
     match = re.search(r"(?:最近|近)(\d+)天", text)
     if match:
@@ -817,11 +827,59 @@ def _table_names(start, end):
         cursor = date(cursor.year, 7, 1) if cursor.month <= 6 else date(cursor.year + 1, 1, 1)
     return tables
 
+def _compact_org(value):
+    value = re.sub(r"[\s（）()\-_/]+", "", _text(value))
+    value = re.sub(r"(?:有限责任公司|有限公司|公司)$", "", value)
+    return value
+
 def _org_match(row, value):
     term = _text(value)
     if not term:
         return False
-    return term == _text(row.get("code")) or any(term in _text(row.get(key)) for key in ("name", "abbreviation", "full_path"))
+    if term == _text(row.get("code")):
+        return True
+    compact_term = _compact_org(term)
+    if not compact_term:
+        return False
+    return any(compact_term in _compact_org(row.get(key)) for key in ("name", "abbreviation", "full_path"))
+
+def _org_preference_score(row, value, indicator):
+    term = re.sub(r"公司$", "", re.sub(r"\s+", "", _text(value)))
+    name = _text(row.get("name"))
+    compact_name = re.sub(r"[\s（）()\-_/]+", "", name)
+    score = 0
+    if term and term in compact_name:
+        score += 3
+
+    # A plant-generation measure is semantically owned by an energy project
+    # company. Prefer that unique candidate over same-city water entities or
+    # a duplicate name carrying a trailing organization code.
+    generation = _text(indicator.get("level")) == "plant_total" or _text(indicator.get("business_subject")) == "发电"
+    input_text = re.sub(r"\s+", "", _text(value))
+    if "水务" in input_text:
+        score += 8 if "水务" in name else -8
+    elif generation:
+        if re.search(r"环保能源|再生能源|生物质", name):
+            score += 5
+        if "水务" in name:
+            score -= 5
+
+    if re.search(r"\d{5,}$", name):
+        score -= 2
+    if "项目公司" in _text(row.get("full_path")):
+        score += 1
+    return score
+
+def _prefer_organization(candidates, value, indicator):
+    if len(candidates) <= 1:
+        return candidates
+    scored = sorted(
+        ((_org_preference_score(row, value, indicator), index, row) for index, row in enumerate(candidates)),
+        key=lambda item: (-item[0], item[1]),
+    )
+    if not scored or scored[0][0] <= scored[1][0]:
+        return candidates
+    return [scored[0][2]]
 
 def _safe_sql_identifier(value):
     return bool(re.match(r"^CGXTAPPMISDate_\d{4}_(?:06|12)$", _text(value)))
@@ -1118,6 +1176,7 @@ def main(analysis_plan: str, indicator_data, indicator_error: str, organization_
         unmatched = []
         for item in org_inputs:
             matches = [row for row in candidates if _org_match(row, item)]
+            matches = _prefer_organization(matches, item, primary)
             codes = list(dict.fromkeys(_text(row.get("code")) for row in matches if _text(row.get("code"))))
             if len(codes) == 1:
                 allowed_org_codes = [_text(code) for code in (authorization.get("allowed_org_codes") or []) if _text(code)]
@@ -1819,9 +1878,23 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
         },
     }
     if final_status in ("INDICATOR_AMBIGUOUS", "ORGANIZATION_AMBIGUOUS"):
-        clarification = plan.get("clarification") or (scope.get("clarification") if final_status == "ORGANIZATION_AMBIGUOUS" else {}) or {}
+        # The plan always carries a default clarification object.  Do not let
+        # that empty placeholder shadow the organization-specific clarification
+        # populated by the resolver for an ambiguous organization.
+        plan_clarification = plan.get("clarification") or {}
+        scope_clarification = scope.get("clarification") if final_status == "ORGANIZATION_AMBIGUOUS" else {}
+        clarification = (
+            plan_clarification
+            if isinstance(plan_clarification, dict) and (
+                plan_clarification.get("required")
+                or plan_clarification.get("candidates")
+                or plan_clarification.get("slot")
+            )
+            else scope_clarification
+        ) or {}
         candidates = clarification.get("candidates", []) if isinstance(clarification, dict) else []
-        response["clarification"] = {"slot": clarification.get("slot", "organization" if final_status == "ORGANIZATION_AMBIGUOUS" else "indicator"), "title": "找到多个候选，请选择", "candidates": [{"id": _text(item.get("code")), "label": _text(item.get("name")), "description": _text(item.get("full_path"))} for item in candidates if isinstance(item, dict)]}
+        clarification_slot = clarification.get("slot", "organization" if final_status == "ORGANIZATION_AMBIGUOUS" else "indicator")
+        response["clarification"] = {"slot": clarification_slot, "title": "请确认组织" if clarification_slot == "organization" else "请确认指标", "candidates": [{"id": _text(item.get("code")), "label": _text(item.get("name")), "description": _text(item.get("full_path"))} for item in candidates if isinstance(item, dict)]}
     audit["visible_answer"] = visible
     audit["follow_ups"] = followups
     audit["chart"] = chart
