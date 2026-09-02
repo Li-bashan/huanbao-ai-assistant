@@ -369,7 +369,11 @@ def _question_indicator_fallback(question):
     return value if len(value) >= 2 else ""
 
 def _org_inputs(intent, previous, question):
-    if re.search(r"全集团|集团|全部公司|所有公司|各公司|各项目公司|所有项目公司", question):
+    # A group-ranking follow-up is a scope change, not a request to rank the
+    # company selected in the previous turn.  In particular, clicking
+    # “查看项目公司排名” after a company fact query must clear the previous
+    # single-company input so the resolver can build a project-company set.
+    if re.search(r"全集团|集团|全部公司|所有公司|各公司|各项目公司|所有项目公司|项目公司排名", question):
         return []
     candidates = intent.get("organization_inputs") or intent.get("organizations") or intent.get("organization_names")
     if isinstance(candidates, str):
@@ -2023,4 +2027,4 @@ def main(analysis_plan_json: str, business_status: str, execution_data, executio
   }
 }
 
-run()
+window.__huanbaoDifyUpgradePromise = run()

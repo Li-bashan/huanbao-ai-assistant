@@ -89,6 +89,17 @@ half_year_end = date.fromisoformat(half_year_plan['time']['end'])
 half_year_span = (half_year_end.year - half_year_start.year) * 12 + half_year_end.month - half_year_start.month
 check('half-year-window', half_year_plan['time']['granularity'] == 'month' and half_year_span == 6, json.dumps(half_year_plan, ensure_ascii=False))
 
+ranking_followup_plan = json.loads(plan({}, '查看项目公司排名', half_year_plan)['analysis_plan'])
+check(
+  'group-ranking-clears-company-scope',
+  ranking_followup_plan['analysis_type'] == 'RANKING'
+    and ranking_followup_plan['organization_scope']['type'] == 'project_company'
+    and ranking_followup_plan['organization_scope']['inputs'] == []
+    and ranking_followup_plan['time']['start'] == half_year_plan['time']['start']
+    and ranking_followup_plan['time']['end'] == half_year_plan['time']['end'],
+  json.dumps(ranking_followup_plan, ensure_ascii=False),
+)
+
 group_overview = plan({}, '请做2024年全集团发电量经营总览')
 group_overview_plan = json.loads(group_overview['analysis_plan'])
 check('group-scope-is-collection', group_overview_plan['organization_scope']['inputs'] == [], json.dumps(group_overview_plan, ensure_ascii=False))

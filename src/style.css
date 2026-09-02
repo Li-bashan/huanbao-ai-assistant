@@ -1500,6 +1500,47 @@ button {
   word-break: normal;
 }
 
+.data-query-structured-table-card th[data-column-key="rank"],
+.data-query-structured-table-card td[data-column-key="rank"] {
+  width: 8%;
+  text-align: center;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.data-query-structured-table-card th[data-column-key="companyName"],
+.data-query-structured-table-card td[data-column-key="companyName"] {
+  width: 32%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.data-query-structured-table-card th[data-column-key="currentValue"],
+.data-query-structured-table-card td[data-column-key="currentValue"],
+.data-query-structured-table-card th[data-column-key="baselineValue"],
+.data-query-structured-table-card td[data-column-key="baselineValue"] {
+  width: 18%;
+  white-space: nowrap;
+  word-break: normal;
+  text-align: right;
+}
+
+.data-query-structured-table-card th[data-column-key="changeRate"],
+.data-query-structured-table-card td[data-column-key="changeRate"] {
+  width: 14%;
+  white-space: nowrap;
+  word-break: normal;
+  text-align: right;
+}
+
+.data-query-structured-table-card th[data-column-key="rankChange"],
+.data-query-structured-table-card td[data-column-key="rankChange"] {
+  width: 10%;
+  white-space: nowrap;
+  word-break: normal;
+  text-align: right;
+}
+
 .data-query-ranking-card:fullscreen {
   box-sizing: border-box;
   width: 100vw;

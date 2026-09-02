@@ -1,274 +1,64 @@
 # AI 网关接口说明
 
-更新时间：2026-08-31
+更新时间：2026-09-02
 
-当前状态：智能问数已切换为环宝前端调用 `POST /api/ai/data-query/chat`，Gateway 服务端完成身份校验、开放范围校验、Dify 代理、v2 协议适配、限流和审计。制度问答与办公智能仍按各自现有链路运行；Dify 控制台发布、生产密钥配置和 Kingbase 全链路联调需在部署环境完成。
+AI Gateway 是前端与 Dify、权限、会话和审计之间的服务端中间层。当前工作区前端已具备统一 Master、制度、办公和智能问数四条网关调用链；流程助手仍只走前端动作桥接。工作区存在未提交改动，线上是否已部署 Master 路由需要单独确认。
 
-AI Gateway 是 `huanbao-ai-assistant` 前端与 Dify、审计日志之间的后端安全中间层。
+## 1. 路由总表
 
-第一版只做：
+| 路由 | 方法 | 用途 | 当前状态 |
+|---|---|---|---|
+| /api/ai/health | GET | 健康检查 | 线上只读返回 200 / UP |
+| /api/ai/master/chat | POST SSE | 制度和办公统一入口 | 当前工作区新增，未证明已部署 |
+| /api/ai/policy/chat | POST JSON | 制度 blocking 兼容代理 | 代码存在 |
+| /api/ai/office/chat | POST SSE | 办公 streaming 兼容代理 | 代码存在 |
+| /api/ai/data-query/access | POST JSON | 问数开放范围 | 线上空身份返回 401 |
+| /api/ai/data-query/chat | POST SSE | 问数代理、v2 协议、会话和审计 | 当前前端已调用 |
+| /api/ai/data-query/users | GET/POST/PUT/DELETE | 管理授权用户 | 未带管理令牌返回 401 |
+| /api/ai/action-audits | GET/POST | 流程动作审计 | 当前查询结果 total=0；代码需补鉴权 |
+| /api/ai/workflow/actions/validate | POST | 验证动作卡片参数 | 预留接口，不做真实业务权限 |
 
-- Dify 制度问答代理。
-- 智能问数开放范围、查询前二次校验和人员管理 CRUD。
-- 流程助手操作审计落库。
-- 动作参数校验预留。
-- 统一异常处理。
-- 参数校验。
-- 健康检查。
+## 2. 智能问数请求与身份
 
-第一版不做：
+请求使用 POST /api/ai/data-query/chat 和 text/event-stream。生产默认 SIGNED_HEADER 模式，Gateway 校验 X-Portal-Identity、时间戳和 HMAC 签名，再按租户、用户和服务端授权表决定开放范围。浏览器提交的 userContext、姓名或组织不能覆盖签名身份；BODY_TRIAL 只有显式配置才允许。
 
-- 不接真实 iGIX 权限接口。
-- 不实现流程发起。
-- 不改变前端 `postMessage` 协议。
-- 不在前端暴露 Dify API Key。
+首轮可以不传 conversationId，Gateway 生成用户专属 opaque 会话句柄。Dify 内部 conversation id 只保存在服务端，不返回浏览器。后续请求校验租户、用户、模式和句柄归属。
 
-智能问数人员白名单接口和试点边界见[智能问数人员开放范围说明](./智能问数人员开放范围说明.md)。
+稳定 SSE 事件是：analysis_started、text_delta、analysis_result、clarification、completed、error。前端对 protocolVersion=2.0 结果渲染指标、表格、图表、证据和 follow-up；协议不合格时降级为可信文本或错误提示。
 
-## 智能问数 v2 代理
+## 3. 统一 Master
 
-```http
-POST /api/ai/data-query/chat
-Accept: text/event-stream
-Content-Type: application/json
-```
+POST /api/ai/master/chat 由 MasterChatController 接收请求，DifyMasterChatService 代理 Dify Agent/Workflow SSE，并过滤内部分析事件。前端会消费 analysis_started、text_delta、analysis_result、completed 和 error。
 
-请求体中的 `userContext` 或 `untrustedClientContext` 都只是兼容字段；生产权限不信任浏览器字段，而由 Gateway 的 `SIGNED_HEADER` 模式校验 `X-Portal-Identity`、时间戳和 HMAC 签名，再按 `tenantId + userId` 查询服务端开放范围。`BODY_TRIAL` 只有显式配置 `DATA_QUERY_ALLOW_BODY_IDENTITY_TRIAL=true` 才能使用，并且响应身份会标记为未验证。
+Master、Policy、Office、Data Query 的 Dify Base URL 和 Key 只配置在 Gateway 服务端。仓库不记录真实 Key，也不把 Dify API 地址作为浏览器直接调用入口。
 
-```json
-{
-  "query": "查询今年项目公司发电量排名",
-  "conversationId": "",
-  "requestId": "客户端请求 ID",
-  "userContext": {
-    "userId": "门户用户 ID",
-    "userCode": "用户编码",
-    "userName": "用户姓名",
-    "orgCode": "组织编码",
-    "orgName": "组织名称",
-    "tenantId": "租户 ID"
-  },
-  "clientContext": {
-    "assistantMode": "data-query",
-    "timezone": "Asia/Shanghai"
-  }
-}
-```
+## 4. 统一返回和错误
 
-`conversationId` 是环宝持有的当前数据问数会话句柄。首轮可以为空，Gateway 会生成用户专属的 opaque handle；后续按 `tenantId + userId + assistantMode + conversationId` 校验归属，再把服务端保存的 Dify `conversation_id` 转给 Dify。Dify 内部会话 ID 不返回浏览器，避免会话串用和越权。Gateway 不重新计算指标、排名或同比。
+JSON 接口使用：
 
-稳定 SSE 事件为：`analysis_started`、`text_delta`、`analysis_result`、`clarification`、`completed`、`error`。Dify 内部的 `message`、`agent_message`、`workflow_started`、`node_started` 等事件只在 Gateway 内部适配，不直接成为页面契约。
+    {
+      "success": true,
+      "code": "0",
+      "message": "ok",
+      "data": {}
+    }
 
-## 智能问数 v2 响应
+常见错误包括 UNAUTHORIZED、CURRENT_USER_MISSING、VALIDATION_ERROR、DIFY_TIMEOUT_OR_NETWORK_ERROR 和 PROTOCOL_VALIDATION_FAILED。线上探测中空 query 返回 HTTP 400，未授权用户管理返回 HTTP 401。
 
-`analysis_result.response` 使用 `Data Query Response Protocol v2`：
+## 5. 流程动作和审计
 
-```json
-{
-  "protocolVersion": "2.0",
-  "requestId": "",
-  "conversationId": "",
-  "status": "SUCCESS_WITH_DATA",
-  "messageType": "analysis",
-  "analysisType": "RANKING",
-  "content": {
-    "title": "",
-    "summary": "",
-    "metrics": [],
-    "table": {"columns": [], "rows": [], "total": 0, "defaultVisibleRows": 10},
-    "chart": {"type": "bar", "categories": [], "series": []},
-    "insights": [],
-    "evidence": [],
-    "dataInfo": {},
-    "followUps": []
-  },
-  "clarification": null,
-  "meta": {}
-}
-```
+流程助手动作仍由前端通过 IGIX_AI_ACTION 向门户父页面发送，当前已验证采购请示单：
 
-前端只按 `messageType`、`analysisType` 和结构化字段渲染；协议校验失败时降级为可信摘要文本，并记录 `PROTOCOL_VALIDATION_FAILED`。组织或指标澄清通过 `messageType=clarification` 返回候选卡片，点击后仍复用原 `conversationId`。
+- action：open_form
+- formCode：CGQSD
+- funcId：9744034a-7fcc-4510-97fa-f563aecd26e6
+- 不发送 fields，不自动提交
 
-## 统一返回结构
+POST /api/ai/action-audits 已有写入接口和 docs/sql/ai_action_audit.sql DDL，但当前 sendIgixAction 没有自动调用它，动作发送成功不等于审计落库或业务执行成功。该接口当前代码层还需要管理员/签名鉴权。
 
-```json
-{
-  "success": true,
-  "code": "0",
-  "message": "ok",
-  "data": {}
-}
-```
+## 6. 当前不能从接口文档推出的结论
 
-失败时：
-
-```json
-{
-  "success": false,
-  "code": "VALIDATION_ERROR",
-  "message": "query must not be blank",
-  "data": null
-}
-```
-
-## 健康检查
-
-```http
-GET /api/ai/health
-```
-
-返回示例：
-
-```json
-{
-  "success": true,
-  "code": "0",
-  "message": "ok",
-  "data": {
-    "status": "UP",
-    "time": "2026-06-28T10:00:00+08:00",
-    "version": "0.1.0"
-  }
-}
-```
-
-## 流程动作审计写入
-
-```http
-POST /api/ai/action-audits
-Content-Type: application/json
-```
-
-请求示例：
-
-```json
-{
-  "actionId": "9d0fd475-1f54-4db6-a9e7-dc37e08eeb3f",
-  "userId": "c9dc8506-eec2-a73f-ecf5-ede837808cee",
-  "userName": "刘昊澎",
-  "query": "打开采购请示单",
-  "action": "open_form",
-  "formCode": "CGQSD",
-  "funcId": "9744034a-7fcc-4510-97fa-f563aecd26e6",
-  "status": "verified",
-  "hasFields": false,
-  "sentAt": "2026-06-28T10:00:00+08:00",
-  "result": "sent",
-  "errorMessage": ""
-}
-```
-
-校验规则：
-
-- `actionId` 必填，最长 80。
-- `action` 必填，最长 40。
-- `result` 必填，最长 40。
-- `userName` 最长 80。
-- `query` 最长 1000。
-- 不保存完整 `fields`。
-- 服务端自动保存 `clientIp` 和 `userAgent`。
-
-## 流程动作审计查询
-
-```http
-GET /api/ai/action-audits?page=1&size=20
-```
-
-支持查询参数：
-
-- `userId`
-- `action`
-- `formCode`
-- `result`
-- `startTime`
-- `endTime`
-- `page`
-- `size`
-
-时间格式使用 ISO-8601，例如：
-
-```text
-2026-06-28T00:00:00+08:00
-```
-
-## Dify 制度问答代理
-
-```http
-POST /api/ai/policy/chat
-Content-Type: application/json
-```
-
-请求示例：
-
-```json
-{
-  "query": "差旅费包括哪些费用？",
-  "conversationId": "",
-  "userId": "c9dc8506-eec2-a73f-ecf5-ede837808cee",
-  "userName": "刘昊澎"
-}
-```
-
-网关调用：
-
-```http
-POST {dify.policy.apiBase}/chat-messages
-Authorization: Bearer ${DIFY_POLICY_API_KEY}
-```
-
-返回字段：
-
-```json
-{
-  "answer": "制度回答内容",
-  "conversationId": "dify-conversation-id",
-  "retrieverResources": []
-}
-```
-
-要求：
-
-- Dify API Key 只能配置在后端环境变量或 `application.yml`。
-- API Key 不能返回给前端。
-- Dify 401 转为 `DIFY_UNAUTHORIZED`。
-- Dify 超时或网络异常转为 `DIFY_TIMEOUT_OR_NETWORK_ERROR`。
-- 基础问答日志当前只打印，不落库。
-
-## 动作校验预留
-
-```http
-POST /api/ai/workflow/actions/validate
-Content-Type: application/json
-```
-
-请求示例：
-
-```json
-{
-  "action": "open_form",
-  "formCode": "CGQSD",
-  "funcId": "9744034a-7fcc-4510-97fa-f563aecd26e6",
-  "status": "verified"
-}
-```
-
-返回示例：
-
-```json
-{
-  "success": true,
-  "code": "0",
-  "message": "ok",
-  "data": {
-    "allow": true,
-    "reason": "ok"
-  }
-}
-```
-
-第一版规则：
-
-- `status = verified` 才允许通过。
-- `action` 只能是 `open_form` 或 `open_menu`。
-- `formCode` 和 `funcId` 必填。
-- 不做真实权限判断。
+- 不能仅凭 Gateway 在线返回 UP 推出 Dify Key 绑定了哪个 App。
+- 不能仅凭 Dify 页面可达推出 Kingbase 查询成功。
+- 不能仅凭 Gateway 下发 auth_context 推出 Dify SQL 已执行组织过滤。
+- 不能把工作区未提交的 Master 路由写成生产已部署。

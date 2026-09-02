@@ -1,5 +1,5 @@
 import { streamDataQueryMessage } from './dataQueryApi.js'
-import { sendGatewayPolicyMessage, streamGatewayOfficeMessage } from './gatewayChatApi.js'
+import { sendGatewayPolicyMessage, streamGatewayMasterMessage, streamGatewayOfficeMessage } from './gatewayChatApi.js'
 
 function createChatAbortError() {
   const error = new Error('当前执行已停止。')
@@ -60,7 +60,7 @@ export async function streamChatMessage(question, options = {}) {
 }
 
 export async function sendMasterChatMessage(question, options = {}) {
-  return streamChatMessage(question, options)
+  return streamGatewayMasterMessage(question, options)
 }
 
 export async function runDataQueryWorkflow(question, options = {}) {

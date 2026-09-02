@@ -74,7 +74,10 @@ const openAndFocusCurrent = async () => {
 
   emit('update:open', true)
   await repositionPopover()
-  selectorRef.value?.querySelector('.mode-option.active')?.focus()
+  const focusSelector = props.adaptive
+    ? '.mode-option-adaptive'
+    : '.mode-option.active'
+  selectorRef.value?.querySelector(focusSelector)?.focus()
 }
 
 const toggle = () => {
@@ -187,10 +190,10 @@ onUnmounted(() => {
         v-for="mode in modes"
         :key="mode.key"
         class="mode-option"
-        :class="{ active: currentModeKey === mode.key }"
+        :class="{ active: !adaptive && currentModeKey === mode.key }"
         type="button"
         role="menuitemradio"
-        :aria-checked="currentModeKey === mode.key"
+        :aria-checked="!adaptive && currentModeKey === mode.key"
         @click="selectMode(mode.key)"
       >
         <component
@@ -205,7 +208,7 @@ onUnmounted(() => {
           <span class="mode-option-desc">{{ mode.desc || mode.shortDescription }}</span>
         </span>
         <Check
-          v-if="currentModeKey === mode.key"
+          v-if="!adaptive && currentModeKey === mode.key"
           class="mode-option-check"
           :size="15"
           :stroke-width="2.2"

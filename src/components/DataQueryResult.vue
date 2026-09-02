@@ -101,7 +101,9 @@ const formatStructuredValue = (value, column) => {
 
 const formatStructuredCell = (value, column) => {
   const formatted = formatStructuredValue(value, column)
-  return column?.key === 'organization' ? displayCompanyName(formatted) : formatted
+  return ['organization', 'companyName'].includes(column?.key)
+    ? displayCompanyName(formatted)
+    : formatted
 }
 
 const structuredTableMatrix = () => {

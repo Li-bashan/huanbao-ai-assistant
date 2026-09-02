@@ -1,4 +1,5 @@
 import { getPortalIdentityHeaders } from '../utils/igixUser.js'
+import { getDataQueryDisplayText, normalizeDataQueryResponse } from '../utils/dataQueryProtocol.js'
 
 export class GatewayChatApiError extends Error {
   constructor(message, code = '') {
@@ -206,6 +207,124 @@ export async function streamGatewayOfficeMessage(question, options = {}) {
   }, options.signal)
 
   const result = buildSseResult(answer, responseConversationId, requestId, messageId, options, suggestedActions)
+  options.onComplete?.(result)
+  return result
+}
+
+export async function streamGatewayMasterMessage(question, options = {}) {
+  const baseUrl = gatewayBaseUrl()
+  if (!baseUrl) throw new GatewayChatApiError('智能网关未配置，请联系管理员。', 'GATEWAY_CONFIG_MISSING')
+
+  const body = {
+    ...createBody(question, options, 'master'),
+    clientContext: {
+      assistantMode: 'master',
+      ...(options.analysisState ? { analysisState: options.analysisState } : {}),
+    },
+    ...(options.clarification ? { clarification: options.clarification } : {}),
+  }
+  let response
+  try {
+    response = await fetch(`${baseUrl}/api/ai/master/chat`, {
+      method: 'POST',
+      signal: options.signal,
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        ...getPortalIdentityHeaders(options.currentUser),
+      },
+      body: JSON.stringify(body),
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError' || options.signal?.aborted) {
+      throw new GatewayChatApiError('当前执行已停止。', 'CHAT_CANCELLED')
+    }
+    throw new GatewayChatApiError('网络连接失败，请稍后重试。', 'NETWORK_ERROR')
+  }
+  if (!response.ok) throw await readError(response)
+
+  const requestId = response.headers.get('X-Request-Id') || body.requestId
+  let answer = ''
+  let responseConversationId = body.conversationId
+  let messageId = ''
+  let finalResult = null
+  let suggestedActions = []
+  let sources = []
+
+  await parseSse(response, (eventName, payload) => {
+    if (payload === '[DONE]') return
+    const data = payload && typeof payload === 'object' ? payload : { text: String(payload || '') }
+    responseConversationId = data.conversationId || data.conversation_id || responseConversationId
+    messageId = data.messageId || data.message_id || messageId
+
+    if (eventName === 'analysis_started') {
+      options.onStatus?.('环宝正在处理您的问题...')
+      return
+    }
+    if (eventName === 'text_delta') {
+      answer = mergeText(answer, data.delta || data.text || '')
+      return
+    }
+    if (eventName === 'analysis_result') {
+      answer = String(data.answer || answer)
+      suggestedActions = Array.isArray(data.suggestedActions) ? data.suggestedActions : []
+      sources = Array.isArray(data.sources) ? data.sources : []
+      const parsed = (() => {
+        try { return JSON.parse(answer) } catch { return null }
+      })()
+      if (parsed?.protocolVersion === '2.0') {
+        finalResult = normalizeDataQueryResponse(parsed, {
+          requestId,
+          conversationId: responseConversationId,
+          fallbackText: answer,
+        })
+        suggestedActions = finalResult.content.followUps?.length
+          ? finalResult.content.followUps
+          : suggestedActions
+        options.onAnalysisResult?.(finalResult)
+        options.onMessage?.(getDataQueryDisplayText(finalResult), { replace: true })
+      } else {
+        options.onMessage?.(answer, { replace: true })
+      }
+      return
+    }
+    if (eventName === 'completed') {
+      responseConversationId = data.conversationId || responseConversationId
+      messageId = data.messageId || data.message_id || messageId
+      return
+    }
+    if (eventName === 'error') {
+      throw new GatewayChatApiError(data.message || '统一智能中枢处理失败，请稍后重试。', data.code || 'DIFY_STREAM_ERROR')
+    }
+  }, options.signal)
+
+  if (!finalResult && answer) {
+    try {
+      const parsed = JSON.parse(answer)
+      if (parsed?.protocolVersion === '2.0') {
+        finalResult = normalizeDataQueryResponse(parsed, {
+          requestId,
+          conversationId: responseConversationId,
+          fallbackText: answer,
+        })
+      }
+    } catch {
+      // Office, policy and flow replies are ordinary text or action JSON.
+    }
+  }
+
+  const result = {
+    answer: finalResult ? getDataQueryDisplayText(finalResult) : answer || '当前未获取到有效回答，请稍后重试。',
+    conversationId: responseConversationId,
+    messageId,
+    requestId,
+    sources,
+    suggestedActions,
+    protocol: finalResult,
+    analysisState: finalResult?.meta?.analysisState || null,
+    chartOption: finalResult?.meta?.chartOption || null,
+    noHit: finalResult?.status === 'SUCCESS_EMPTY',
+  }
   options.onComplete?.(result)
   return result
 }

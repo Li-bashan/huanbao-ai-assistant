@@ -8,6 +8,7 @@ import com.huanbao.aigateway.dto.DataQueryChatRequest;
 import com.huanbao.aigateway.dto.DataQueryUserContext;
 import com.huanbao.aigateway.dto.PolicyChatRequest;
 import com.huanbao.aigateway.dto.OfficeChatRequest;
+import com.huanbao.aigateway.dto.MasterChatRequest;
 import com.huanbao.aigateway.exception.BusinessException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -80,6 +81,21 @@ public class DataQueryIdentityService {
 
     public DataQueryIdentity resolve(
         OfficeChatRequest request,
+        String signedIdentity,
+        String timestamp,
+        String signature
+    ) {
+        if ("BODY_TRIAL".equals(properties.safeIdentityMode())) {
+            if (!properties.allowBodyIdentityTrial()) {
+                throw new BusinessException("IDENTITY_UNVERIFIED", "body identity trial is disabled");
+            }
+            return fromContext(request.userContext(), false, "BODY_TRIAL");
+        }
+        return resolveSignedContext(signedIdentity, timestamp, signature);
+    }
+
+    public DataQueryIdentity resolve(
+        MasterChatRequest request,
         String signedIdentity,
         String timestamp,
         String signature

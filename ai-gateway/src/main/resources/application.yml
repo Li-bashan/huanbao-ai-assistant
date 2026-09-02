@@ -32,6 +32,10 @@ dify:
     api-base: ${DIFY_OFFICE_API_BASE:http://localhost/v1}
     api-key: ${DIFY_OFFICE_API_KEY:}
     timeout-ms: ${DIFY_OFFICE_TIMEOUT_MS:60000}
+  master:
+    api-base: ${DIFY_MASTER_API_BASE:http://localhost/v1}
+    api-key: ${DIFY_MASTER_API_KEY:}
+    timeout-ms: ${DIFY_MASTER_TIMEOUT_MS:240000}
 
 data-query:
   admin-token: ${DATA_QUERY_ADMIN_TOKEN:}

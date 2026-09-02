@@ -24,6 +24,11 @@ public class RestClientConfig {
         return buildClient(properties.timeoutMs());
     }
 
+    @Bean("difyMasterRestClient")
+    public RestClient difyMasterRestClient(DifyMasterProperties properties) {
+        return buildClient(properties.timeoutMs());
+    }
+
     private RestClient buildClient(int configuredTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         int timeout = configuredTimeout > 0 ? configuredTimeout : (int) Duration.ofSeconds(30).toMillis();
