@@ -83,3 +83,12 @@
 - 数据边界：视图业务数据只从 `content` 读取；指标名称和统计期间/截止日期只从 `dataInfo` 读取。可选高阶字段缺失时使用空集合或通用文案，不使用 Mock 数据假装后端支持。
 - 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2503 个模块并成功生成生产产物；浏览器走查确认缺少 `sections` 的 OVERVIEW 能展示 summary/documentMarkdown、指标和明细，ANOMALY 能展示 attention 关注文本，DRILLDOWN 能展示 insights/evidence 线索和固定免责声明；页面无运行时错误。仅保留既有大 chunk 体积警告。
 - 提交：`feat(data-query): checkpoint-4 anomaly drilldown overview views and gate-constrained fallback`，最终 hash 以本节提交后的 Git HEAD 为准。
+
+## Checkpoint 5：Data Query -> Office AI 跨能力协同契约
+
+- 实施状态：`COMPLETED_WITH_BACKEND_REQUIRED`
+- Gate 判定：`composite_data_to_doc=PARTIAL`，其中公开 Gateway/Master 服务端编排接口为 `NOT_SUPPORTED`；当前不能把内部 DataQuery 文档编排入口当作公开可调用能力。
+- 施工边界：仅新增《问数与公文跨能力协同接口契约规范》，未修改 `src/`、Gateway、DataQuery、Java、SQL 或任何前端业务代码；严禁浏览器端先取数、拼接 Prompt 再调用 Office AI。
+- 契约产物：定义 Truth/Presentation 分层、服务端两阶段编排、单一聚合 SSE 流、`POST /api/ai/composite/data-to-doc` 建议路由、请求体边界、`data_ready -> doc_streaming -> completed` 事件标准、失败语义、幂等审计和快照哈希防篡改约束。
+- 后端前置条件：必须先由 Gateway 或 DataQuery 服务端提供正式路由、OpenAPI/JSON Schema、真实 SSE 正负样例、DataScope 继承、数值一致性校验和数据结果保留降级，前端才具备接入条件。
+- 前端状态：当前独立问数和办公能力保持不变；跨能力协同前端准备原则已明确，但实现受服务端公开契约阻断，状态标记为 `BACKEND_REQUIRED`。
