@@ -4152,3 +4152,314 @@ button {
     white-space: nowrap;
   }
 }
+
+/* 智能自适应欢迎台：四项能力保持平级，作为统一入口而非单一模块首页。 */
+.huanbao-welcome {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 17px;
+  border: 1px solid #d6e7fb;
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(239, 248, 255, 0.92)),
+    url("/huanbao-welcome-bg.png") center / cover no-repeat;
+  box-shadow: 0 8px 20px rgba(30, 96, 160, 0.06);
+}
+
+.huanbao-welcome-copy {
+  min-width: 0;
+}
+
+.huanbao-welcome-tag {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 7px;
+  padding: 4px 9px;
+  border: 1px solid rgba(125, 211, 252, 0.36);
+  border-radius: 999px;
+  color: #0284c7;
+  background: #e0f2fe;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.huanbao-welcome-copy h2 {
+  margin: 0 0 5px;
+  color: #0f2747;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.huanbao-welcome-copy p {
+  max-width: 620px;
+  margin: 0;
+  color: #51677f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.huanbao-capability-grid {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.huanbao-capability-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid #d8e7f5;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.huanbao-capability-card:hover,
+.huanbao-capability-card:focus-visible {
+  border-color: #91bde7;
+  background: #ffffff;
+  box-shadow: 0 7px 16px rgba(57, 117, 181, 0.1);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.huanbao-capability-card.is-locked {
+  border-color: #d9e2ec;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.huanbao-capability-card.is-locked:hover,
+.huanbao-capability-card.is-locked:focus-visible {
+  border-color: #b7c9dc;
+  box-shadow: 0 7px 16px rgba(84, 110, 137, 0.08);
+}
+
+.huanbao-capability-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.huanbao-capability-icon {
+  flex: 0 0 auto;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.huanbao-capability-head h3 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #23496d;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.huanbao-capability-status {
+  flex: 0 0 auto;
+  color: #71859b;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.huanbao-capability-card.is-locked .huanbao-capability-status {
+  color: #718096;
+}
+
+.huanbao-capability-questions {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.huanbao-capability-question {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  color: #5b7690;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.huanbao-capability-question span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.huanbao-capability-question:hover,
+.huanbao-capability-question:focus-visible {
+  color: #176dcc;
+  outline: none;
+}
+
+.huanbao-capability-question:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.huanbao-welcome-hint {
+  margin: -3px 0 0;
+  padding: 7px 9px;
+  border-radius: 9px;
+  color: #6f7f91;
+  background: #f4f7fa;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.chat-body {
+  overflow-x: hidden;
+}
+
+@media (max-width: 520px) {
+  .huanbao-welcome {
+    gap: 11px;
+    padding: 13px;
+  }
+
+  .huanbao-welcome-copy h2 {
+    font-size: 16px;
+  }
+
+  .huanbao-welcome-copy p {
+    font-size: 12px;
+  }
+
+  .huanbao-capability-grid {
+    gap: 7px;
+  }
+
+  .huanbao-capability-card {
+    gap: 6px;
+    padding: 9px;
+  }
+
+  .huanbao-capability-head {
+    gap: 4px;
+  }
+
+  .huanbao-capability-icon {
+    font-size: 17px;
+  }
+
+  .huanbao-capability-head h3 {
+    font-size: 12px;
+  }
+
+  .huanbao-capability-status {
+    font-size: 9px;
+  }
+
+  .huanbao-capability-question {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .assistant-header {
+    gap: 3px;
+    padding: 0 6px;
+  }
+
+  .brand {
+    flex: 1 1 auto;
+    gap: 5px;
+  }
+
+  .assistant-avatar {
+    width: 30px;
+    height: 30px;
+  }
+
+  .brand-copy h1 {
+    font-size: 12px;
+  }
+
+  .brand-copy p {
+    gap: 3px;
+    font-size: 9px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .mode-switch {
+    max-width: 100px;
+    gap: 3px;
+    margin-left: 0;
+  }
+
+  .mode-current-button {
+    width: 100px;
+    max-width: 100px;
+    gap: 3px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  .mode-current-label {
+    max-width: 61px;
+  }
+
+  .header-actions {
+    gap: 1px;
+  }
+
+  .new-chat-button,
+  .history-button,
+  .window-control-button {
+    width: 22px;
+    height: 22px;
+  }
+
+  .titlebar-icon {
+    width: 15px;
+    height: 15px;
+  }
+
+  .titlebar-divider {
+    height: 15px;
+    margin: 0;
+  }
+
+  .chat-body {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .huanbao-welcome {
+    padding: 11px;
+  }
+
+  .huanbao-capability-card {
+    padding: 8px;
+  }
+}

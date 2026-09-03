@@ -35,3 +35,14 @@
 - 安全状态：`ACCESS_AND_SECURITY=PARTIAL`。签名身份和组织 DataScope 有代码链路，但指标范围/集团权限未传入执行服务，Gateway 未执行 Origin 白名单校验。
 - 强制 Gate：`FAIL / BLOCKED_FOR_VIEW_CODING`。在 COMPARISON、ANOMALY、OVERVIEW、DRILLDOWN 和 ACCESS_AND_SECURITY 的阻断项关闭前，不开始依赖这些假设的新界面视图编码。
 - 前端防线：保留 `protocolValid` 双条件结构化入口、v2 失败文本降级、legacy Markdown 兼容、字段裁剪和不猜测字段策略；另记录后端 `NO_DATA` 与前端 `NO_DATA_IN_PERIOD` 的状态命名偏差，待后续契约统一。
+
+## Checkpoint 1：欢迎界面与智能自适应入口治理
+
+- 实施状态：`COMPLETED`
+- 变更边界：仅修改 `src/App.vue`、新增 `src/components/welcome/HuanbaoWelcome.vue`、修改 `src/style.css`，并追加本节；未修改问数分析视图、Gateway、Java、SQL 或生产契约。
+- 欢迎台：智能自适应状态下使用中立的环宝 AI 智能助手欢迎语，四项能力以 2×2 平级卡片展示：规章制度查询、生产智能问数、办公公文起草、业务流程指引。
+- 入口交互：点击能力卡片填充首条示例问题；点击具体预设问题直接复用现有意图路由或流程动作卡片；输入框在自适应状态保持可用。
+- 权限感知：复用现有问数 `/access` 检查；问数未授权时全员仍可见入口，并显示 `🔒 需授权`，点击后提示联系管理员开通；锁定问数模式仍使用原有阻断页。
+- 历史面板：保留标题栏原生面板打开机制，补充搜索框无障碍标签和模式 Tag 的 `aria-pressed` 状态，未改为抽屉。
+- 响应式安全：补充 400px 级别的标题栏和欢迎卡片布局约束；根容器未使用 `position: fixed`，浏览器实测 `innerWidth=400` 时 `documentScrollWidth=400`、`bodyScrollWidth=400`。
+- 验证结果：`npm run build` 通过；本地浏览器验证四项入口、流程卡片、历史搜索与模式筛选；模拟 `DATA_QUERY_NOT_COVERED` 验证问数锁标识和管理员引导。

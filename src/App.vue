@@ -30,6 +30,7 @@ import DataQueryHome from './components/DataQueryHome.vue'
 import DataQueryUserAdmin from './components/DataQueryUserAdmin.vue'
 import PromptStarters from './components/PromptStarters.vue'
 import WorkflowActionCard from './components/WorkflowActionCard.vue'
+import HuanbaoWelcome from './components/welcome/HuanbaoWelcome.vue'
 import { sendMasterChatMessage, stopChatMessage } from './services/chatApi'
 import { streamDataQueryMessage } from './services/dataQueryApi.js'
 import { checkDataQueryAccess } from './services/dataQueryAccessApi'
@@ -144,8 +145,8 @@ const isModeLocked = ref(getStoredModeLock())
 const currentMode = computed(() => getModeByKey(currentModeKey.value))
 const welcomeTitle = computed(() =>
   currentUser.value?.name
-    ? `您好，${currentUser.value.name}，我是环宝${currentMode.value.label}助手。`
-    : currentMode.value.welcomeTitle,
+    ? `您好，${currentUser.value.name}！我是环宝 AI 智能助手`
+    : '您好！我是环宝 AI 智能助手',
 )
 const hasUserMessages = computed(() =>
   messages.value.some((message) => message.role === 'user' && message.content?.trim()),
@@ -173,7 +174,7 @@ const dataQueryInputPlaceholder = computed(() => {
 })
 const inputPlaceholder = computed(() => {
   if (inputAssistPlaceholder.value) return inputAssistPlaceholder.value
-  if (currentMode.value.key === 'data-query' && dataQueryAccessStatus.value !== 'covered') {
+  if (isModeLocked.value && currentMode.value.key === 'data-query' && dataQueryAccessStatus.value !== 'covered') {
     return dataQueryInputPlaceholder.value
   }
 
@@ -446,8 +447,8 @@ const scrollToBottom = async () => {
   }
 }
 
-const refreshDataQueryAccess = async () => {
-  if (currentMode.value.key !== 'data-query' || !currentUserReady.value) return
+const refreshDataQueryAccess = async ({ force = false } = {}) => {
+  if ((!force && currentMode.value.key !== 'data-query') || !currentUserReady.value) return
 
   const requestId = ++dataQueryAccessRequestId
   const userId = currentUser.value?.userId?.trim()
@@ -1292,6 +1293,29 @@ const handleStarterSelect = (question, starter) => {
   })
 }
 
+const handleWelcomeSelect = (question, action = {}) => {
+  const promptText = String(question || '').trim()
+  if (!promptText || isChatBusy.value) return
+
+  inputValue.value = promptText
+  nextTick(() => inputRef.value?.focus())
+
+  if (!action.direct) return
+
+  sendMessage(promptText, {
+    bypassRecentGuard: true,
+    modeKeyOverride: action.modeKey,
+    modeKeysOverride: [action.modeKey],
+  })
+}
+
+const handleWelcomeAccessBlocked = () => {
+  appendAssistantMessage(
+    '生产智能问数当前需要授权，请联系管理员开通问数权限后再使用。',
+    'data-query',
+  )
+}
+
 const retryFailedMessage = async (message) => {
   const question = message?.errorState?.question?.trim()
   if (!question || isChatBusy.value) return
@@ -1597,6 +1621,7 @@ onMounted(async () => {
   window.addEventListener('pageshow', handleWindowResume)
 
   await refreshCurrentUser({ retry: true })
+  await refreshDataQueryAccess({ force: true })
   conversationHistory.value = getConversationHistory()
   const currentConversation = getCurrentConversation()
 
@@ -1717,15 +1742,17 @@ watch(
               v-model="historySearch"
               class="history-search"
               type="text"
-              placeholder="搜索历史会话..."
+              aria-label="搜索历史会话"
+              placeholder="搜索历史会话…"
             />
-            <div class="history-filter-list">
+            <div class="history-filter-list" aria-label="按能力筛选历史会话">
               <button
                 v-for="filter in historyFilters"
                 :key="filter.key"
                 class="history-filter-button"
                 :class="{ active: historyFilter === filter.key }"
                 type="button"
+                :aria-pressed="historyFilter === filter.key"
                 @click="historyFilter = filter.key"
               >
                 {{ filter.label }}
@@ -1831,7 +1858,7 @@ watch(
     >
       <div class="chat-content">
         <DataQueryHome
-          v-if="currentMode.key === 'data-query' && dataQueryAccessStatus === 'covered'"
+          v-if="isModeLocked && currentMode.key === 'data-query' && dataQueryAccessStatus === 'covered'"
           :session-key="currentConversationId"
           :org-name="currentUser?.orgName || currentUser?.unitName || ''"
           :disabled="isChatBusy"
@@ -1842,7 +1869,7 @@ watch(
         />
 
         <section
-          v-else-if="currentMode.key === 'data-query'"
+          v-else-if="isModeLocked && currentMode.key === 'data-query'"
           class="data-query-access-state"
           :class="`data-query-access-state-${dataQueryAccessStatus}`"
           aria-live="polite"
@@ -1860,7 +1887,20 @@ watch(
           </button>
         </section>
 
-        <section v-else class="welcome-card" aria-label="助手欢迎信息">
+        <HuanbaoWelcome
+          v-if="!hasMessages && !isModeLocked"
+          :user-name="currentUser?.name || ''"
+          :data-query-access-status="dataQueryAccessStatus"
+          :disabled="isChatBusy"
+          @select="handleWelcomeSelect"
+          @access-blocked="handleWelcomeAccessBlocked"
+        />
+
+        <section
+          v-else-if="!hasMessages && isModeLocked && currentMode.key !== 'data-query'"
+          class="welcome-card"
+          aria-label="助手欢迎信息"
+        >
           <div class="welcome-copy">
             <span class="welcome-tag">{{ currentMode.badge }}</span>
             <h2>{{ welcomeTitle }}</h2>
@@ -1872,7 +1912,7 @@ watch(
         </section>
 
         <section class="message-list" aria-label="对话消息">
-          <div v-if="!hasMessages && currentMode.key !== 'data-query'" class="message-row message-row-assistant">
+          <div v-if="!hasMessages && isModeLocked && currentMode.key !== 'data-query'" class="message-row message-row-assistant">
             <span class="message-avatar" aria-hidden="true">
               <img src="/huanbao-avatar.png" alt="" />
             </span>
@@ -2114,7 +2154,7 @@ watch(
         </section>
 
         <PromptStarters
-          v-if="!hasMessages && currentMode.key !== 'data-query'"
+          v-if="!hasMessages && isModeLocked && currentMode.key !== 'data-query'"
           :mode="isModeLocked ? currentMode.key : 'all'"
           :org-name="currentUser?.orgName || currentUser?.unitName || ''"
           :disabled="isChatBusy"
@@ -2137,7 +2177,7 @@ watch(
           type="text"
           :placeholder="inputPlaceholder"
           :aria-label="inputPlaceholder"
-          :disabled="isChatBusy || (currentMode.key === 'data-query' && dataQueryAccessStatus !== 'covered')"
+          :disabled="isChatBusy || (isModeLocked && currentMode.key === 'data-query' && dataQueryAccessStatus !== 'covered')"
           @input="clearInputAssistPlaceholder"
         />
         <button
@@ -2146,7 +2186,7 @@ watch(
           type="button"
           :title="isChatBusy ? '停止当前执行' : '发送'"
           :aria-label="isChatBusy ? '停止当前执行' : '发送'"
-          :disabled="!isChatBusy && currentMode.key === 'data-query' && dataQueryAccessStatus !== 'covered'"
+          :disabled="!isChatBusy && isModeLocked && currentMode.key === 'data-query' && dataQueryAccessStatus !== 'covered'"
           @click.stop.prevent="handleSendButtonClick"
         >
           <Square v-if="isChatBusy" :size="14" :stroke-width="2.4" fill="currentColor" aria-hidden="true" />
