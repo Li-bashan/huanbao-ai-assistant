@@ -8,6 +8,9 @@ import FactView from './data-query/views/FactView.vue'
 import TrendView from './data-query/views/TrendView.vue'
 import RankingView from './data-query/views/RankingView.vue'
 import ComparisonView from './data-query/views/ComparisonView.vue'
+import AnomalyView from './data-query/views/AnomalyView.vue'
+import DrilldownView from './data-query/views/DrilldownView.vue'
+import OverviewView from './data-query/views/OverviewView.vue'
 
 const EMPTY_STATE_TEXT = '当前统计期间暂无可用数据。'
 const PROTOCOL_ERROR_TEXT = '结果协议校验失败，请稍后重试。'
@@ -73,6 +76,11 @@ const normalizedPayload = computed(() => {
       insights: Array.isArray(rawContent.insights) ? rawContent.insights : [],
       evidence: Array.isArray(rawContent.evidence) ? rawContent.evidence : [],
       dataInfo: isPlainObject(rawContent.dataInfo) ? rawContent.dataInfo : {},
+      // These fields are optional contract extensions. Keep them empty when absent;
+      // high-order views must remain usable on the current partial protocol.
+      sections: Array.isArray(rawContent.sections) ? rawContent.sections : [],
+      documentMarkdown: readText(rawContent.documentMarkdown),
+      relatedMetrics: Array.isArray(rawContent.relatedMetrics) ? rawContent.relatedMetrics : [],
       followUps: Array.isArray(rawContent.followUps)
         ? rawContent.followUps
         : Array.isArray(rawContent.follow_ups)
@@ -120,6 +128,10 @@ const viewComponentMap = {
   TREND: TrendView,
   RANKING: RankingView,
   COMPARISON: ComparisonView,
+  ANOMALY: AnomalyView,
+  DRILLDOWN: DrilldownView,
+  DIAGNOSIS: DrilldownView,
+  OVERVIEW: OverviewView,
 }
 
 const resolvedViewComponent = computed(() =>

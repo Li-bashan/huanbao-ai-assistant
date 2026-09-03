@@ -71,3 +71,15 @@
 - 状态兼容：精细视图延续 `NO_DATA`、`NO_DATA_IN_PERIOD`、`SUCCESS_EMPTY` 与 `EMPTY` 的中性空态兼容，未授权、加载和协议降级仍由根调度器优先处理。
 - 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2497 个模块并成功生成生产产物；6 个月和 12 个月趋势样例均保留后端折线 categories/series；禁用硬编码与 `AVG()` 检查无命中。仅保留既有大 chunk 体积警告。
 - 提交：`feat(data-query): checkpoint-3 core views fact trend ranking comparison and router switch`，最终 hash 以本节提交后的 Git HEAD 为准。
+
+## Checkpoint 4：ANOMALY、DRILLDOWN、OVERVIEW 高阶视图与 Gate 降级
+
+- 实施状态：`COMPLETED_WITH_GATE_FALLBACK`
+- 变更边界：仅更新 `src/components/DataQueryResult.vue`、新增 `AnomalyView`、`DrilldownView`、`OverviewView`，并追加本节；未修改 Gateway、Java、SQL、协议工具层或生产数据契约。
+- 根路由：`ANOMALY` 映射 `AnomalyView`，`DRILLDOWN` / `DIAGNOSIS` 映射 `DrilldownView`，`OVERVIEW` 映射 `OverviewView`，其他未定义类型继续回退 `GenericAnalysisView`。
+- ANOMALY 降级：优先展示 `content.insights` 中 `attention` 类型的关注文本；当前没有独立异常 DTO，因此不渲染异常点、阈值或异常序列，固定提供通用核查提示，并继续展示现有 metrics、chart、table、evidence。
+- DRILLDOWN 降级：不提供下钻树、父子维度或因果结论。若存在可选 `content.relatedMetrics`，仅将其作为原样线索文本展示；当前真实契约缺失该结构时，回退到 `content.insights` / `content.evidence` 文本，不凭空生成指标卡，并固定展示同期数据变动线索边界、现场排查方向和免责声明。
+- OVERVIEW 降级：`content.sections` 存在时通过防御性递归按层级渲染；当前真实协议没有该数组时，回退展示 `summary` / `documentMarkdown`，以及现有 `metrics`、`chart`、`table`、`insights`、`evidence`，不构造领导视角分段。
+- 数据边界：视图业务数据只从 `content` 读取；指标名称和统计期间/截止日期只从 `dataInfo` 读取。可选高阶字段缺失时使用空集合或通用文案，不使用 Mock 数据假装后端支持。
+- 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2503 个模块并成功生成生产产物；浏览器走查确认缺少 `sections` 的 OVERVIEW 能展示 summary/documentMarkdown、指标和明细，ANOMALY 能展示 attention 关注文本，DRILLDOWN 能展示 insights/evidence 线索和固定免责声明；页面无运行时错误。仅保留既有大 chunk 体积警告。
+- 提交：`feat(data-query): checkpoint-4 anomaly drilldown overview views and gate-constrained fallback`，最终 hash 以本节提交后的 Git HEAD 为准。
