@@ -46,3 +46,14 @@
 - 历史面板：保留标题栏原生面板打开机制，补充搜索框无障碍标签和模式 Tag 的 `aria-pressed` 状态，未改为抽屉。
 - 响应式安全：补充 400px 级别的标题栏和欢迎卡片布局约束；根容器未使用 `position: fixed`，浏览器实测 `innerWidth=400` 时 `documentScrollWidth=400`、`bodyScrollWidth=400`。
 - 验证结果：`npm run build` 通过；本地浏览器验证四项入口、流程卡片、历史搜索与模式筛选；模拟 `DATA_QUERY_NOT_COVERED` 验证问数锁标识和管理员引导。
+
+## Checkpoint 2：问数根渲染调度器与 Generative UI 组件解耦
+
+- 实施状态：`COMPLETED`
+- 变更边界：仅重构 `src/components/DataQueryResult.vue`，新增 `src/components/data-query/views/` 与 `src/components/data-query/shared/` 展示组件，并更新本文件；未修改 App、Gateway、Java、SQL 或协议工具层。
+- 根入口：`DataQueryResult.vue` 是智能问数唯一根调度器，按未授权阻断、加载骨架、有效 v2 结构化协议、降级文本四级优先级分发；Task 3/4 精细视图暂不提前接入，v2 统一进入 `GenericAnalysisView`。
+- 组件落地：`AccessBlockedView`、`LoadingSkeleton`、`ProtocolFallbackView`、`GenericAnalysisView` 已落地；`MetricGrid`、`AnalysisTable`、`InsightList`、`FollowUpActions` 已拆为独立 shared 展示组件。`AnalysisTable` 保留紧凑明细、复制、CSV 导出、展开和全屏能力。
+- 协议对齐：业务字段始终位于 `content` 下，根调度器向视图传递 `normalizedPayload.content`、同级 `meta` 和 `content.dataInfo`；指标名称与数据截止日期仅从 `content.dataInfo.indicatorName` / `content.dataInfo.dataCutoffDate` 展示，不读取或推断 `meta.periodLabel`。
+- 状态兼容：`NO_DATA`、`NO_DATA_IN_PERIOD`、`SUCCESS_EMPTY` 与 `EMPTY` 统一进入中性空态文案；访问阻断状态单独处理，不与无数据状态混淆。当前 App 仍传 `protocol`，根组件同时保留该兼容入口，规范调用可直接传 `data`。
+- 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2489 个模块并成功生成生产产物；仅保留问数异步 chunk 体积警告，无 Vue/import 语法错误。
+- 提交：`refactor(data-query): checkpoint-2 root renderer and buildable shell`，最终 hash 以本节提交后的 Git HEAD 为准。
