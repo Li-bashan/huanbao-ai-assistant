@@ -25,11 +25,17 @@ vllm:
   base-url: ${VLLM_BASE_URL:http://121.237.178.23:9002/v1}
   model: ${VLLM_MODEL:Qwen3.8-27B}
 
+dataquery:
+  fast-path-enabled: ${DATAQUERY_FAST_PATH_ENABLED:false}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+  metrics:
+    enable:
+      hikaricp: true
   endpoint:
     health:
       show-details: never

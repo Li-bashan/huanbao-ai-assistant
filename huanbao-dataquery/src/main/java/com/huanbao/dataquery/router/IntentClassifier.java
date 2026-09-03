@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -72,6 +73,9 @@ public class IntentClassifier {
     private final Set<String> organizationTermSet;
     private final String model;
 
+    @Value("${dataquery.fast-path-enabled:false}")
+    private boolean fastPathEnabled;
+
     public IntentClassifier(
             @Qualifier("vllmRestClient") RestClient vllmRestClient,
             ObjectMapper objectMapper,
@@ -111,6 +115,11 @@ public class IntentClassifier {
             return fallback(query);
         }
 
+        AnalysisPlanDto fastPath = deterministicFastPath(query);
+        if (fastPath != null) {
+            return fastPath;
+        }
+
         try {
             String systemPrompt = buildSystemPrompt(query);
             String responseBody = vllmRestClient.post()
@@ -125,6 +134,27 @@ public class IntentClassifier {
                     exception.getClass().getSimpleName());
             return fallback(query);
         }
+    }
+
+    /**
+     * 高频、低歧义经营问数走本地受控规则，避免每次都占用 vLLM 分类槽位。
+     * 仅覆盖已验收的标准排名句式，其他自然语言仍由 vLLM 分类并保留规则降级。
+     */
+    private AnalysisPlanDto deterministicFastPath(String query) {
+        if (!fastPathEnabled
+                || !query.contains("今年")
+                || !query.contains("项目公司")
+                || !query.contains("发电量")
+                || !RANKING_PATTERN.matcher(query).find()) {
+            return null;
+        }
+        return new AnalysisPlanDto(
+                "DATA_QUERY",
+                extractMatches(query, metricTerms),
+                extractMatches(query, organizationTerms),
+                extractTimeExpression(query),
+                "RANKING",
+                List.of());
     }
 
     /** 暴露给同包测试和诊断使用，保证动态注入后的完整 Prompt 不超过约束。 */

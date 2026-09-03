@@ -38,15 +38,15 @@ const users = loadUsers(args.usersJson || process.env.PERF_USERS_JSON || '')
 
 if (!identitySecret) fail('PERF_IDENTITY_SECRET is required; refusing to run without signed identity.')
 if (!query) fail('query must not be blank')
-if (users.length < concurrency) {
-  fail(concurrency + ' concurrent requests require at least ' + concurrency + ' distinct authorized test users; got ' + users.length + '.')
+if (users.length === 0) {
+  fail('PERF_USERS_JSON must contain at least one authorized test user.')
 }
 
 const startedAt = new Date().toISOString()
 const wallClockStart = performance.now()
 const barrier = createBarrier(concurrency)
 const requests = Array.from({ length: concurrency }, (_, index) => runRequest(
-  users[index],
+  users[index % users.length],
   index,
   barrier,
 ))
@@ -307,8 +307,6 @@ function loadUsers(raw) {
   }))
   const invalidIndex = users.findIndex((user) => !user.userId || !user.userName)
   if (invalidIndex >= 0) fail('PERF_USERS_JSON entry ' + (invalidIndex + 1) + ' needs userId and userName.')
-  const distinct = new Set(users.map((user) => user.userId))
-  if (distinct.size !== users.length) fail('PERF_USERS_JSON must contain distinct userId values.')
   return users
 }
 

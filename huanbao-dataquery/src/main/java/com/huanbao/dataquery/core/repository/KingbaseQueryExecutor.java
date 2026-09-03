@@ -34,7 +34,7 @@ import java.util.Objects;
  * 数据库连接、PreparedStatement 超时和最大行数是三道独立的物理防线。</p>
  */
 @Repository
-public final class KingbaseQueryExecutor {
+public class KingbaseQueryExecutor {
 
     public static final int QUERY_TIMEOUT_SECONDS = 15;
     public static final int MAX_ROWS = 5000;
