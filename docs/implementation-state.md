@@ -103,3 +103,76 @@
 - `WorkflowActionCard.vue`：执行动作显示 `待发送 -> 已发出 -> 等待门户响应 -> 已确认 / 门户处理失败 / 等待超时`；ACK 前不显示办理成功结论，超时明确提示当前不能确认已办理。
 - 父页面规范：新增《iGIX 门户父页面 ACK 对接规范》，定义 iframe 来源校验、`IGIX_AI_ACTION` payload、`IGIX_AI_ACTION_ACK` 回执、父页面权限校验和 `actionId` 幂等消费要求。
 - 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2503 个模块；仅保留既有大异步 chunk 体积警告。隔离通信回归验证合法 ACK、错误来源忽略、约 5007ms 无 ACK `TIMEOUT`、listener 清理和审计 500 静默容错均通过。
+
+## Checkpoint 7：File Hub 平台级附件支撑中心延期归档
+
+- 实施状态：`OPTIONAL_SKIPPED`
+- 归档结论：Task 7 按项目决策延期至二期专项建设，不阻塞一期主线发布，也不在本轮新增文件上传、引用或导出入口。
+- 二期规划文档：[二期 File Hub 平台级附件支撑中心架构设计与待办规划](./04-规划与研究/二期FileHub平台级附件支撑中心架构设计与待办规划.md)
+- 业务范围：公文多模态上下文起草、线下私有表格沙箱即席计算（DuckDB/SQLite）、高保真 Word/PPT 导出。
+- 前置依赖：MinIO/临时对象存储接入、Apache POI/Tika 解析微服务、AI 网关上传流式鉴权、脱敏与租户级 DataScope 隔离。
+- 开发纪律：二期另立专属分支 `feat/file-hub-platform`；严禁侵入一期只读指标库及其既有查询、权限和 SQL 资产。
+- 本轮变更边界：仅新增二期规划文档并更新本状态文件；未修改一期前端、Gateway、DataQuery、Java、SQL 或生产配置。
+
+## Checkpoint 8A：发布前代码级终验与性能复测
+
+- 终验时间：2026-09-03（Asia/Shanghai）
+- Checkpoint 8A 状态：`RELEASE_CANDIDATE_APPROVED_WITH_GAPS`
+- 项目最终验收：`PROJECT_FINAL_ACCEPTANCE = BLOCKED`
+- 总纲裁决：构建通过，核心前端代码级走查通过，Gateway 安全单测通过，既有生产 10/10 与 20 并发基线证据通过；但受 Checkpoint 0.5 审计事实约束，`ACCESS_AND_SECURITY=PARTIAL`，且 OVERVIEW/DRILLDOWN 的后端独立结构仍未闭环，因此不构成全量生产业务与安全签收。
+- 发布范围：准许进入 Task 8B，但仅限发布前端体验治理成果；不得将本状态解释为后端权限、安全或真实业务全链路缺口已关闭。
+
+### 8A.1 生产打包验证
+
+- 执行：`npm run build`
+- 结果：`PASS`，退出码 0；Vite `8.0.16` 转换 2503 个模块并成功生成 `dist/`。
+- 产物：`dist/index.html`、静态图片/SVG、入口 JS/CSS，以及 `DataQueryResult` 异步 JS/CSS 均完整输出。
+- 备注：仅有问数异步 chunk 大于 500 kB 的既有体积警告；没有 syntax、type 或 broken import 错误。
+
+### 8A.2 既有生产基线 10/10 核心场景代码级回归走查
+
+判定口径：下表是当前代码、自动化测试断言和既有生产基线报告的交叉核验，不把本次因凭据缺失而未执行的真实库套件伪装成实时 E2E 通过。`CoreScenarioRegressionTest` 本次运行被设计性阻断：缺少 `DATAQUERY_DB_PASSWORD`，10 项均未执行，禁止退回 H2 或虚拟数据。
+
+| # | 核心场景 | 当前代码/既有基线核验 | 本次判定 |
+|---:|---|---|---|
+| 1 | 秦皇岛基准全厂发电量查询 | `FactView`、秦皇岛正式编码解析与 `scenario01` 真实库断言存在；既有生产报告记录通过 | `PASS`（本次真实库复测 BLOCKED） |
+| 2 | 项目公司全厂发电量排名 | `RankingView`、排名图/表与 `scenario02` 63 家组织断言存在；既有生产报告记录通过 | `PASS`（本次真实库复测 BLOCKED） |
+| 3 | 月度发电量趋势连续性 | `TrendView` 直接消费后端 categories/series；`scenario03` 断言连续月份与折线结构 | `PASS`（本次真实库复测 BLOCKED） |
+| 4 | 用户组织 DataScope 越权拦截 | Gateway 将 `allowedOrgCodes` 传入执行边界，查询根 WHERE 注入组织范围；组织维度拦截有代码/测试证据 | `PASS`（指标/集团权限仍受安全缺口约束） |
+| 5 | 单月数据异常识别与关注文本 | `ProtocolAssembler` 生成 `attention` 关注线索，`AnomalyView` 只展示关注文本与已有事实，不编造异常 DTO | `PASS`（降级边界） |
+| 6 | 指标字典口径解释 | `OpsDomainSemanticProviderTest` 校验 46 项指标加载、编码和安全聚合口径；`scenario06` 保留三层证据 | `PASS` |
+| 7 | 跨组织对标对比 | `ComparisonView` 仅渲染后端已返回的 value/同比/环比事实，不派生双轴或虚构计算；`scenario07` 有比较断言 | `PASS`（现有返回事实降级） |
+| 8 | 连续追问槽位平滑继承 | `ConversationStateManagerTest` 与 `scenario10` 校验只更新请求槽位、保留指标/组织/期间/比较状态 | `PASS` |
+| 9 | ECharts 结构化图表渲染 | `DataQueryChart` 使用 ECharts；趋势为 `line`，排名由 `RankingView` 适配水平 `bar`；场景 2/3 有协议断言 | `PASS` |
+| 10 | 空身份/非法请求网关拦截 | `DataQueryChatControllerTest`、`DataQueryIdentityServiceTest` 校验缺签名/非法身份 401；既有线上探测记录无身份问数被拦截 | `PASS`（本次生产请求未复测） |
+
+综合结果：代码级场景矩阵 `10/10 PASS`；当前真实 Kingbase E2E 复测 `10/10 BLOCKED`，不是失败，也不能当作本轮新鲜 E2E 证据。
+
+### 8A.3 MUST_HAVE 核心矩阵
+
+| MUST_HAVE | 终验判定 | 事实边界 |
+|---|---|---|
+| `FACT` | `PASS` | 单值强化胶囊和动态指标展示存在 |
+| `TREND` | `PASS` | 动态 metrics 栅格，无“近半年”死字，副标题按 timeRange/indicatorName 动态拼接 |
+| `RANKING` | `PASS` | 水平柱状图与明细均存在 |
+| `COMPARISON` | `PASS`（降级） | 就地渲染现有返回事实，不虚构双轴对比 |
+| `ANOMALY` | `PASS`（降级） | 基于 `attention` 关注线索呈现，不编造指标卡、阈值或异常点 |
+| `OVERVIEW` | `PASS`（降级） | 有 `sections` 循环；缺失时回退 summary/documentMarkdown、指标和明细，不白屏 |
+| `DRILLDOWN` | `PASS`（降级） | 呈现客观线索，固定免责声明边界，严禁强加因果 |
+| `ACCESS_AND_SECURITY` | `PARTIAL / BLOCKING` | Checkpoint 0.5 已确认指标级 DataScope、集团/全组织权限未穿透执行服务，Gateway 未做 Origin 白名单校验；存在未闭环安全缺口，触发一票否决，不能判为 A |
+
+### 8A.4 20 并发性能复测与基线比对
+
+- 压测工具：`tools/perf_data_query.mjs`；`node --check tools/perf_data_query.mjs` 通过。
+- 本次正式复测：执行 `node tools/perf_data_query.mjs --concurrency=20` 时，脚本因缺少 `PERF_IDENTITY_SECRET` 主动退出，未发出未授权或伪造身份请求；本地环境没有可用的签名密钥和授权用户 JSON，因此本次运行状态为 `BLOCKED_BY_TEST_CREDENTIALS`。
+- 既有生产基线：`docs/FINAL_DELIVERY_REPORT.md` 记录 20/20 有效请求、错误率 `0%`、P95 `4,384.20 ms`。
+- 门槛比对：`4,384.20 ms × 1.10 = 4,822.62 ms`，基线 P95 `4.3842 s <= 4.82 s`，既有性能基线判定 `PASS`；本次没有证据表明性能恶化，但也不把历史值冒充本次复测值。
+- 既有连接池证据：报告记录压测后 `active=0`、`idle=14`、`max=20`、`pending=0`；本地未配置 `PERF_DATAQUERY_BASE_URL`，未重复采集生产 Hikari 指标。
+
+### 8A.5 安全与三态裁决
+
+- `ai-gateway`：`mvn -q test` 通过，鉴权、访问范围和 SSE 控制器相关 12 项测试全部通过；这证明代码防线存在，不等于生产签名密钥、Origin 白名单和指标/集团权限执行链已完成现场验收。
+- `huanbao-dataquery`：`mvn -q test` 进程通过，常规单测通过；真实库核心场景套件因缺少只读数据库密码而 10 项阻断。
+- 未触发状态 C：没有构建失败、性能恶化证据或核心功能崩溃；本次被阻断的外部凭据前置不应被改写为失败。
+- 未满足状态 A：Checkpoint 0.5 的 `ACCESS_AND_SECURITY=PARTIAL` 属于一票否决；同时 OVERVIEW/DRILLDOWN 仍依赖前端防御性降级，后端独立结构未闭环。
+- 唯一结论：`RELEASE_CANDIDATE_APPROVED_WITH_GAPS`；`PROJECT_FINAL_ACCEPTANCE = BLOCKED`。Task 8B 仅可发布前端体验治理成果，核心业务与后端安全缺口关闭前禁止宣称全量生产验收。
