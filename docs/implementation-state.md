@@ -57,3 +57,17 @@
 - 状态兼容：`NO_DATA`、`NO_DATA_IN_PERIOD`、`SUCCESS_EMPTY` 与 `EMPTY` 统一进入中性空态文案；访问阻断状态单独处理，不与无数据状态混淆。当前 App 仍传 `protocol`，根组件同时保留该兼容入口，规范调用可直接传 `data`。
 - 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2489 个模块并成功生成生产产物；仅保留问数异步 chunk 体积警告，无 Vue/import 语法错误。
 - 提交：`refactor(data-query): checkpoint-2 root renderer and buildable shell`，最终 hash 以本节提交后的 Git HEAD 为准。
+
+## Checkpoint 3：FACT、TREND、RANKING、COMPARISON 精细视图
+
+- 实施状态：`COMPLETED`
+- 变更边界：仅更新 `src/components/DataQueryResult.vue`，新增 `FactView`、`TrendView`、`RankingView`、`ComparisonView`，并追加本节；`DataQueryChart.vue` 无需改动，未修改 App、Gateway、Java、SQL 或协议工具层。
+- 根路由：`FACT` / `DETAIL` 映射 `FactView`，`TREND` 映射 `TrendView`，`RANKING` 映射 `RankingView`，`COMPARISON` 映射 `ComparisonView`；未知分析类型继续安全回退 `GenericAnalysisView`，未建立平行根组件。
+- FACT：以 `content.metrics[0]` 作为事实主卡，其他 KPI 仍通过动态 `MetricGrid` 展示；明细、洞察、证据、图表和后续追问沿用 shared 展示组件。
+- TREND：`content.metrics` 全量动态循环，图表直接使用 `content.chart` 的 categories/series；副标题优先拼接 `content.dataInfo.timeRange.expression` 与 `content.dataInfo.indicatorName`，无表达式时降级为“指标数据要点”，不硬编码“近半年”或“运行特征摘要”；截止日期只读取 `content.dataInfo.dataCutoffDate`。
+- RANKING：将后端 chart categories/series 适配为水平柱状图，排名梯队与 `previousRank`、`rank`、`rankChange` 均原样读取后端字段，不在前端推导名次变化。
+- COMPARISON：仅展示后端已返回的 `value`、`yearOverYearPercent`、`monthOverMonthPercent` 事实字段，缺失字段直接隐藏；不根据 rows 做加减，也不使用 `AVG()` 派生单耗或比率。
+- 协议对齐：所有业务数据继续从 `content.metrics`、`content.table`、`content.chart`、`content.insights`、`content.evidence`、`content.followUps` 读取；指标名称和数据截止日期从根传入的 `content.dataInfo` 读取，未将 content 平铺到顶层。
+- 状态兼容：精细视图延续 `NO_DATA`、`NO_DATA_IN_PERIOD`、`SUCCESS_EMPTY` 与 `EMPTY` 的中性空态兼容，未授权、加载和协议降级仍由根调度器优先处理。
+- 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2497 个模块并成功生成生产产物；6 个月和 12 个月趋势样例均保留后端折线 categories/series；禁用硬编码与 `AVG()` 检查无命中。仅保留既有大 chunk 体积警告。
+- 提交：`feat(data-query): checkpoint-3 core views fact trend ranking comparison and router switch`，最终 hash 以本节提交后的 Git HEAD 为准。

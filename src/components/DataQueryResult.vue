@@ -4,6 +4,10 @@ import AccessBlockedView from './data-query/views/AccessBlockedView.vue'
 import LoadingSkeleton from './data-query/views/LoadingSkeleton.vue'
 import ProtocolFallbackView from './data-query/views/ProtocolFallbackView.vue'
 import GenericAnalysisView from './data-query/views/GenericAnalysisView.vue'
+import FactView from './data-query/views/FactView.vue'
+import TrendView from './data-query/views/TrendView.vue'
+import RankingView from './data-query/views/RankingView.vue'
+import ComparisonView from './data-query/views/ComparisonView.vue'
 
 const EMPTY_STATE_TEXT = '当前统计期间暂无可用数据。'
 const PROTOCOL_ERROR_TEXT = '结果协议校验失败，请稍后重试。'
@@ -110,7 +114,17 @@ const isValidProtocol = computed(() =>
   normalizedPayload.value.protocolValid === true,
 )
 
-const resolvedViewComponent = computed(() => GenericAnalysisView)
+const viewComponentMap = {
+  FACT: FactView,
+  DETAIL: FactView,
+  TREND: TrendView,
+  RANKING: RankingView,
+  COMPARISON: ComparisonView,
+}
+
+const resolvedViewComponent = computed(() =>
+  viewComponentMap[normalizedPayload.value.analysisType] || GenericAnalysisView,
+)
 
 const fallbackText = computed(() => {
   if (isNoData.value) return normalizedPayload.value.content.summary || EMPTY_STATE_TEXT
@@ -126,7 +140,7 @@ const fallbackText = computed(() => {
     <!-- 2. 加载骨架屏 -->
     <LoadingSkeleton v-else-if="loading" />
 
-    <!-- 3. 结构化协议分发：当前阶段统一进入通用分析视图。 -->
+    <!-- 3. 结构化协议分发：精细视图优先，未知类型安全回退到通用分析视图。 -->
     <component
       :is="resolvedViewComponent"
       v-else-if="isValidProtocol"

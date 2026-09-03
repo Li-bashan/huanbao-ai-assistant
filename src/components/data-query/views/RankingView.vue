@@ -1,0 +1,241 @@
+<script setup>
+import { computed } from 'vue'
+import DataQueryChart from '../../DataQueryChart.vue'
+import MetricGrid from '../shared/MetricGrid.vue'
+import AnalysisTable from '../shared/AnalysisTable.vue'
+import InsightList from '../shared/InsightList.vue'
+import FollowUpActions from '../shared/FollowUpActions.vue'
+import { createDataQueryChartOption } from '../../../utils/dataQueryProtocol.js'
+
+const NO_DATA_STATUSES = new Set(['NO_DATA', 'NO_DATA_IN_PERIOD', 'SUCCESS_EMPTY', 'EMPTY'])
+
+const isPlainObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const props = defineProps({
+  content: { type: Object, default: () => ({}) },
+  dataInfo: { type: Object, default: () => ({}) },
+  meta: { type: Object, default: () => ({}) },
+  status: { type: String, default: '' },
+  messageType: { type: String, default: '' },
+  clarification: { type: Object, default: null },
+  chartOption: { type: Object, default: null },
+  windowView: { type: String, default: 'compact' },
+})
+
+const emit = defineEmits(['follow-up', 'clarification'])
+
+const content = computed(() => (isPlainObject(props.content) ? props.content : {}))
+const dataInfo = computed(() => (isPlainObject(props.dataInfo) ? props.dataInfo : {}))
+const metrics = computed(() => (Array.isArray(content.value.metrics) ? content.value.metrics : []))
+const table = computed(() => (isPlainObject(content.value.table) ? content.value.table : null))
+const rows = computed(() => {
+  const value = table.value?.rows
+  return Array.isArray(value) ? value.filter((row) => isPlainObject(row)) : []
+})
+const insights = computed(() => (Array.isArray(content.value.insights) ? content.value.insights : []))
+const evidence = computed(() => (Array.isArray(content.value.evidence) ? content.value.evidence : []))
+const followUps = computed(() => (Array.isArray(content.value.followUps) ? content.value.followUps : []))
+const status = computed(() => String(props.status || '').trim().toUpperCase())
+const isNoData = computed(() => NO_DATA_STATUSES.has(status.value))
+const indicatorName = computed(() => String(dataInfo.value.indicatorName || '指标').trim() || '指标')
+const summary = computed(() => {
+  const value = String(content.value.summary || '').trim()
+  return value || (isNoData.value ? '当前统计期间暂无可用数据。' : '查询已完成。')
+})
+const statusLabel = computed(() => (isNoData.value ? '暂无数据' : '已校验'))
+
+const chart = computed(() => {
+  const base = createDataQueryChartOption({ content: content.value })
+  if (!base) return isPlainObject(props.chartOption) ? props.chartOption : null
+
+  const categories = Array.isArray(base.xAxis?.data) ? base.xAxis.data : []
+  if (!categories.length || !Array.isArray(base.series) || !base.series.length) return base
+
+  return {
+    ...base,
+    title: { text: base.title?.text || content.value.title || '排名' },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    xAxis: {
+      type: 'value',
+      name: content.value.chart?.yField || '',
+      axisLabel: { hideOverlap: true },
+    },
+    yAxis: {
+      type: 'category',
+      data: categories,
+      axisLabel: { width: 150, overflow: 'truncate' },
+    },
+    series: base.series.map((series) => ({ ...series, type: 'bar' })),
+    grid: { left: 10, right: 18, top: 52, bottom: 16, containLabel: true },
+  }
+})
+
+const hasField = (row, key) => row && row[key] !== null && row[key] !== undefined && row[key] !== ''
+const rankMovementRows = computed(() => rows.value.filter((row) => hasField(row, 'previousRank') || hasField(row, 'rankChange')))
+const rowLabel = (row) => row.companyName || row.organization || row.subject || '-'
+const formatValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value !== 'number' || !Number.isFinite(value)) return String(value)
+  return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 })
+}
+const formatListItem = (item) => {
+  if (typeof item === 'string') return item
+  if (isPlainObject(item)) return item.text || item.label || item.description || ''
+  return String(item ?? '')
+}
+const warnings = computed(() => {
+  const value = dataInfo.value.warnings
+  return Array.isArray(value) ? value.filter(Boolean).slice(0, 6) : []
+})
+
+const dataInfoLabels = {
+  analysisType: '分析类型',
+  indicatorName: '主指标',
+  indicatorCode: '指标编码',
+  unit: '单位',
+  timeRange: '统计期间',
+  dataCutoffDate: '数据截止',
+  aggregation: '聚合口径',
+  organizationScope: '组织范围',
+  rowCount: '数据行数',
+  statistics: '统计摘要',
+  comparison: '对比口径',
+  sourceTables: '来源表',
+  warnings: '校验提醒',
+  validation: '结果校验',
+}
+const dataInfoEntries = computed(() => Object.entries(dataInfo.value))
+const dataInfoLabel = (key) => dataInfoLabels[key] || key
+const formatDataInfoValue = (value) => {
+  if (typeof value === 'object' && value !== null) {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return '[不可展示]'
+    }
+  }
+  return String(value ?? '')
+}
+</script>
+
+<template>
+  <article class="data-query-result data-query-analysis-card data-query-ranking-view">
+    <header class="data-query-analysis-header">
+      <div>
+        <span class="data-query-analysis-kicker">排名</span>
+        <h3>{{ content.title || `${indicatorName}排名` }}</h3>
+      </div>
+      <span class="data-query-analysis-status">{{ statusLabel }}</span>
+    </header>
+
+    <p class="data-query-analysis-summary">{{ summary }}</p>
+    <div v-if="dataInfo.indicatorName || dataInfo.dataCutoffDate" class="data-query-view-context">
+      <span v-if="dataInfo.indicatorName">指标：{{ dataInfo.indicatorName }}</span>
+      <span v-if="dataInfo.dataCutoffDate">数据截至：{{ dataInfo.dataCutoffDate }}</span>
+    </div>
+
+    <MetricGrid :metrics="metrics" />
+    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+
+    <section v-if="rankMovementRows.length" class="data-query-ranking-movement" aria-label="排名变动">
+      <div class="data-query-ranking-movement-title">排名变动</div>
+      <div v-for="(row, index) in rankMovementRows" :key="`${rowLabel(row)}-${index}`" class="data-query-ranking-movement-row">
+        <strong>{{ rowLabel(row) }}</strong>
+        <span v-if="hasField(row, 'previousRank')">上期第 {{ row.previousRank }} 名</span>
+        <span v-if="hasField(row, 'rank')">本期第 {{ row.rank }} 名</span>
+        <em v-if="hasField(row, 'rankChange')">变动 {{ formatValue(row.rankChange) }}</em>
+      </div>
+    </section>
+
+    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
+    <InsightList :insights="insights" />
+
+    <section
+      v-if="messageType === 'clarification' && clarification?.candidates?.length"
+      class="data-query-clarification-card"
+      aria-label="请选择候选项"
+    >
+      <strong>{{ clarification.title || '请选择一个候选项' }}</strong>
+      <button
+        v-for="candidate in clarification.candidates"
+        :key="candidate.id || candidate.label"
+        type="button"
+        class="data-query-clarification-option"
+        @click="emit('clarification', candidate)"
+      >
+        <span>{{ candidate.label }}</span>
+        <small v-if="candidate.description">{{ candidate.description }}</small>
+      </button>
+    </section>
+
+    <section v-if="evidence.length || warnings.length" class="data-query-evidence-card" aria-label="证据与校验">
+      <div class="data-query-evidence-title">证据与校验</div>
+      <ul v-if="evidence.length" class="data-query-evidence-list">
+        <li v-for="(item, index) in evidence" :key="`${formatListItem(item)}-${index}`">{{ formatListItem(item) }}</li>
+      </ul>
+      <ul v-if="warnings.length" class="data-query-warning-list">
+        <li v-for="(warning, index) in warnings" :key="`${formatListItem(warning)}-${index}`">{{ formatListItem(warning) }}</li>
+      </ul>
+    </section>
+
+    <details v-if="dataInfoEntries.length" class="data-query-data-info">
+      <summary>数据说明</summary>
+      <dl>
+        <template v-for="([key, value]) in dataInfoEntries" :key="key">
+          <dt>{{ dataInfoLabel(key) }}</dt>
+          <dd>{{ formatDataInfoValue(value) }}</dd>
+        </template>
+      </dl>
+    </details>
+
+    <FollowUpActions :follow-ups="followUps" @select="emit('follow-up', $event)" />
+  </article>
+</template>
+
+<style scoped>
+.data-query-view-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: -3px 0 9px;
+  color: #6d8195;
+  font-size: 11px;
+}
+
+.data-query-ranking-movement {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e2edf7;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.data-query-ranking-movement-title {
+  color: #536b82;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.data-query-ranking-movement-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 9px;
+  color: #6d8195;
+  font-size: 11px;
+}
+
+.data-query-ranking-movement-row strong {
+  min-width: 120px;
+  color: #294b6d;
+}
+
+.data-query-ranking-movement-row em {
+  color: #176dcc;
+  font-style: normal;
+  font-weight: 700;
+}
+</style>
