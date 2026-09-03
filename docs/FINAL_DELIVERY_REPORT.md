@@ -3,6 +3,7 @@
 - 验收时间：2026-09-03（Asia/Shanghai）
 - 对账基准：docs/DATABASE_RECONCILIATION_REPORT.md，基准日期 2026-09-02
 - 压测脚本：tools/perf_data_query.mjs
+- 发布提交：24e9c92，已推送 origin/main；服务器 pull、重建和 Nginx reload 未完成
 - 当前签收结论：阻断，不予最终生产签收；本地构建已通过，生产全链路和有效用户问数尚未闭环
 
 ## 验收摘要
@@ -206,6 +207,8 @@ META-INF/services/com.huanbao.dataquery.core.spi.DomainSemanticProvider
 ### 6.1 当前意见
 
 本项目当前意见为：有条件交付，暂不最终签收 TASK-4.3 Final Sign-off。
+
+发布动作记录：本地完整工作区已提交为 24e9c92 并成功推送 origin/main。按部署规程尝试连接 192.168.245.138 执行服务器 pull、npm ci、npm run build 和 systemctl reload nginx 时，SSH 连接被拒绝；尝试连接 121.237.178.23 时被公钥/密码认证拒绝。因此本次没有服务器侧拉取、重建或重载的可验证证据。
 
 已完成的交付物：
 
