@@ -1,8 +1,10 @@
 <script setup>
 import { ArrowUpRight, LoaderCircle } from '@lucide/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { ENABLE_WORKFLOW_PREFILL } from '../config/workflowActions.js'
+import { sendIgixAction } from '../utils/actionBridge.js'
 
-defineProps({
+const props = defineProps({
   card: {
     type: Object,
     required: true,
@@ -11,15 +13,82 @@ defineProps({
 
 const emit = defineEmits(['action'])
 const loadingAction = ref('')
+const bridgeState = ref('IDLE')
+const bridgeActionId = ref('')
+const bridgeErrorMessage = ref('')
 
-const triggerAction = (action) => {
-  if (loadingAction.value) return
+const bridgeStateLabel = computed(() => {
+  const labels = {
+    IDLE: '待发送',
+    SENDING: '正在发送',
+    SENT: '已发出',
+    WAITING_ACK: '等待门户响应',
+    SUCCESS: '已确认',
+    FAILED: '门户处理失败',
+    TIMEOUT: '等待超时',
+  }
+  return labels[bridgeState.value] || '待发送'
+})
 
+const bridgeStateHint = computed(() => {
+  if (bridgeState.value === 'SUCCESS') return '门户已返回确认，动作已被门户接收。'
+  if (bridgeState.value === 'FAILED') {
+    return bridgeErrorMessage.value || '门户未确认该动作，请检查门户权限或稍后重试。'
+  }
+  if (bridgeState.value === 'TIMEOUT') {
+    return '未在 5 秒内收到门户确认，当前不能确认已办理。'
+  }
+  if (bridgeState.value === 'WAITING_ACK') return '已请求打开，等待门户处理。'
+  if (bridgeState.value === 'SENT') return '已请求打开，等待门户处理。'
+  return ''
+})
+
+const isBridgePending = computed(() => ['SENDING', 'SENT', 'WAITING_ACK'].includes(bridgeState.value))
+
+const getActionPayload = (action) => {
+  if (action.includes('预填') && !ENABLE_WORKFLOW_PREFILL) return null
+  return (
+    props.card.actionPayloads?.[action] ||
+    (action.includes('预填') ? Object.values(props.card.actionPayloads || {})[0] : null)
+  )
+}
+
+const handleBridgeState = (state, detail = {}) => {
+  bridgeState.value = state
+  bridgeActionId.value = detail.actionId || bridgeActionId.value
+  bridgeErrorMessage.value = detail.errorMessage || ''
+}
+
+const triggerAction = async (action) => {
+  if (loadingAction.value || isBridgePending.value) return
+
+  const actionPayload = getActionPayload(action)
   loadingAction.value = action
-  emit('action', action)
-  window.setTimeout(() => {
+
+  if (!actionPayload) {
+    emit('action', action)
+    window.setTimeout(() => {
+      if (loadingAction.value === action) loadingAction.value = ''
+    }, 900)
+    return
+  }
+
+  bridgeState.value = 'SENDING'
+  bridgeActionId.value = ''
+  bridgeErrorMessage.value = ''
+
+  try {
+    await sendIgixAction(actionPayload, {
+      status: props.card.status,
+      onStateChange: handleBridgeState,
+    })
+  } catch (error) {
+    handleBridgeState('FAILED', {
+      errorMessage: '动作桥接异常，当前不能确认已办理。',
+    })
+  } finally {
     if (loadingAction.value === action) loadingAction.value = ''
-  }, 900)
+  }
 }
 </script>
 
@@ -59,6 +128,22 @@ const triggerAction = (action) => {
       </div>
       <p v-else class="workflow-empty-fields">
         {{ card.unavailableReason || '该事项暂未配置可执行动作。' }}
+      </p>
+    </div>
+
+    <div v-if="card.actions?.length" class="workflow-section" aria-live="polite">
+      <div class="workflow-section-title">动作状态</div>
+      <div
+        class="workflow-card-status"
+        :class="bridgeState === 'SUCCESS' ? 'workflow-card-status-verified' : 'workflow-card-status-pending'"
+      >
+        {{ bridgeStateLabel }}
+      </div>
+      <p v-if="bridgeStateHint" class="workflow-empty-fields">
+        {{ bridgeStateHint }}
+      </p>
+      <p v-if="bridgeActionId" class="workflow-empty-fields">
+        动作编号：{{ bridgeActionId }}
       </p>
     </div>
 

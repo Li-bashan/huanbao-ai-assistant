@@ -92,3 +92,14 @@
 - 契约产物：定义 Truth/Presentation 分层、服务端两阶段编排、单一聚合 SSE 流、`POST /api/ai/composite/data-to-doc` 建议路由、请求体边界、`data_ready -> doc_streaming -> completed` 事件标准、失败语义、幂等审计和快照哈希防篡改约束。
 - 后端前置条件：必须先由 Gateway 或 DataQuery 服务端提供正式路由、OpenAPI/JSON Schema、真实 SSE 正负样例、DataScope 继承、数值一致性校验和数据结果保留降级，前端才具备接入条件。
 - 前端状态：当前独立问数和办公能力保持不变；跨能力协同前端准备原则已明确，但实现受服务端公开契约阻断，状态标记为 `BACKEND_REQUIRED`。
+
+## Task 6：流程助手安全通信、两阶段握手与父页面 ACK 协议
+
+- 实施状态：`COMPLETED_WITH_HOST_PENDING`
+- Gate 结论：严格保留 `workflow_audit_api=PARTIAL` 与 `portal_ack=NOT_VERIFIED / HOST_PENDING`；本次只完成前端可交付骨架，不能宣称全链路端到端已闭环。
+- `src/utils/actionBridge.js`：生成 UUID `actionId`，递归清洗 payload，使用解析后的 `portalOrigin` 发送顶层及 payload 内一致的 `actionId`；不使用通配符目标 Origin。
+- ACK 安全校验：只接受同时满足 `event.origin === portalOrigin`、`event.source === window.parent`、消息类型和 `actionId` 匹配的回执；支持 `SUCCESS`、`FAILED`、`TIMEOUT`，5 秒无合法 ACK 自动进入 `TIMEOUT`，并清理 listener 与定时器。
+- 审计容错：发送前尝试 `ATTEMPT` 预审计，收到 ACK 或超时后尝试最终审计；404、500、网络错误和同 `actionId` 唯一键冲突只记录 `console.warn`，不阻断动作或使页面崩溃。现有 Gateway 尚不支持 ATTEMPT 到最终结果的同 actionId 幂等更新，因此审计仍为 `PARTIAL`。
+- `WorkflowActionCard.vue`：执行动作显示 `待发送 -> 已发出 -> 等待门户响应 -> 已确认 / 门户处理失败 / 等待超时`；ACK 前不显示办理成功结论，超时明确提示当前不能确认已办理。
+- 父页面规范：新增《iGIX 门户父页面 ACK 对接规范》，定义 iframe 来源校验、`IGIX_AI_ACTION` payload、`IGIX_AI_ACTION_ACK` 回执、父页面权限校验和 `actionId` 幂等消费要求。
+- 验证结果：`npm run build` 通过，Vite 8.0.16 转换 2503 个模块；仅保留既有大异步 chunk 体积警告。隔离通信回归验证合法 ACK、错误来源忽略、约 5007ms 无 ACK `TIMEOUT`、listener 清理和审计 500 静默容错均通过。
