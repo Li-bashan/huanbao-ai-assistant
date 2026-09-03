@@ -25,6 +25,7 @@ import com.huanbao.aigateway.security.DataQueryIdentity;
 import com.huanbao.aigateway.security.DataQueryIdentityService;
 import com.huanbao.aigateway.service.DataQueryAccessService;
 import com.huanbao.aigateway.service.DataQueryRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -80,7 +81,8 @@ class DataQueryChatControllerTest {
             any(DataQueryChatRequest.class),
             isNull(String.class),
             isNull(String.class),
-            isNull(String.class)
+            isNull(String.class),
+            any(HttpServletRequest.class)
         )).thenReturn(IDENTITY);
         when(accessService.requireCovered(IDENTITY)).thenReturn(AUTHORIZATION);
         when(rateLimiter.tryAcquire("user-1")).thenReturn(true);

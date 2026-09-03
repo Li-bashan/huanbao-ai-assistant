@@ -9,6 +9,7 @@ import com.huanbao.aigateway.security.DataQueryIdentityService;
 import com.huanbao.aigateway.service.DataQueryAccessService;
 import com.huanbao.aigateway.service.DataQueryRateLimiter;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -72,12 +73,15 @@ public class DataQueryChatController {
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> chat(
+        HttpServletRequest servletRequest,
         @RequestHeader(value = DataQueryIdentityService.IDENTITY_HEADER, required = false) String signedIdentity,
         @RequestHeader(value = DataQueryIdentityService.TIMESTAMP_HEADER, required = false) String timestamp,
         @RequestHeader(value = DataQueryIdentityService.SIGNATURE_HEADER, required = false) String signature,
         @Valid @RequestBody DataQueryChatRequest request
     ) {
-        DataQueryIdentity identity = identityService.resolve(request, signedIdentity, timestamp, signature);
+        DataQueryIdentity identity = identityService.resolve(
+            request, signedIdentity, timestamp, signature, servletRequest
+        );
         DataQueryAuthorization authorization = accessService.requireCovered(identity);
         if (!rateLimiter.tryAcquire(authorization.userId())) {
             throw new BusinessException("RATE_LIMITED", "data query rate limit exceeded");

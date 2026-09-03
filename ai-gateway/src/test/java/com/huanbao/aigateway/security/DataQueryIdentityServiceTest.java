@@ -16,6 +16,7 @@ import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 class DataQueryIdentityServiceTest {
     private static final String SECRET = "test-secret";
@@ -56,6 +57,51 @@ class DataQueryIdentityServiceTest {
             BusinessException.class,
             () -> service("SIGNED_HEADER", false).resolve(request(), encoded, String.valueOf(timestamp), "bad")
         );
+        assertEquals("IDENTITY_UNVERIFIED", exception.getCode());
+    }
+
+    @Test
+    void permissiveModeDefaultsToConfiguredDemoUserWhenIdentityIsAbsent() {
+        DataQueryChatRequest request = new DataQueryChatRequest(
+            "查询发电量", "", "request-1", null, java.util.Map.of(), null
+        );
+
+        DataQueryIdentity identity = service("PERMISSIVE", false)
+            .resolve(request, "", "", "");
+
+        assertFalse(identity.verified());
+        assertEquals("PERMISSIVE", identity.source());
+        assertEquals("liu_haopeng", identity.userId());
+        assertEquals("刘昊澎", identity.userName());
+    }
+
+    @Test
+    void permissiveModePrefersClientUserIdHeader() {
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        servletRequest.addHeader("X-User-Id", "chi_quanhu");
+        DataQueryChatRequest request = new DataQueryChatRequest(
+            "查询发电量", "", "request-1", null, java.util.Map.of(), null
+        );
+
+        DataQueryIdentity identity = service("PERMISSIVE", false)
+            .resolve(request, "", "", "", servletRequest);
+
+        assertEquals("chi_quanhu", identity.userId());
+        assertEquals("迟全虎", identity.userName());
+        assertFalse(identity.verified());
+    }
+
+    @Test
+    void permissiveModeDoesNotDowngradePartiallyProvidedSignedIdentity() {
+        DataQueryChatRequest request = new DataQueryChatRequest(
+            "查询发电量", "", "request-1", null, java.util.Map.of(), null
+        );
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> service("PERMISSIVE", false).resolve(request, "signed", "", "")
+        );
+
         assertEquals("IDENTITY_UNVERIFIED", exception.getCode());
     }
 

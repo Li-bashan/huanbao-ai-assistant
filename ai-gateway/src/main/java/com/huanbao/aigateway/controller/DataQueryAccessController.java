@@ -7,6 +7,7 @@ import com.huanbao.aigateway.security.DataQueryIdentity;
 import com.huanbao.aigateway.security.DataQueryIdentityService;
 import com.huanbao.aigateway.service.DataQueryAccessService;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -29,12 +30,15 @@ public class DataQueryAccessController {
 
     @PostMapping("/access")
     public ApiResponse<DataQueryAccessResponse> access(
+        HttpServletRequest servletRequest,
         @RequestHeader(value = DataQueryIdentityService.IDENTITY_HEADER, required = false) String signedIdentity,
         @RequestHeader(value = DataQueryIdentityService.TIMESTAMP_HEADER, required = false) String timestamp,
         @RequestHeader(value = DataQueryIdentityService.SIGNATURE_HEADER, required = false) String signature,
         @Valid @RequestBody DataQueryAccessRequest request
     ) {
-        DataQueryIdentity identity = identityService.resolve(request, signedIdentity, timestamp, signature);
+        DataQueryIdentity identity = identityService.resolve(
+            request, signedIdentity, timestamp, signature, servletRequest
+        );
         return ApiResponse.ok(accessService.check(identity));
     }
 }
