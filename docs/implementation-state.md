@@ -176,3 +176,96 @@
 - 未触发状态 C：没有构建失败、性能恶化证据或核心功能崩溃；本次被阻断的外部凭据前置不应被改写为失败。
 - 未满足状态 A：Checkpoint 0.5 的 `ACCESS_AND_SECURITY=PARTIAL` 属于一票否决；同时 OVERVIEW/DRILLDOWN 仍依赖前端防御性降级，后端独立结构未闭环。
 - 唯一结论：`RELEASE_CANDIDATE_APPROVED_WITH_GAPS`；`PROJECT_FINAL_ACCEPTANCE = BLOCKED`。Task 8B 仅可发布前端体验治理成果，核心业务与后端安全缺口关闭前禁止宣称全量生产验收。
+
+## Task 8B：前端体验治理受控发布与现场冒烟报告
+
+- 执行时间：2026-09-03 22:13（Asia/Shanghai）
+- 8A 准入：`RELEASE_CANDIDATE_APPROVED_WITH_GAPS`，满足受控发布条件；本次仅核验并发布前端体验治理候选成果，不宣称后端安全或全链路验收完成。
+- 发布候选 commit：`bda833f8b9530accfb95d0dc39340e60395ef65d`。
+- 双轨状态：`FRONTEND_RELEASE = APPROVED`；`PROJECT_FINAL_ACCEPTANCE = BLOCKED`。
+- 现场执行状态：`PRODUCTION_ROLLOUT = BLOCKED_BY_ENVIRONMENT_ACCESS`。前端候选和 UI 冒烟达到发布批准条件，但本机没有现场 Nginx/SSH 控制面，未把远端旧页面冒充为本次已覆盖版本。
+
+### 8B.1 强制前置与构建产物
+
+- `git status --short --branch`：工作区 clean，输出仅有 `## main...origin/main [ahead 9]`，无文件变更；HEAD 与 8A 发布候选 commit 一致。
+- `npm run build`：`PASS`，退出码 0；Vite `8.0.16` 转换 2503 个模块并生成 `dist/`。仅有既有大异步 chunk 体积警告。
+- `dist/index.html` 入口引用：`/assets/index-BtasfnsH.js`、`/assets/index-CdoNN_K4.css`，两项文件均存在；对应 SHA-256 分别为 `907516F8995F855E486D5BE11CA35EB74898726F9068A1437CE6EBB2CE45E2FC`、`4CD6B53341E5DEB1436BBB8B2F1798CCBE4FE50AD522E6F7B7D7D1F118EC6DB6`。
+
+### 8B.2 Nginx 动态探测、备份与发布边界
+
+- 本机执行 `nginx -T`：失败，原因是 Windows 本机未安装或未暴露 `nginx` 命令；`127.0.0.1:9002` 与 `127.0.0.1:8090` 均 connection refused，仅 `127.0.0.1:5173` 为本地 Vite 开发服务。
+- 现场只读 HTTP 探测：`http://192.168.245.138:8090/` 返回 200，`http://121.237.178.23:9002/` 也返回前端 HTML；但 `192.168.245.138:22` connection refused，无法进入远端执行 `nginx -T`、读取真实 `root/alias` 或复制文件。
+- 动态路径：`WEB_ROOT = UNRESOLVED`；未从真实 Nginx `server` block 读取到路径。
+- 现场备份：`BACKUP_DIR = NOT_CREATED`。由于没有真实 `WEB_ROOT`，没有执行 `cp -r`、静态资源覆盖、`nginx -t` 或 `nginx -s reload`，避免误拷贝到未知目录。
+- Nginx 步骤仅生成以下标准 Linux 发布/回滚脚本，未在本机执行：
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+DIST_DIR="${PROJECT_DIR}/dist"
+NGINX_DUMP="$(mktemp)"
+trap 'rm -f "$NGINX_DUMP"' EXIT
+
+nginx -T >"$NGINX_DUMP" 2>&1
+WEB_ROOT="$(awk '
+/^[[:space:]]*server[[:space:]]*\{/ { depth=1; hit=0; next }
+depth > 0 {
+  line=$0
+  open_count=gsub(/\{/, "", line)
+  close_count=gsub(/\}/, "", line)
+  if ($0 ~ /^[[:space:]]*listen[[:space:]]+([^;]*:)?9002([[:space:];]|$)/) hit=1
+  if (hit && $0 ~ /^[[:space:]]*(root|alias)[[:space:]]+/) {
+    path=$2; sub(/;$/, "", path); print path; exit
+  }
+  depth += open_count - close_count
+}' "$NGINX_DUMP")"
+
+if [[ -z "$WEB_ROOT" || "$WEB_ROOT" != /* || "$WEB_ROOT" == "/" || ! -d "$WEB_ROOT" ]]; then
+  echo "Unable to resolve a safe absolute WEB_ROOT from nginx -T" >&2
+  exit 1
+fi
+if [[ ! -f "$DIST_DIR/index.html" ]]; then
+  echo "Missing release artifact: $DIST_DIR/index.html" >&2
+  exit 1
+fi
+
+export WEB_ROOT
+BACKUP_DIR="${WEB_ROOT}_backup_$(date +%Y%m%d_%H%M%S)"
+export BACKUP_DIR
+cp -r "$WEB_ROOT" "$BACKUP_DIR"
+cp -r "$DIST_DIR"/. "$WEB_ROOT"/
+nginx -t && nginx -s reload
+
+LOCAL_REFS="$(grep -oE '(src|href)="[^"]+\.(js|css)"' "$DIST_DIR/index.html" | sed -E 's/.*="([^"]+)"/\1/' | sort)"
+ONLINE_REFS="$(curl -fsS http://127.0.0.1:9002/ | grep -oE '(src|href)="[^"]+\.(js|css)"' | sed -E 's/.*="([^"]+)"/\1/' | sort)"
+test "$LOCAL_REFS" = "$ONLINE_REFS"
+echo "Released with WEB_ROOT=$WEB_ROOT BACKUP_DIR=$BACKUP_DIR"
+printf 'Rollback: cp -r "%s"/. "%s"/ && nginx -s reload\n' "$BACKUP_DIR" "$WEB_ROOT"
+```
+
+### 8B.3 防缓存击穿 Hash 对账
+
+- 本地候选 `dist/index.html` 与其引用文件严格一致，引用文件均存在。
+- `127.0.0.1:9002/`：connection refused，无法完成用户指定的本机线上 HTML 对账。
+- `192.168.245.138:8090/` 返回 `/assets/index-CSOSpz8D.js`、`/assets/index-DP1OF6Md.css`；`121.237.178.23:9002/` 返回 `/assets/index-CRzxlC43.js`、`/assets/index-BUA8lWxQ.css`。两套线上引用均与候选 `index-BtasfnsH.js`、`index-CdoNN_K4.css` 严格不一致；线上现状判定为 `HASH_MISMATCH / CANDIDATE_NOT_DEPLOYED`，不宣称发布已覆盖。
+
+### 8B.4 真实环境与隔离 UI 冒烟矩阵
+
+| 项目 | 判定 | 证据与边界 |
+|---|---|---|
+| 欢迎台 | `PASS`（本地候选） | 隔离浏览器加载候选前端；四项能力 2×2 平级展示。400px 视口下 `documentScrollWidth=400`、`bodyScrollWidth=400`，网格为 `175.5px 175.5px`，无横向溢出。 |
+| 问数未授权卡片 | `PASS`（隔离 UI 模拟） | 用非敏感测试身份和模拟 `DATA_QUERY_NOT_COVERED` 响应验证，卡片展示 `🔒 需授权`，点击后提示联系管理员；不作为真实权限链验收证据。 |
+| FACT/TREND/RANKING/COMPARISON Generative UI | `BLOCKED_FOR_REAL_BACKEND` | 真实门户身份不可用，独立本地访问问数返回“暂未获取到当前登录信息”；本次未伪造授权用户或业务数据。沿用 8A 的代码级通过结论，不改写为本次真实数据 E2E。 |
+| OVERVIEW/ANOMALY/DRILLDOWN | `BLOCKED_FOR_REAL_BACKEND` | 真实数据协议未进入本次浏览器会话；8A 已验证缺少 `sections`、attention 线索和固定免责声明的代码级降级边界，本次不把它扩展成后端结构已闭环。 |
+| 流程助手握手 | `PASS`（前端/网关审计容错） | “打开采购请示单”动作卡片发出 `IGIX_AI_ACTION`，界面先显示“等待门户响应”，无 ACK 约 5 秒后显示“等待超时”和“当前不能确认已办理”；预审计 HTTP 200，最终审计 HTTP 500 被前端以 handled warning 容错，未显示虚假成功。 |
+| Console / Network | `PASS`（候选本地会话） | `errors` 无 unhandled error；仅有预期的开发信息和审计 500 handled warning。Network 未发现 Dify URL、Dify Key 或直传 SQL；流程冒烟只访问本地模块和 AI Gateway 审计接口。 |
+| 现场 8090 页面 | `BLOCKED / OLD_ARTIFACT` | 浏览器可打开但仍是旧版制度欢迎页，静态 hash 与候选不一致；不能作为 8B 新版冒烟通过证据。 |
+
+### 8B.5 现场安全补充与最终裁决
+
+- `http://121.237.178.23:9002/api/ai/health` 返回 200/UP。
+- 无身份调用 `POST /api/ai/data-query/access` 返回宽松 `covered=true`、`identityVerified=false`、`identitySource=PERMISSIVE` 结果，说明真实环境仍存在 8A 已标注的身份/权限闭环缺口；没有继续发起真实问数，避免越过授权边界。
+- `FRONTEND_RELEASE = APPROVED` 仅表示前端体验治理候选通过构建和前端冒烟并获准受控发布；实际远端静态资源覆盖因现场控制面不可达保持 `BLOCKED`。
+- `PROJECT_FINAL_ACCEPTANCE = BLOCKED`。Checkpoint 0.5/8A 的后端安全、DataScope、门户 ACK 全链路和高阶视图后端契约缺口继续有效。
