@@ -1,8 +1,8 @@
 # Dify 全部应用与工作流现状
 
-更新时间：2026-08-28
+更新时间：2026-09-02
 
-本文是当前 Dify 自托管实例的全量应用和工作流盘点。核验依据是服务器上的 Dify 数据库记录和工作流 JSON，不以控制台列表的视觉排序作为判断依据。本文只记录结构、节点、发布状态和项目对接关系，不记录任何 API Key、数据库密码或其他敏感配置值。
+本文主体是 2026-08-28 的 Dify 自托管实例盘点，记录结构、节点和历史发布状态，不记录任何 API Key、数据库密码或其他敏感配置值。2026-09-02 的控制台复核、资产冲突和 Gateway Key 绑定边界见 PROJECT_AUDIT_REPORT.md；没有服务器侧 Key 绑定证据时，本文的“当前使用”只能理解为历史快照。
 
 ## 1. 实例和总体结论
 
@@ -17,9 +17,9 @@
 
 当前最重要的结论有四个：
 
-1. 当前项目的智能问数线上应用是 `智慧办公—智能问数`，应用关联已发布工作流为 28 个节点、30 条连线的版本。
-2. 智能问数已发布版本和最新草稿都直接使用 `rookie_text2data / rookie_excute_sql` 插件连接 KingbaseES，没有 Dify HTTP 请求节点，也没有调用仓库内 AI Gateway。
-3. `智慧办公—环宝制度智能助手` 是当前制度问答工作流；它是 5 节点线性链路，检索 `公司制度` 知识库，并通过代码节点清洗模型思考内容。
+1. 历史快照记录的智能问数应用是 `智慧办公—智能问数`，当时关联已发布工作流为 28 个节点、30 条连线；当前 Gateway Key 是否仍绑定它尚未证实。
+2. 历史问数版本直接使用 `rookie_text2data / rookie_excute_sql` 插件连接 KingbaseES；当前工作区前端已改走 Gateway，Dify 是否消费 Gateway 权限上下文仍需目标环境验证。
+3. 历史快照记录 `智慧办公—环宝制度智能助手` 为 5 节点线性链路，检索 `公司制度` 知识库；当前制度主路径已具备统一 Master Gateway 工作区改动。
 4. 两个 Agent 应用没有 `workflows` 表中的图形工作流，不能把 Agent 配置误写成 Dify Workflow 节点图；`流程助手`也不调用 Dify。
 
 ## 2. Dify 应用清单
@@ -169,12 +169,12 @@ advanced-chat 应用没有已发布 workflow，最新草稿 ID 为 `8ea67b3c-797
 
 | 能力 | 前端代码 | 当前 Dify 对接 | 当前权限边界 |
 |---|---|---|---|
-| 制度问答 | `src/services/chatApi.js` blocking | `智慧办公—环宝制度智能助手` | Dify API Key 在前端直连配置中，未切 AI Gateway |
-| 办公智能 | `src/services/chatApi.js` Agent streaming | `智慧办公-环宝办公智能助手` | Agent 配置，不是 workflow 图 |
-| 智能问数 | `src/services/chatApi.js` streaming | `智慧办公—智能问数` | 前端静态名单；Dify 当前不消费 `current_user_name` |
+| 制度问答 | `src/services/chatApi.js` / Gateway | 候选为制度助手或统一中枢 | 浏览器不再作为当前工作区主路径直连 Dify；Key 绑定待核对 |
+| 办公智能 | `src/services/chatApi.js` / Gateway | 候选为办公 Agent 或统一中枢 | Master 代码已提交；生产服务器部署待确认；Agent 配置不是 workflow 图 |
+| 智能问数 | `src/services/chatApi.js` / Gateway | 候选为独立问数或统一中枢 | Gateway 负责身份和 v2；Dify 是否消费 auth_context 待核对 |
 | 流程助手 | `src/config/workflowActions.js` + iGIX bridge | 不调用 Dify | 当前只开放已验证入口 |
 
-当前智能问数工作流 JSON 中没有 `current_user_name`、`userName` 或 `AI_GATEWAY` 引用，但包含 `DB_HOST`、`DB_PASSWORD` 等 Dify 环境变量引用。也就是说，仓库里的 AI Gateway 虽然已经实现查询前二次校验和人员管理接口，当前 Dify 工作流并没有调用它。
+历史智能问数工作流 JSON 中没有 `current_user_name`、`userName` 或 `AI_GATEWAY` 引用，但包含 `DB_HOST`、`DB_PASSWORD` 等 Dify 环境变量引用。当前工作区 Gateway 已实现查询前二次校验和人员管理接口；是否已绑定到当前 Dify 发布版本，必须在服务器侧核对，不能由历史 JSON 推出。
 
 ## 9. 发布和维护要求
 

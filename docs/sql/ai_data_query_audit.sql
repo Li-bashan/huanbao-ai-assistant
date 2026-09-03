@@ -1,3 +1,4 @@
+-- 2026-09-02 只读复核：本文件是 DDL 资产，本次未执行。
 CREATE TABLE IF NOT EXISTS ai_data_query_audit (
   id BIGSERIAL PRIMARY KEY,
   request_id VARCHAR(100) NOT NULL,

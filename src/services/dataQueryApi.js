@@ -223,8 +223,17 @@ export async function streamDataQueryMessage(question, options = {}) {
     responseConversationId = payload.conversationId || payload.conversation_id || responseConversationId
     messageId = payload.messageId || payload.message_id || messageId
 
+    if (eventName === 'stage') {
+      const stageMessage = String(payload.message || mapStageMessage(payload.stage)).trim()
+      options.onStage?.({ ...payload, message: stageMessage })
+      options.onStatus?.(stageMessage)
+      return
+    }
+
     if (eventName === 'analysis_started') {
-      options.onStatus?.(mapStageMessage(payload.stage))
+      const stageMessage = mapStageMessage(payload.stage)
+      options.onStage?.({ ...payload, message: stageMessage })
+      options.onStatus?.(stageMessage)
       return
     }
 

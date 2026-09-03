@@ -6,9 +6,8 @@ spring:
     name: huanbao-ai-gateway
   mvc:
     async:
-      # Data-query is a real workflow, not a single SQL round trip. Keep the
-      # HTTP streaming response alive long enough for Dify to finish, while
-      # still allowing the caller to receive a deterministic error event.
+      # Keep the HTTP streaming response alive while the data-query service
+      # executes the request and emits its SSE events.
       request-timeout: ${AI_GATEWAY_ASYNC_REQUEST_TIMEOUT_MS:300000}
   datasource:
     url: ${AI_GATEWAY_DB_URL:jdbc:postgresql://localhost:5432/huanbao_ai}
@@ -39,12 +38,6 @@ dify:
 
 data-query:
   admin-token: ${DATA_QUERY_ADMIN_TOKEN:}
-  api-base: ${DIFY_DATA_QUERY_API_BASE:http://localhost/v1}
-  api-key: ${DIFY_DATA_QUERY_API_KEY:}
-  # The Dify workflow can spend more than a minute in planning, SQL and
-  # presentation nodes before it emits workflow_finished. The upstream read
-  # timeout must not race that normal execution window.
-  timeout-ms: ${DIFY_DATA_QUERY_TIMEOUT_MS:240000}
   dify-user-hmac-secret: ${DIFY_USER_HMAC_SECRET:}
   identity-mode: ${DATA_QUERY_IDENTITY_MODE:SIGNED_HEADER}
   identity-secret: ${DATA_QUERY_IDENTITY_SECRET:}
@@ -56,6 +49,11 @@ data-query:
   allow-group-ranking: ${DATA_QUERY_ALLOW_GROUP_RANKING:false}
   allowed-indicator-codes: ${DATA_QUERY_ALLOWED_INDICATOR_CODES:}
   audit-enabled: ${DATA_QUERY_AUDIT_ENABLED:true}
+
+dataquery:
+  service:
+    url: ${DATAQUERY_SERVICE_URL:http://127.0.0.1:8089}
+  read-timeout: 60s
 
 logging:
   level:

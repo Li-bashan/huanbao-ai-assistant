@@ -23,3 +23,11 @@ ai-gateway/target/
 *.njsproj
 *.sln
 *.sw?
+
+# 本地浏览器审计截图和抓包，不属于项目源文件
+dify-*.png
+igix-*.png
+local-frontend-*.png
+overview-*.png
+qhd-*.png
+igix-*.har

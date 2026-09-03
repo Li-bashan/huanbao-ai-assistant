@@ -72,6 +72,7 @@ let resizeObserver = null
 let actionMessageTimer = null
 let assistantWindow = null
 let expandWindowTimer = null
+let resizeAfterExpandTimer = null
 
 const getChartOption = () => adaptDataQueryChartOption(props.option) || props.option
 
@@ -223,6 +224,8 @@ const expandWindowForChart = () => {
 
   isExpandingWindow.value = true
   assistantWindow?.wide()
+  window.clearTimeout(resizeAfterExpandTimer)
+  resizeAfterExpandTimer = window.setTimeout(resizeChart, 300)
   showActionMessage('正在展开中窗查看图表')
   window.clearTimeout(expandWindowTimer)
   expandWindowTimer = window.setTimeout(() => {
@@ -254,6 +257,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState)
   window.clearTimeout(actionMessageTimer)
   window.clearTimeout(expandWindowTimer)
+  window.clearTimeout(resizeAfterExpandTimer)
   resizeObserver?.disconnect()
   window.removeEventListener('resize', resizeChart)
   assistantWindow?.destroy()

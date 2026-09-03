@@ -2,6 +2,8 @@
 
 环宝 AI 智能助手是一个基于 Vue 3 + Vite 的企业门户右侧智能助手前端项目，用于嵌入公司办公门户，为员工提供查制度、写材料、办流程、问生产数据的一站式入口。
 
+截至 2026-09-02，统一 Master Gateway 改动已提交并与 origin/main 同步；线上健康接口已验证，但生产服务器是否已拉取并重载该提交、Dify Key 实际绑定哪个 App、Kingbase 和门户身份是否联调完成，不能只从本 README 推出。详细证据见 [系统抓取与文档同步报告](./docs/系统抓取与文档同步报告-2026-09-02.md)。
+
 当前版本是可演示、可使用的前端 V1：制度问答、办公智能和智能问数统一经 AI Gateway 接入 Dify，流程助手为前端动作卡片演示版，后续通过 postMessage、门户父页面、iGIX 菜单/表单能力完成真实办理。
 
 项目整体最新状态见[项目现状总览](./docs/项目现状总览.md)；Dify 全部应用、已发布工作流、草稿和其他节点见[Dify 全部应用与工作流现状](./docs/Dify全部应用与工作流现状.md)，服务器和模型配置见[Dify 服务器部署与模型配置](./docs/Dify服务器部署与模型配置.md)。
@@ -11,8 +13,8 @@
 - 企业门户右侧嵌入式助手面板。
 - 环宝 AI 视觉风格、欢迎区、消息气泡、输入区。
 - 四项专业智能能力：
-  - 制度问答：查询制度依据，使用 Dify blocking。
-  - 办公智能：办公材料处理，使用 Dify Agent streaming。
+- 制度问答：查询制度依据，通过 AI Gateway 访问 Dify blocking/统一 Master。
+  - 办公智能：办公材料处理，通过 AI Gateway 访问 Dify Agent streaming/统一 Master。
   - 流程助手：流程办理辅助，当前为前端动作卡片，不接真实业务系统。
   - 智能问数：查询生产指标数据，前端只持有用户专属会话句柄，由 AI Gateway 负责身份、DataScope、会话归属和 Dify SSE 代理；详见 [智能问数一体化升级交付报告](./docs/智能问数一体化升级交付报告.md)。
 - 标题栏智能能力选择器，数量和菜单来自 `assistantModes` 配置。
@@ -88,7 +90,7 @@ VITE_DATA_QUERY_DEFAULT_PERIOD=今年
 ```
 
 说明：
-- `VITE_AI_GATEWAY_BASE_URL` 是智能问数当前生产入口；Gateway 的 Dify Key 只放后端环境变量。
+- `VITE_AI_GATEWAY_BASE_URL` 是前端 Gateway 入口；Gateway 的 Dify Key 只放后端环境变量。
 - 旧版前端直连 Dify 变量已从运行链路移除，不要再写入 `.env.local`。
 - Vite 只能读取 `VITE_` 开头的变量。
 
@@ -147,7 +149,7 @@ systemctl reload nginx
 
 ## 常见问题
 
-- 办公智能报 `Agent Chat App does not support blocking mode`：说明错误使用 blocking，请确认办公智能走 `streamChatMessage` 和 `response_mode: streaming`。
+- 办公智能报 `Agent Chat App does not support blocking mode`：说明错误使用 blocking，请确认 Gateway/前端走 streaming 和 `response_mode: streaming`。
 - 401：通常是 Dify API Key 错误或环境变量未生效。
 - 页面仍是旧版本：确认本地已 push、服务器已 pull，浏览器强刷缓存。
 - 历史记录不互通：历史使用浏览器 localStorage，本地、服务器、不同浏览器之间不会同步。

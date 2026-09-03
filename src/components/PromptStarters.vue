@@ -6,6 +6,7 @@ import { getRecommendedStarters } from '../config/starters.config.ts'
 const props = defineProps({
   mode: { type: [String, Object], default: 'policy' },
   orgName: { type: String, default: '' },
+  sessionKey: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
 })
 
@@ -35,7 +36,7 @@ const selectStarter = (starter) => {
   emit('select', starter.prompt, starter)
 }
 
-watch(() => [modeKey.value, props.orgName], refreshStarters, { immediate: true })
+watch(() => [modeKey.value, props.orgName, props.sessionKey], refreshStarters, { immediate: true })
 </script>
 
 <template>

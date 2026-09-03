@@ -1,8 +1,8 @@
 # Dify / AI Gateway 查询人大金仓接入说明
 
-更新时间：2026-08-28
+更新时间：2026-09-02
 
-> 重要：截至 2026-08-28，线上 `智慧办公—智能问数` 工作流还没有使用 Dify HTTP 节点，也没有调用仓库内的 AI Gateway。当前工作流通过 `rookie_text2data / rookie_excute_sql` 插件直接连接 KingbaseES。本文件下面的 HTTP 节点方案是目标接入方案，不代表当前线上链路。
+> 复核备注：本文主体是 Kingbase 接入方案和历史链路记录。当前环宝前端问数入口是 AI Gateway 的 /api/ai/data-query/chat；本次没有连接 Kingbase、没有执行 SQL，也没有证明目标 Dify App 已经消费 Gateway 的权限上下文。下面的 Dify HTTP 节点方案仍需目标环境验收。
 
 ## 当前实际链路
 

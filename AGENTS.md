@@ -23,9 +23,10 @@ Codex 修改代码前应先阅读：
 
 ## 当前能力
 
-- 制度问答：Dify blocking，带引用来源。
-- 办公智能：Dify Agent streaming，过滤 `<think>`。
+- 制度问答：通过 AI Gateway 访问 Dify blocking/统一 Master，带引用来源。
+- 办公智能：通过 AI Gateway 访问 Dify Agent streaming/统一 Master，过滤 `<think>`。
 - 流程助手：前端动作卡片，当前不接真实业务系统。
+- 智能问数：通过 AI Gateway 做身份、授权、会话、SSE 和 v2 协议适配。
 - 自动意图识别：`src/utils/intentRouter.js`。
 - 本地历史：搜索、筛选、删除、清空。
 - AI 输出复用：复制、导出 Markdown、导出 Word/HTML。
@@ -34,7 +35,7 @@ Codex 修改代码前应先阅读：
 
 - `src/App.vue`：主界面、模式切换、发送、历史、工具栏。
 - `src/services/chatApi.js`：Dify blocking / streaming / Mock。
-- `src/config/assistantModes.js`：三种助手模式配置。
+- `src/config/assistantModes.js`：四种助手模式配置。
 - `src/config/workflowActions.js`：流程助手动作卡片配置。
 - `src/utils/intentRouter.js`：自动意图识别。
 - `src/utils/conversationStorage.js`：localStorage 历史。
@@ -42,17 +43,18 @@ Codex 修改代码前应先阅读：
 - `src/utils/markdown.js`：Markdown 渲染。
 - `src/style.css`：全部样式。
 
-## 三个助手模式
+## 四个助手模式
 
-1. `policy` 制度问答：查制度、标准、规定，必须使用 Dify blocking。
-2. `office-ai` 办公智能：会议纪要、通知、总结、润色，必须使用 Dify streaming。
+1. `policy` 制度问答：查制度、标准、规定，通过 Gateway 使用 Dify blocking 或统一 Master。
+2. `office-ai` 办公智能：会议纪要、通知、总结、润色，通过 Gateway 使用 Dify streaming 或统一 Master。
 3. `workflow` 流程助手：采购请示单、合同评审、我的待办，必须使用动作卡片和 Mock，不要直接调用 Dify。
+4. `data-query` 智能问数：必须使用 Gateway access/chat，不能信任浏览器身份，也不要前端直连 Dify。
 
 ## Dify 规则
 
 - 不要把真实 API Key 写进代码、文档、提交记录。
-- 制度问答使用 `VITE_POLICY_DIFY_API_BASE` / `VITE_POLICY_DIFY_API_KEY`。
-- 办公智能使用 `VITE_OFFICE_DIFY_API_BASE` / `VITE_OFFICE_DIFY_API_KEY`。
+- Dify API Key 只能使用 Gateway 后端环境变量，不能写入任何 `VITE_` 变量。
+- 当前工作区 Master 路由使用 `DIFY_MASTER_API_BASE` / `DIFY_MASTER_API_KEY`；制度、办公和问数分别有 Gateway 后端配置。
 - 修改 `.env.local` 后必须重启 `npm run dev`。
 
 ## streaming 规则

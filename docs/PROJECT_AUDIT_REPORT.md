@@ -10,11 +10,11 @@
 
 当前最重要的三个事实是：
 
-1. 本地前端运行时已经不再直连 Dify，制度问答、办公智能、智能问数都走 `VITE_AI_GATEWAY_BASE_URL`。本地构建成功，问数前端已有结构化结果卡片和 ECharts 动态图表。
+1. 本地前端运行时已经不再直连 Dify，智能问数走 `/api/ai/data-query/chat`；当前制度问答和办公智能的主路径走 `/api/ai/master/chat`，代码已提交并与 origin/main 同步，兼容 policy/office 路由仍保留。本地构建成功，问数前端已有结构化结果卡片和 ECharts 动态图表。
 2. 线上 `http://121.237.178.23:9002/api/ai/health` 返回 Gateway `0.1.0 / UP`。未携带签名身份访问智能问数权限接口返回 `401`，说明生产入口的身份闸门确实在工作；动作审计查询接口返回 `200`，当前返回总记录数为 0。
 3. 当前统一中枢草稿实测为 29 个节点、40 条连线，数据库查询分支有确定性计划、组织/指标解析、权限范围过滤、异常统计和 v2 结果协议；但它仍由 Dify 的 `rookie_excute_sql` 插件直接连接 KingbaseES。Gateway 环境变量实际绑定的是哪个 Dify App/发布版本，仓库中没有 App ID 配置，本次也没有执行有效问数，故仍需服务器侧只读确认。另有一个高风险细节：工具节点的 schema 参数写成 `public`，而 SQL 使用 `MSOKFPT`，必须验证插件对两者的实际解释。
 
-本次没有执行任何数据库 SQL，没有执行任何 DDL/DML，没有调用用户权限管理的写接口，没有改动现有业务代码；只更新本报告文件。由于 SSH 登录和直连 KingbaseES 均未能建立，数据库表结构、字段注释、`LIMIT 3` 样本、参数库覆盖公司数，本次只能标注为待实库核验，不能把 Prompt 或工作流代码当作数据库事实。
+本次没有执行任何数据库 SQL，没有执行任何 DDL/DML，没有调用用户权限管理的写接口。审计工作本身不改业务代码；后续文档同步另行更新文档文件。由于 SSH 登录和直连 KingbaseES 均未能建立，数据库表结构、字段注释、`LIMIT 3` 样本、参数库覆盖公司数，本次只能标注为待实库核验，不能把 Prompt 或工作流代码当作数据库事实。
 
 ## 1. 审计证据等级与边界
 
@@ -31,7 +31,7 @@
 - 线上只读：GET 健康状态、GET 动作审计列表、GET 未授权用户列表；POST 仅发送了空查询/空身份以验证参数与身份拦截，未进入有效 Dify/数据库查询。
 - 数据库：未建立直接 SSH/KingbaseES 会话，没有手工发送任何 SQL，也没有执行任何写操作；线上动作审计 GET 属于只读 API，可能由 Gateway 在元数据库内部执行 SELECT，返回 total=0。
 - 敏感信息：数据库密码、Dify API Key、Gateway 密钥在本报告中全部使用 `****`、`${ENV}` 或“不展示”处理。
-- 工作区：审计时工作区已有未提交修改和未跟踪文件；本次未对现有业务文件做编辑、回退或清理，只更新本报告。
+- 工作区：审计时曾有未提交修改和未跟踪文件；当前代码主提交已与 origin/main 同步，本次清理仅删除明确的临时截图/HAR/空文件和根目录未引用历史截图，未回退业务代码。
 
 ## 2. 系统资产拓扑图
 
@@ -86,12 +86,12 @@ flowchart LR
 
 | 模式 | 前端配置 | 当前调用 | 备注 |
 |---|---|---|---|
-| 制度问答 | `apiMode: dify` | Gateway `/api/ai/policy/chat`，blocking JSON | 源码运行链路已不是浏览器直连 Dify |
-| 办公智能 | `apiMode: dify` | Gateway `/api/ai/office/chat`，SSE | 支持流式输出；前端过滤/处理流式事件 |
+| 制度问答 | `apiMode: dify` | 主路径 Gateway `/api/ai/master/chat`，兼容 policy blocking 路由 | 代码已提交；生产服务器部署待确认 |
+| 办公智能 | `apiMode: dify` | 主路径 Gateway `/api/ai/master/chat`，兼容 office streaming 路由 | 支持流式输出；生产部署待确认 |
 | 流程助手 | `apiMode: mock` | 前端 Mock + 动作卡片 | 不接真实业务系统，不调用 Dify |
 | 智能问数 | `apiMode: workflow` | Gateway `/api/ai/data-query/chat`，SSE | Gateway 负责身份、权限、会话和 Dify 代理 |
 
-`src/services/chatApi.js` 是总路由：问数走 `streamDataQueryMessage`，制度走 `sendGatewayPolicyMessage`，办公走 `streamGatewayOfficeMessage`，流程走本地 Mock。运行时没有发现 `VITE_POLICY_DIFY_*` 或 `VITE_OFFICE_DIFY_*` 直连代码；`.env.local` 只有非敏感的 Gateway 地址和默认查询周期。Dify API Key 由后端环境变量读取，不进浏览器构建产物。
+`src/services/chatApi.js` 是总路由：问数走 `streamDataQueryMessage`，制度和办公在当前工作区走 `sendMasterChatMessage`，流程走本地 Mock；policy/office Gateway 兼容函数仍保留。运行时没有发现 `VITE_POLICY_DIFY_*` 或 `VITE_OFFICE_DIFY_*` 直连代码；`.env.local` 只有非敏感的 Gateway 地址和默认查询周期。Dify API Key 由后端环境变量读取，不进浏览器构建产物。
 
 ### 3.2 智能问数 UI 与协议能力
 

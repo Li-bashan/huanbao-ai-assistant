@@ -195,6 +195,12 @@ const capabilityLabelsByMode = {
   workflow: '流程助手',
   'data-query': '智能问数',
 }
+const executionCapabilityLabelsByMode = {
+  policy: '制度问答',
+  'office-ai': '智能办公',
+  workflow: '流程助手',
+  'data-query': '智能问数',
+}
 const assistantWindow = createIgixAssistantWindow()
 let unbindWindowEscape = null
 let unsubscribeWindowState = null
@@ -828,6 +834,30 @@ const handleDifyExecutionEvent = (message, event) => {
   scrollToBottom()
 }
 
+const handleExecutionStage = (message, stagePayload = {}) => {
+  const process = message?.executionProcess
+  if (!process) return
+
+  const stageKey = String(stagePayload.stage || '').trim().toLowerCase()
+  const capabilityLabel =
+    executionCapabilityLabelsByMode[normalizeModeKey(stageKey)] ||
+    ({ '智能问数': '智能问数', '智能办公': '智能办公', '办公智能': '智能办公' }[stageKey] || '')
+  const stageMessage = String(stagePayload.message || stagePayload.label || '').trim()
+
+  process.visible = true
+  process.status = 'running'
+  if (capabilityLabel) {
+    process.activeCapability = capabilityLabel
+    if (!process.capabilities.includes(capabilityLabel)) process.capabilities.push(capabilityLabel)
+  }
+  if (stageMessage) {
+    process.stage = stageMessage
+  } else if (capabilityLabel) {
+    process.stage = `正在调用${capabilityLabel}...`
+  }
+  scrollToBottom()
+}
+
 const toggleDifyExecution = (message) => {
   const process = message?.executionProcess
   if (!process) return
@@ -903,7 +933,17 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
   recentSubmittedQuestion = { value: content, at: now }
 
   const previousModeKey = currentMode.value.key
-  const detectedIntent = detectIntent(content, { currentModeKey: previousModeKey })
+  const forcedModeKey = options.modeKeyOverride
+    ? normalizeModeKey(options.modeKeyOverride)
+    : ''
+  const detectedIntent = forcedModeKey
+    ? {
+        modeKey: forcedModeKey,
+        modeKeys: options.modeKeysOverride || [forcedModeKey],
+        confidence: 1,
+        reason: '推荐题目指定执行链路',
+      }
+    : detectIntent(content, { currentModeKey: previousModeKey })
   const routedMode = detectedIntent.modeKey ? getModeByKey(detectedIntent.modeKey) : currentMode.value
   const capabilityKeys = normalizeCapabilityKeys(
     detectedIntent.modeKeys?.length ? detectedIntent.modeKeys : [routedMode.key],
@@ -1035,11 +1075,11 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
     chartOption: null,
     actionPills: [],
     executionProcess:
-      requestMode.apiMode === 'dify'
+      (requestMode.apiMode === 'dify' || requestModeKey === 'data-query')
         ? createDifyExecutionProcess({
             modeKey: requestModeKey,
             visible: requestModeKey !== 'policy',
-            capabilities: capabilityKeys.map((key) => capabilityLabelsByMode[key]),
+            capabilities: capabilityKeys.map((key) => executionCapabilityLabelsByMode[key]),
             stage:
               requestModeKey === 'policy'
                 ? '正在检索制度依据...'
@@ -1139,6 +1179,14 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
           if (!streamingMessage) return
           handleDifyExecutionEvent(streamingMessage, event)
         },
+        onStage: (stagePayload) => {
+          if (requestController.signal.aborted) return
+          const streamingMessage = messages.value.find(
+            (message) => message.id === loadingMessageId,
+          )
+          if (!streamingMessage) return
+          handleExecutionStage(streamingMessage, stagePayload)
+        },
       },
     )
 
@@ -1230,8 +1278,18 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
   await scrollToBottom()
 }
 
-const handleStarterSelect = (question) => {
-  sendMessage(question, { bypassRecentGuard: true })
+const handleStarterSelect = (question, starter) => {
+  const promptText = String(question || '').trim()
+  if (!promptText) return
+  inputValue.value = promptText
+  const shouldUseDataQueryPipeline =
+    starter?.isCompound === true && starter.supportedModes?.includes('data-query')
+  sendMessage(promptText, {
+    bypassRecentGuard: true,
+    ...(shouldUseDataQueryPipeline
+      ? { modeKeyOverride: 'data-query', modeKeysOverride: ['data-query', 'office-ai'] }
+      : {}),
+  })
 }
 
 const retryFailedMessage = async (message) => {
@@ -1775,10 +1833,12 @@ watch(
         <DataQueryHome
           v-if="currentMode.key === 'data-query' && dataQueryAccessStatus === 'covered'"
           :session-key="currentConversationId"
+          :org-name="currentUser?.orgName || currentUser?.unitName || ''"
+          :disabled="isChatBusy"
           :show-home="!hasMessages"
           :input-value="inputValue"
           @update:input-value="inputValue = $event"
-          @submit-query="sendMessage($event)"
+          @submit-query="handleStarterSelect"
         />
 
         <section
@@ -1866,7 +1926,7 @@ watch(
                 @toggle="toggleDifyExecution(message)"
               />
               <div
-                v-if="message.role === 'assistant' && !message.messageType && !message.loading && getCapabilityText(message)"
+                v-if="message.role === 'assistant' && !message.messageType && !message.loading && !message.executionProcess && getCapabilityText(message)"
                 class="message-capability-note"
               >
                 <span class="message-capability-note-dot" aria-hidden="true"></span>

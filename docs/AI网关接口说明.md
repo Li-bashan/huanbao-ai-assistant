@@ -2,14 +2,14 @@
 
 更新时间：2026-09-02
 
-AI Gateway 是前端与 Dify、权限、会话和审计之间的服务端中间层。当前工作区前端已具备统一 Master、制度、办公和智能问数四条网关调用链；流程助手仍只走前端动作桥接。工作区存在未提交改动，线上是否已部署 Master 路由需要单独确认。
+AI Gateway 是前端与 Dify、权限、会话和审计之间的服务端中间层。当前代码已具备统一 Master、制度、办公和智能问数四条网关调用链；流程助手仍只走前端动作桥接。代码已提交并与 origin/main 同步，线上服务器是否已部署 Master 路由仍需单独确认。
 
 ## 1. 路由总表
 
 | 路由 | 方法 | 用途 | 当前状态 |
 |---|---|---|---|
 | /api/ai/health | GET | 健康检查 | 线上只读返回 200 / UP |
-| /api/ai/master/chat | POST SSE | 制度和办公统一入口 | 当前工作区新增，未证明已部署 |
+| /api/ai/master/chat | POST SSE | 制度和办公统一入口 | 代码已提交；线上服务器部署待确认 |
 | /api/ai/policy/chat | POST JSON | 制度 blocking 兼容代理 | 代码存在 |
 | /api/ai/office/chat | POST SSE | 办公 streaming 兼容代理 | 代码存在 |
 | /api/ai/data-query/access | POST JSON | 问数开放范围 | 线上空身份返回 401 |
@@ -61,4 +61,4 @@ POST /api/ai/action-audits 已有写入接口和 docs/sql/ai_action_audit.sql DD
 - 不能仅凭 Gateway 在线返回 UP 推出 Dify Key 绑定了哪个 App。
 - 不能仅凭 Dify 页面可达推出 Kingbase 查询成功。
 - 不能仅凭 Gateway 下发 auth_context 推出 Dify SQL 已执行组织过滤。
-- 不能把工作区未提交的 Master 路由写成生产已部署。
+- 不能把代码已提交、Gateway UP 或 Dify 页面可达直接写成生产全链路已验收。

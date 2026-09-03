@@ -1,8 +1,8 @@
 # Dify 智能问数工作流现状
 
-> 历史调查记录：本文记录的“前端直连 Dify、静态名单、尚未接 Gateway”是 2026-08-28 的基线，不代表当前环宝代码链路。当前智能问数 Gateway/v2 协议和未完成的外部发布项以《智能问数一体化升级交付报告》为准。
+> 复核备注：本文主体记录的是历史 Dify 工作流调查，尤其是前端直连、静态名单和旧节点图。当前环宝代码链路已经由 Gateway 承接问数；本次没有有效门户身份和 Kingbase 查询，Dify Key 的实际 App/发布版本绑定仍待服务器侧确认。
 
-更新时间：2026-08-28
+更新时间：2026-09-02
 
 本文记录当前服务器上实际运行的 Dify 智能问数工作流，以 Dify 自托管实例和数据库中的工作流配置为准。它用于和前端代码、AI Gateway 设计文档交叉核对，避免把计划中的链路误写成已经上线的链路。
 
@@ -59,7 +59,7 @@ Dify streaming 返回前端
 - 前端虽然会传 `inputs.current_user_name`，但当前 Dify 图中没有消费它。
 - 当前 Dify 查询不会经过仓库内的 Spring Boot AI Gateway。
 - 当前实际数据库访问权限由 Dify 插件连接配置、数据库账号权限和 SQL 白名单共同决定。
-- 仓库中的 AI Gateway 查询接口仍属于已实现但尚未接入当前 Dify 工作流的安全中间层。
+- 仓库中的 AI Gateway 已成为当前环宝前端问数入口；本文历史工作流是否已被 Gateway Key 绑定，仍需服务器侧确认。
 
 这是当前最重要的现状差异，后续切换到 Gateway 前不能把现有工作流描述成已经完成了服务端用户鉴权。
 
@@ -183,7 +183,7 @@ flowchart TD
 
 ## 6. 当前项目侧对接状态
 
-前端 `src/services/chatApi.js` 当前直接调用 Dify 的 `/chat-messages`，使用 `VITE_DATA_QUERY_DIFY_API_BASE` 和 `VITE_DATA_QUERY_DIFY_API_KEY`，以 streaming 方式读取答案。进入智能问数前，`src/config/dataQueryAccess.js` 使用姓名做前端静态名单检查；`VITE_AI_GATEWAY_BASE_URL` 目前只被人员管理 CRUD 使用。前端会把当前用户姓名放进 `inputs.current_user_name`，但当前 Dify 工作流没有引用这个变量，所以它目前不会影响 SQL 工具权限。
+历史代码曾由 `src/services/chatApi.js` 直接调用 Dify 的 `/chat-messages`，使用 `VITE_DATA_QUERY_DIFY_API_BASE` 和 `VITE_DATA_QUERY_DIFY_API_KEY`，并通过前端静态名单放行。当前工作区前端已改为调用 Gateway 的 `/api/ai/data-query/access` 和 `/api/ai/data-query/chat`；生产权限由签名身份和服务端授权表决定。本文记录的旧 Dify 工作流仍需核对是否消费 Gateway 的 auth_context 和 DataScope。
 
 仓库内 `ai-gateway/` 已实现智能问数开放范围检查、查询前二次校验和人员管理接口，但当前 Dify 工作流中没有 HTTP 节点调用它。后续如果切换到 Gateway，需要同时完成：
 

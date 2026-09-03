@@ -1,0 +1,1200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "dictionaryName": "环宝垃圾焚烧发电核心经营指标语义字典",
+  "dslVersion": "1.0.0",
+  "generatedAt": "2026-09-02",
+  "metricCount": 46,
+  "sourceDocuments": [
+    {
+      "path": "docs/DATABASE_RECONCILIATION_REPORT.md",
+      "role": "数据库资产、46项公式差异、参数覆盖及空值/零值事实来源"
+    },
+    {
+      "path": "docs/sql/patch_dim_org_mapping.sql",
+      "role": "组织层级、项目公司 formal_code、region 及业务板块权威映射"
+    },
+    {
+      "path": "docs/业务Excel/【文件1】需求文档：查询分析表 (1).xlsx#Sheet1",
+      "role": "46项核心经营指标的名称、单位、原子编码及业务公式"
+    },
+    {
+      "path": "docs/业务Excel/【文件5】项目公司月报模版.xlsx#1-1.子公司月度报表模板",
+      "role": "月报日指标编码、组织汇总限制及标红不可直接加和约定"
+    }
+  ],
+  "reconciliationCoverage": {
+    "formulaBaselineCount": 46,
+    "preciseFormulaMissingCount": 21,
+    "formulaTextBlankCount": 1,
+    "formulaGapsCoveredByThisDsl": 22,
+    "inboundSpecificConsumptionGapsCovered": 5,
+    "preciseFormulaMissingIndicators": [
+      "柴油消耗量",
+      "发电量",
+      "上网电量",
+      "天然气消耗量",
+      "外供汽量",
+      "外供热量",
+      "生产用水量",
+      "生产用水单耗",
+      "餐厨厨余入厂量",
+      "炉渣产生量",
+      "氢氧化钙耗量",
+      "氢氧化钙单耗",
+      "尿素耗量",
+      "氨水耗量",
+      "碳酸氢钠耗量",
+      "活性炭耗量",
+      "氢氧化钙单耗（入厂）",
+      "尿素单耗（入厂）",
+      "活性炭单耗（入厂）",
+      "氨水单耗（入厂）",
+      "碳酸氢钠单耗（入厂）"
+    ],
+    "blankFormulaTextIndicators": ["生活垃圾入厂量"]
+  },
+  "organizationContract": {
+    "mappingView": "MSOKFPT.dim_org_mapping",
+    "businessTypeField": "business_type",
+    "garbageIncinerationBusinessType": "垃圾焚烧发电项目",
+    "garbageIncinerationPlantBaseline": 63,
+    "applicableBusinessTypesForThisDictionary": ["垃圾焚烧发电项目"],
+    "orgLevelMapping": {
+      "GROUP": {
+        "meaning": "集团汇总",
+        "mappingField": null
+      },
+      "REGION": {
+        "meaning": "大区",
+        "mappingField": "region"
+      },
+      "PROJECT_COMPANY": {
+        "meaning": "项目公司",
+        "mappingField": "formal_code",
+        "nameField": "formal_name"
+      }
+    },
+    "scopeRule": "只在 dim_org_mapping.business_type = '垃圾焚烧发电项目' 的组织范围内计算本字典指标；项目公司必须按 formal_code 关联，禁止按简称模糊选取组织。"
+  },
+  "sourceContract": {
+    "dailyMetricTablePattern": "MSOKFPT.CGXTAPPMISDate_YYYY_HH",
+    "indicatorCodeField": "newIndicator",
+    "valueField": "ZBZ",
+    "organizationFields": ["orgcode", "neworgcode"],
+    "baseMetricRefSyntax": "base_<dailyMetricCode>",
+    "dailyMetricCodesUsed": [
+      "1001",
+      "1002",
+      "1003",
+      "1101",
+      "1102",
+      "1103",
+      "1201",
+      "1202",
+      "1214",
+      "1501",
+      "1503",
+      "1504",
+      "1707",
+      "1901",
+      "2001",
+      "2401",
+      "2402",
+      "2403",
+      "2404",
+      "2501",
+      "2504",
+      "2601",
+      "2602",
+      "2603",
+      "2701",
+      "2703",
+      "2704",
+      "2705",
+      "2707"
+    ]
+  },
+  "parameterContract": {
+    "table": "MSOKFPT.enterprise_equipment_info",
+    "joinKey": "orgcode",
+    "recordCountAtReconciliation": 62,
+    "nullableParametersAreAllowed": true,
+    "fields": {
+      "installed_capacity": {
+        "type": "number",
+        "sourceField": "installed_capacity",
+        "semanticName": "装机容量"
+      },
+      "incinerator_count": {
+        "type": "number",
+        "sourceField": "incinerator_count",
+        "semanticName": "焚烧炉台数",
+        "semanticAliases": ["furnace_count"]
+      },
+      "processing_scale": {
+        "type": "number",
+        "sourceField": "processing_scale",
+        "semanticName": "处理规模"
+      },
+      "standard_coeff": {
+        "type": "number",
+        "sourceField": "standard_coeff",
+        "semanticName": "折标系数",
+        "zeroValueCountAtReconciliation": 32
+      }
+    }
+  },
+  "calculationContract": {
+    "formulaLanguage": "Aviator",
+    "baseVariablePrefix": "base_",
+    "parameterVariablePrefix": "param_",
+    "contextVariables": ["context_period_days"],
+    "percentRepresentation": "比率类公式返回 0 到 1 的小数，展示层按百分比格式化；不要在公式中重复乘 100。",
+    "zeroDivisionPolicy": {
+      "formulaConvention": "使用 denominator == 0 ? 0 : numerator / denominator 的三元表达式保护除零。",
+      "returnValue": 0,
+      "qualityFlag": "ZERO_DENOMINATOR",
+      "note": "零分母、缺失分母或归一化后的空参数不得抛出除零异常；返回 0 必须同时保留质量标记。"
+    },
+    "nullParameterPolicy": "参数表空值和空字符串先归一化为 null；涉及参数的指标执行对应 fallbackRules，不把缺失设备参数静默当作真实业务值。",
+    "nonAdditivePolicy": "isNonAdditive=true 的指标跨月或跨组织禁止 SUM，必须按 baseMetricRefs 与参数重新汇总分子、分母后重算。"
+  },
+  "indicators": [
+    {
+      "indicatorCode": "1201",
+      "formalName": "生活垃圾入厂量",
+      "aliases": ["进厂垃圾量", "入厂垃圾量", "垃圾入厂量", "生活垃圾进厂量", "生活垃圾入厂总量"],
+      "category": "产量",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 / 10000",
+      "unit": "万吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "DB_FORMULA_TEXT_BLANK",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "2504",
+      "formalName": "柴油消耗量",
+      "aliases": ["柴油用量", "柴油消耗总量", "柴油耗量", "柴油消耗"],
+      "category": "燃料动力",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2504"],
+      "paramRefs": [],
+      "formulaText": "base_2504",
+      "unit": "吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "1001",
+      "formalName": "发电量",
+      "aliases": ["全厂发电量", "总发电量", "发电总量", "发电量"],
+      "category": "产量",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["1001"],
+      "paramRefs": [],
+      "formulaText": "base_1001 / 10000",
+      "unit": "万度",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "DIESEL_SPECIFIC_CONSUMPTION",
+      "formalName": "柴油单耗",
+      "aliases": ["柴油单位消耗", "单位柴油耗量", "柴油耗用强度"],
+      "category": "燃料动力",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2504", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2504 / base_1201",
+      "unit": "吨/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算柴油单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "1002",
+      "formalName": "上网电量",
+      "aliases": ["全厂上网电量", "并网电量", "上网电量"],
+      "category": "产量",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["1002"],
+      "paramRefs": [],
+      "formulaText": "base_1002",
+      "unit": "万度",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "2501",
+      "formalName": "天然气消耗量",
+      "aliases": ["天然气消耗总量", "天然气用量", "天然气耗量"],
+      "category": "燃料动力",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2501"],
+      "paramRefs": [],
+      "formulaText": "base_2501 / 10000",
+      "unit": "万立方",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "1101",
+      "formalName": "外供汽量",
+      "aliases": ["对外供汽量", "供汽量", "外供蒸汽量"],
+      "category": "产量",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["1101"],
+      "paramRefs": [],
+      "formulaText": "base_1101 / 10000",
+      "unit": "万吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "NATURAL_GAS_SPECIFIC_CONSUMPTION",
+      "formalName": "天然气单耗",
+      "aliases": ["天然气单位消耗", "天然气耗用强度", "天然气吨垃圾单耗"],
+      "category": "燃料动力",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2501", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2501 / base_1201",
+      "unit": "立方/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算天然气单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "1102",
+      "formalName": "外供热量",
+      "aliases": ["对外供热量", "供热量", "外供热量"],
+      "category": "产量",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["1102"],
+      "paramRefs": [],
+      "formulaText": "base_1102 / 10000",
+      "unit": "万GJ",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "PRODUCTION_WATER",
+      "formalName": "生产用水量",
+      "aliases": ["生产取水量", "生产用水总量", "生产用水量"],
+      "category": "燃料动力",
+      "metricType": "DERIVED",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2401", "2402", "2403", "2404"],
+      "paramRefs": [],
+      "formulaText": "(base_2401 + base_2402 + base_2403 + base_2404) / 10000",
+      "unit": "万吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "PRODUCTION_WATER_SPECIFIC_CONSUMPTION",
+      "formalName": "生产用水单耗",
+      "aliases": ["吨垃圾取水量", "吨入厂垃圾取水量", "单位生产用水量"],
+      "category": "燃料动力",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2401", "2402", "2403", "2404", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : (base_2401 + base_2402 + base_2403 + base_2404) / base_1201",
+      "unit": "吨/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算生产用水单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "FOOD_KITCHEN_WASTE_INBOUND",
+      "formalName": "餐厨厨余入厂量",
+      "aliases": ["餐厨垃圾与厨余垃圾入厂量", "餐厨厨余进厂量", "餐厨厨余垃圾量"],
+      "category": "产量",
+      "metricType": "DERIVED",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["1501", "1503"],
+      "paramRefs": [],
+      "formulaText": "(base_1501 + base_1503) / 10000",
+      "unit": "万吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "2603",
+      "formalName": "炉渣产生量",
+      "aliases": ["炉渣外运量", "炉渣量", "炉渣产生总量"],
+      "category": "产量",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2603"],
+      "paramRefs": [],
+      "formulaText": "base_2603 / 10000",
+      "unit": "万吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "TOTAL_PLANT_USE_POWER_RATE",
+      "formalName": "综合厂用电率",
+      "aliases": ["厂用电率", "综合自用电率", "综合厂用电率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1001", "1002", "1003"],
+      "paramRefs": [],
+      "formulaText": "base_1001 == 0 ? 0 : (base_1001 - base_1002 + base_1003) / base_1001",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1001 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "发电量缺失或为 0 时不计算综合厂用电率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "2701",
+      "formalName": "氢氧化钙耗量",
+      "aliases": ["氢氧化钙消耗量", "消石灰耗量", "消石灰用量"],
+      "category": "环保耗材",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2701"],
+      "paramRefs": [],
+      "formulaText": "base_2701",
+      "unit": "吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "TON_ELEC_GEN",
+      "formalName": "吨入厂发电量",
+      "aliases": ["吨垃圾发电量", "单位入厂垃圾发电量", "吨入厂发电量"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1001", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_1001 / base_1201 * 10000",
+      "unit": "度/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算吨入厂发电量。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "CALCIUM_HYDROXIDE_SPECIFIC_CONSUMPTION_FURNACE",
+      "formalName": "氢氧化钙单耗",
+      "aliases": ["消石灰单耗", "氢氧化钙单位消耗", "吨入炉垃圾消石灰单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2701", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2701 / base_1202 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算氢氧化钙单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "TON_GRID_ELEC",
+      "formalName": "吨入厂上网电量",
+      "aliases": ["吨垃圾上网电量", "单位入厂垃圾上网电量", "吨入厂上网电量"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1002", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_1002 / base_1201 * 10000",
+      "unit": "度/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算吨入厂上网电量。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "2704",
+      "formalName": "尿素耗量",
+      "aliases": ["尿素消耗量", "尿素用量", "尿素耗量"],
+      "category": "环保耗材",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2704"],
+      "paramRefs": [],
+      "formulaText": "base_2704",
+      "unit": "吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "BOILER_AVG_RUNTIME",
+      "formalName": "锅炉平均运行时间",
+      "aliases": ["锅炉平均运行小时数", "平均锅炉运行时间", "锅炉运行时间"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1707"],
+      "paramRefs": ["incinerator_count"],
+      "formulaText": "param_incinerator_count == 0 ? 0 : base_1707 / param_incinerator_count",
+      "unit": "小时",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_incinerator_count is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "MISSING_PARAMETER",
+          "note": "焚烧炉台数来自 enterprise_equipment_info.incinerator_count；参数缺失时优雅降级为 0。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "UREA_SPECIFIC_CONSUMPTION_FURNACE",
+      "formalName": "尿素单耗",
+      "aliases": ["尿素单位消耗", "吨入炉垃圾尿素单耗", "尿素单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2704", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2704 / base_1202 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算尿素单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "GENERATION_LOAD_RATE",
+      "formalName": "发电负荷率",
+      "aliases": ["发电利用负荷率", "单位装机发电强度", "发电负荷率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1001", "1707"],
+      "paramRefs": ["incinerator_count", "installed_capacity"],
+      "formulaText": "(param_incinerator_count == 0 || param_installed_capacity == 0 || base_1707 == 0) ? 0 : base_1001 / (base_1707 / param_incinerator_count) / param_installed_capacity",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_incinerator_count is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "MISSING_PARAMETER",
+          "note": "焚烧炉台数缺失时不推断设备台数。"
+        },
+        {
+          "when": "param_installed_capacity is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "MISSING_PARAMETER",
+          "note": "装机容量缺失时不计算发电负荷率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "2705",
+      "formalName": "氨水耗量",
+      "aliases": ["氨水消耗量", "氨水用量", "氨水耗量"],
+      "category": "环保耗材",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2705"],
+      "paramRefs": [],
+      "formulaText": "base_2705",
+      "unit": "吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "TON_FURNACE_STEAM",
+      "formalName": "吨入炉产汽量",
+      "aliases": ["单位入炉垃圾产汽量", "垃圾产汽率", "吨入炉产汽量"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1901", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_1901 / base_1202",
+      "unit": "吨/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算吨入炉产汽量。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "AMMONIA_SPECIFIC_CONSUMPTION_FURNACE",
+      "formalName": "氨水单耗",
+      "aliases": ["氨水单位消耗", "吨入炉垃圾氨水单耗", "氨水单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2705", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2705 / base_1202 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算氨水单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "STEAM_CONSUMPTION_RATE",
+      "formalName": "汽耗率",
+      "aliases": ["发电汽耗率", "蒸汽耗电比", "汽耗率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2001", "1001"],
+      "paramRefs": [],
+      "formulaText": "base_1001 == 0 ? 0 : base_2001 / base_1001 / 10",
+      "unit": "千克/度",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1001 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "发电量缺失或为 0 时不计算汽耗率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "2703",
+      "formalName": "碳酸氢钠耗量",
+      "aliases": ["碳酸氢钠消耗量", "小苏打消耗量", "碳酸氢钠用量"],
+      "category": "环保耗材",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2703"],
+      "paramRefs": [],
+      "formulaText": "base_2703",
+      "unit": "吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "WASTE_INBOUND_RATE",
+      "formalName": "垃圾入厂率",
+      "aliases": ["生活垃圾入厂能力利用率", "处理规模利用率", "垃圾入厂率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1201"],
+      "paramRefs": ["processing_scale"],
+      "contextRefs": ["period_days"],
+      "formulaText": "(context_period_days == 0 || param_processing_scale == 0) ? 0 : base_1201 / context_period_days / param_processing_scale",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_processing_scale is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "MISSING_PARAMETER",
+          "note": "处理规模缺失时不以公司简称或其他公司参数代替。"
+        },
+        {
+          "when": "context_period_days is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "按查询期间实际天数计算，避免跨期日数误用。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "SODIUM_BICARBONATE_SPECIFIC_CONSUMPTION_FURNACE",
+      "formalName": "碳酸氢钠单耗",
+      "aliases": ["碳酸氢钠单位消耗", "小苏打单耗", "吨入炉垃圾碳酸氢钠单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2703", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2703 / base_1202 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算碳酸氢钠单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "LEACHATE_GENERATION_RATE",
+      "formalName": "渗沥液产生率",
+      "aliases": ["渗滤液产生率", "渗沥液产率", "渗沥液产生率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1214", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_1214 / base_1201",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算渗沥液产生率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "2707",
+      "formalName": "活性炭耗量",
+      "aliases": ["活性炭消耗量", "活性炭用量", "活性炭耗量"],
+      "category": "环保耗材",
+      "metricType": "ATOMIC",
+      "isNonAdditive": false,
+      "baseMetricRefs": ["2707"],
+      "paramRefs": [],
+      "formulaText": "base_2707",
+      "unit": "吨",
+      "aggregationRule": "SUM",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": []
+    },
+    {
+      "indicatorCode": "SLAG_GENERATION_RATE_FURNACE",
+      "formalName": "产渣产生率",
+      "aliases": ["炉渣产生率（入炉）", "入炉垃圾产渣率", "产渣产生率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2603", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2603 / base_1202",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算产渣产生率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "ACTIVATED_CARBON_SPECIFIC_CONSUMPTION_FURNACE",
+      "formalName": "活性炭单耗",
+      "aliases": ["活性炭单位消耗", "活性炭单耗（入炉）", "吨入炉垃圾活性炭单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2707", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2707 / base_1202 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算活性炭单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "RAW_ASH_GENERATION_RATE_FURNACE",
+      "formalName": "原灰产生率",
+      "aliases": ["飞灰原灰产生率", "入炉垃圾原灰率", "原灰产生率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2601", "1202"],
+      "paramRefs": [],
+      "formulaText": "base_1202 == 0 ? 0 : base_2601 / base_1202",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1202 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入炉量缺失或为 0 时不计算原灰产生率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "COORDINATED_KITCHEN_OIL_EXTRACTION_RATE",
+      "formalName": "协同餐厨提油率",
+      "aliases": ["餐厨提油率", "粗油脂提取率", "协同餐厨油脂率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1504", "1501"],
+      "paramRefs": [],
+      "formulaText": "base_1501 == 0 ? 0 : base_1504 / base_1501",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1501 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "餐厨垃圾入厂量缺失或为 0 时不计算协同餐厨提油率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "STEAM_EQUIVALENT_PLANT_USE_RATE",
+      "formalName": "折汽综合厂用电率",
+      "aliases": ["折标汽综合厂用电率", "折汽厂用电率", "含供汽供热折标厂用电率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1001", "1002", "1003", "1101", "1103"],
+      "paramRefs": ["standard_coeff"],
+      "formulaText": "(base_1001 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000) == 0 ? 0 : (base_1001 - base_1002 + base_1003 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000) / (base_1001 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000)",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_standard_coeff is null, blank, or zero",
+          "action": "use param_standard_coeff = 0",
+          "qualityFlag": "STANDARD_COEFF_ZERO_FALLBACK",
+          "note": "供汽和供热折算项归零，按纯发电量口径计算；对账时 standard_coeff 有 32 个零值，零值不是空值。"
+        },
+        {
+          "when": "equivalent electric denominator is null or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "折算后总产出为 0 时不计算折汽综合厂用电率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "STEAM_EQUIVALENT_TON_ELEC_GEN",
+      "formalName": "折汽吨入厂发电量",
+      "aliases": ["折标汽吨入厂发电量", "折汽吨垃圾发电量", "折算吨入厂发电量"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1001", "1101", "1103", "1201"],
+      "paramRefs": ["standard_coeff"],
+      "formulaText": "base_1201 == 0 ? 0 : (base_1001 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000) / base_1201 * 10000",
+      "unit": "度/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_standard_coeff is null, blank, or zero",
+          "action": "use param_standard_coeff = 0",
+          "qualityFlag": "STANDARD_COEFF_ZERO_FALLBACK",
+          "note": "折汽贡献归零，退化为纯发电量除以生活垃圾入厂量。"
+        },
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算折汽吨入厂发电量。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "CALCIUM_HYDROXIDE_SPECIFIC_CONSUMPTION_INBOUND",
+      "formalName": "氢氧化钙单耗（入厂）",
+      "aliases": ["氢氧化钙入厂单耗", "消石灰单耗（入厂）", "吨入厂垃圾氢氧化钙单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2701", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2701 / base_1201 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算氢氧化钙入厂单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "STEAM_EQUIVALENT_TON_GRID_ELEC",
+      "formalName": "折汽吨入厂上网电量",
+      "aliases": ["折标汽吨入厂上网电量", "折汽吨垃圾上网电量", "折算吨入厂上网电量"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["1002", "1101", "1103", "1201"],
+      "paramRefs": ["standard_coeff"],
+      "formulaText": "base_1201 == 0 ? 0 : (base_1002 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000) / base_1201 * 10000",
+      "unit": "度/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_standard_coeff is null, blank, or zero",
+          "action": "use param_standard_coeff = 0",
+          "qualityFlag": "STANDARD_COEFF_ZERO_FALLBACK",
+          "note": "折汽贡献归零，退化为纯上网电量除以生活垃圾入厂量。"
+        },
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算折汽吨入厂上网电量。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "UREA_SPECIFIC_CONSUMPTION_INBOUND",
+      "formalName": "尿素单耗（入厂）",
+      "aliases": ["尿素入厂单耗", "吨入厂垃圾尿素单耗", "尿素单耗（入厂）"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2704", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2704 / base_1201 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算尿素入厂单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "STEAM_EQUIVALENT_CONSUMPTION_RATE",
+      "formalName": "折汽汽耗率",
+      "aliases": ["折标汽汽耗率", "折汽发电汽耗率", "折算汽耗率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2001", "1001", "1101", "1103"],
+      "paramRefs": ["standard_coeff"],
+      "formulaText": "(base_1001 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000) == 0 ? 0 : base_2001 / (base_1001 + base_1101 * param_standard_coeff / 10000 + base_1103 * param_standard_coeff / 10000) / 10",
+      "unit": "千克/度",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "param_standard_coeff is null, blank, or zero",
+          "action": "use param_standard_coeff = 0",
+          "qualityFlag": "STANDARD_COEFF_ZERO_FALLBACK",
+          "note": "折汽贡献归零，退化为总进汽量除以纯发电量再除以 10。"
+        },
+        {
+          "when": "equivalent electric denominator is null or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "折算后电量为 0 时不计算折汽汽耗率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "ACTIVATED_CARBON_SPECIFIC_CONSUMPTION_INBOUND",
+      "formalName": "活性炭单耗（入厂）",
+      "aliases": ["活性炭入厂单耗", "吨入厂垃圾活性炭单耗", "活性炭单耗（入厂）"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2707", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2707 / base_1201 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算活性炭入厂单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "FLY_ASH_OUTBOUND_GENERATION_RATE_INBOUND",
+      "formalName": "外运飞灰产生率（入厂）",
+      "aliases": ["飞灰外运率（入厂）", "外运飞灰产生率", "吨入厂垃圾飞灰外运率"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2602", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2602 / base_1201",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算外运飞灰产生率。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "AMMONIA_SPECIFIC_CONSUMPTION_INBOUND",
+      "formalName": "氨水单耗（入厂）",
+      "aliases": ["氨水入厂单耗", "吨入厂垃圾氨水单耗", "氨水单耗（入厂）"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2705", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2705 / base_1201 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算氨水入厂单耗。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "SLAG_GENERATION_RATE_INBOUND",
+      "formalName": "炉渣产生率（入厂）",
+      "aliases": ["炉渣入厂产生率", "吨入厂垃圾炉渣率", "炉渣产生率（入厂）"],
+      "category": "效率",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2603", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2603 / base_1201",
+      "unit": "%",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "PRESENT_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算炉渣产生率（入厂）。"
+        }
+      ]
+    },
+    {
+      "indicatorCode": "SODIUM_BICARBONATE_SPECIFIC_CONSUMPTION_INBOUND",
+      "formalName": "碳酸氢钠单耗（入厂）",
+      "aliases": ["碳酸氢钠入厂单耗", "小苏打单耗（入厂）", "吨入厂垃圾碳酸氢钠单耗"],
+      "category": "环保耗材",
+      "metricType": "DERIVED",
+      "isNonAdditive": true,
+      "baseMetricRefs": ["2703", "1201"],
+      "paramRefs": [],
+      "formulaText": "base_1201 == 0 ? 0 : base_2703 / base_1201 * 1000",
+      "unit": "千克/吨",
+      "aggregationRule": "WEIGHTED_RECALCULATE",
+      "applicableBusinessTypes": ["垃圾焚烧发电项目"],
+      "supportedOrgLevels": ["GROUP", "REGION", "PROJECT_COMPANY"],
+      "formulaStatus": "MISSING_IN_DB_FORMULA",
+      "fallbackRules": [
+        {
+          "when": "base_1201 is null, blank, or zero",
+          "action": "return 0",
+          "qualityFlag": "ZERO_DENOMINATOR",
+          "note": "生活垃圾入厂量缺失或为 0 时不计算碳酸氢钠入厂单耗。"
+        }
+      ]
+    }
+  ]
+}

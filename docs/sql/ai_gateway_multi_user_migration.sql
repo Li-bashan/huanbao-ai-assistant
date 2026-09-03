@@ -1,6 +1,7 @@
 -- 环宝 AI 多用户隔离增量迁移
 -- 适用于已经执行过旧版 ai_data_query_user / ai_data_query_audit 的环境。
 -- 旧名单只补结构并标记 UNRESOLVED，不根据姓名猜测 userId。
+-- 2026-09-02 只读复核：本文件是迁移脚本，本次未执行。
 
 ALTER TABLE ai_data_query_user ADD COLUMN IF NOT EXISTS user_id VARCHAR(120);
 ALTER TABLE ai_data_query_user ADD COLUMN IF NOT EXISTS user_code VARCHAR(120);

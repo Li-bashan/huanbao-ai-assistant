@@ -29,26 +29,30 @@ const capabilities = computed(() => {
 
   const modeKey = props.process.modeKey
   if (modeKey === 'data-query') return ['智能问数']
-  if (['office', 'office-ai', 'general'].includes(modeKey)) return ['办公智能']
+  if (['office', 'office-ai', 'general'].includes(modeKey)) return ['智能办公']
   if (modeKey === 'policy') return ['制度问答']
   return []
 })
+
+const isSuccess = computed(() => props.process.status === 'success')
+const completionLabel = computed(() => `已调用：${capabilities.value.join(' · ')}`)
 
 const stageLabel = computed(() => {
   if (props.process.status === 'failed') return '这次处理未完成'
   if (props.process.status === 'stopped') return '本次处理已停止'
   if (props.process.status === 'paused') return '等待继续处理'
-  if (props.process.status === 'success') return '处理完成'
+  if (props.process.status === 'success') return completionLabel.value
   if (isActive.value) {
+    if (props.process.stage) return props.process.stage
     if (capabilities.value.includes('制度问答')) return '正在检索制度依据'
     if (capabilities.value.includes('智能问数')) return '正在查询生产数据'
-    if (capabilities.value.includes('办公智能')) return '正在整理办公材料'
+    if (capabilities.value.includes('智能办公') || capabilities.value.includes('办公智能')) return '正在整理办公材料'
     return '正在处理您的需求'
   }
   if (props.process.stage) return props.process.stage
   if (capabilities.value.includes('制度问答')) return '正在检索制度依据...'
   if (capabilities.value.includes('智能问数')) return '正在分析生产指标...'
-  if (capabilities.value.includes('办公智能')) return '正在拟制办公材料...'
+  if (capabilities.value.includes('智能办公') || capabilities.value.includes('办公智能')) return '正在拟制办公材料...'
   return '正在处理您的需求...'
 })
 
@@ -71,7 +75,7 @@ const statusIcon = computed(() => {
       type="button"
       class="status-capsule-header"
       :aria-expanded="isActive ? undefined : process.expanded"
-      :aria-label="isActive ? `${stageLabel}，请稍候` : `${stageLabel}，${processStatusLabel}`"
+      :aria-label="isActive ? `${stageLabel}，请稍候` : isSuccess ? stageLabel : `${stageLabel}，${processStatusLabel}`"
       :disabled="isActive"
       @click="emit('toggle')"
     >
@@ -89,7 +93,7 @@ const statusIcon = computed(() => {
         aria-hidden="true"
       />
       <span class="status-capsule-title">{{ stageLabel }}</span>
-      <span class="status-capsule-status">{{ isActive ? '请稍候' : processStatusLabel }}</span>
+      <span v-if="!isSuccess" class="status-capsule-status">{{ isActive ? '请稍候' : processStatusLabel }}</span>
       <ChevronRight
         v-if="!isActive"
         class="status-capsule-chevron"

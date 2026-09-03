@@ -8,14 +8,16 @@ import {
   DATA_QUERY_INDICATOR_GROUPS,
   DATA_QUERY_INDICATORS,
   DATA_QUERY_REGIONS,
-  DATA_QUERY_SUGGESTION_POOLS,
   DATA_QUERY_WELCOME_POOL,
   findDataQueryIndicators,
 } from '../config/dataQueryCatalog'
+import PromptStarters from './PromptStarters.vue'
 
 const props = defineProps({
   inputValue: { type: String, default: '' },
   sessionKey: { type: String, default: '' },
+  orgName: { type: String, default: '' },
+  disabled: { type: Boolean, default: false },
   showHome: { type: Boolean, default: true },
 })
 
@@ -25,7 +27,6 @@ const activeExplorer = ref(null)
 const indicatorSearchKeyword = ref('')
 const companySearchKeyword = ref('')
 const homeWelcome = ref('')
-const homeSuggestions = ref([])
 const previewQuery = ref('')
 const queryComposer = reactive({
   timeRange: DATA_QUERY_DEFAULT_PERIOD,
@@ -87,16 +88,8 @@ const hasComposerSelection = computed(() =>
   Boolean(queryComposer.indicator || queryComposer.region || queryComposer.company),
 )
 
-const shuffle = (items) => [...items].sort(() => Math.random() - 0.5)
-
-const pickHomeState = () => {
+const pickHomeWelcome = () => {
   homeWelcome.value = DATA_QUERY_WELCOME_POOL[Math.floor(Math.random() * DATA_QUERY_WELCOME_POOL.length)]
-  const selected = [
-    shuffle(DATA_QUERY_SUGGESTION_POOLS.overview)[0],
-    shuffle(DATA_QUERY_SUGGESTION_POOLS.comparison)[0],
-    shuffle([...DATA_QUERY_SUGGESTION_POOLS.company, ...DATA_QUERY_SUGGESTION_POOLS.monthly])[0],
-  ]
-  homeSuggestions.value = shuffle(selected)
 }
 
 const buildQuery = () => {
@@ -174,6 +167,10 @@ const syncPreview = (value) => {
   emit('update:inputValue', value)
 }
 
+const submitStarter = (question, starter) => {
+  emit('submit-query', question, starter)
+}
+
 watch(
   () => props.sessionKey,
   () => {
@@ -181,7 +178,7 @@ watch(
     indicatorSearchKeyword.value = ''
     companySearchKeyword.value = ''
     clearComposer()
-    pickHomeState()
+    pickHomeWelcome()
   },
   { immediate: true },
 )
@@ -227,14 +224,13 @@ watch(
       </div>
     </section>
 
-    <section class="data-query-recommend-section" aria-label="推荐问题">
-      <div class="data-query-section-head"><span>推荐问题</span><span class="data-query-section-note">自然语言直接查询</span></div>
-      <div class="data-query-recommend-list">
-        <button v-for="question in homeSuggestions" :key="question" type="button" class="data-query-recommend" @click="emit('submit-query', question)">
-          <span>{{ question }}</span><ChevronRight :size="16" aria-hidden="true" />
-        </button>
-      </div>
-    </section>
+    <PromptStarters
+      mode="data-query"
+      :org-name="orgName"
+      :session-key="sessionKey"
+      :disabled="disabled"
+      @select="submitStarter"
+    />
   </section>
 
   <div v-else class="data-query-mini-quick-list" aria-label="智能问数快捷入口">
