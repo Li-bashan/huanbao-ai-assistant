@@ -92,6 +92,25 @@ class DataQueryIdentityServiceTest {
     }
 
     @Test
+    void permissiveModeCanonicalizesPortalNameAndIgnoresUntrustedTenant() {
+        DataQueryChatRequest request = new DataQueryChatRequest(
+            "查询发电量", "", "request-1",
+            new DataQueryUserContext(
+                "portal-internal-id", "portal-code", "刘昊澎",
+                "portal-org", "门户组织", "企业信息系统"
+            ),
+            java.util.Map.of(), null
+        );
+
+        DataQueryIdentity identity = service("PERMISSIVE", false)
+            .resolve(request, "", "", "");
+
+        assertEquals("liu_haopeng", identity.userId());
+        assertEquals("刘昊澎", identity.userName());
+        assertEquals("default", identity.tenantId());
+    }
+
+    @Test
     void permissiveModeDoesNotDowngradePartiallyProvidedSignedIdentity() {
         DataQueryChatRequest request = new DataQueryChatRequest(
             "查询发电量", "", "request-1", null, java.util.Map.of(), null

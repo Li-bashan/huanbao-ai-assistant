@@ -228,6 +228,9 @@ public class DataQueryIdentityService {
         }
 
         DataQueryUserContext context = knownTestUser(requestedUser);
+        if (context == null && bodyContext != null) {
+            context = knownTestUser(bodyContext.userName());
+        }
         if (context == null && bodyContext != null
             && StringUtils.hasText(bodyContext.userId())
             && StringUtils.hasText(bodyContext.userName())) {
@@ -242,6 +245,13 @@ public class DataQueryIdentityService {
         if (context == null) {
             context = new DataQueryUserContext(
                 DEFAULT_USER_ID, DEFAULT_USER_CODE, DEFAULT_USER_NAME, "", "", "default"
+            );
+        }
+
+        if (context.tenantId() == null || !"default".equalsIgnoreCase(context.tenantId().trim())) {
+            context = new DataQueryUserContext(
+                context.userId(), context.userCode(), context.userName(),
+                context.orgCode(), context.orgName(), "default"
             );
         }
 
