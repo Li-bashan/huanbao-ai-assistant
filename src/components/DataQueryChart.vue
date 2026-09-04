@@ -56,6 +56,8 @@ use([
 
 const props = defineProps({
   option: { type: Object, required: true },
+  title: { type: String, default: '' },
+  unit: { type: String, default: '' },
   windowView: { type: String, default: 'compact' },
 })
 
@@ -77,6 +79,7 @@ let resizeAfterExpandTimer = null
 const getChartOption = () => adaptDataQueryChartOption(props.option) || props.option
 
 const getChartTitle = (option) => {
+  if (props.title) return props.title
   if (typeof option?.title === 'string') return option.title
   return option?.title?.text || ''
 }
@@ -213,7 +216,9 @@ const renderChart = async () => {
   if (!chartRef.value) return
 
   if (!chartInstance) chartInstance = init(chartRef.value)
-  chartInstance.setOption(adaptDataQueryChartOption(props.option), { notMerge: true, lazyUpdate: true })
+  const option = adaptDataQueryChartOption(props.option) || props.option
+  if (props.title && option?.title) option.title.show = false
+  chartInstance.setOption(option, { notMerge: true, lazyUpdate: true })
   chartInstance.resize()
 }
 
@@ -275,7 +280,10 @@ onBeforeUnmount(() => {
     aria-label="智能问数图表"
   >
     <div class="data-query-chart-header">
-      <div class="data-query-chart-label">ECHARTS</div>
+      <div class="data-query-chart-label">
+        <span class="data-query-chart-title">{{ title || 'ECHARTS' }}</span>
+        <span v-if="unit" class="data-query-chart-unit">单位：{{ unit }}</span>
+      </div>
       <div class="data-query-chart-toolbar" aria-label="图表操作">
         <button
           v-if="isCompactWindow && !isMaximized"
@@ -311,3 +319,30 @@ onBeforeUnmount(() => {
     <div ref="chartRef" class="data-query-chart" role="img" aria-label="智能问数结果图表"></div>
   </section>
 </template>
+
+<style scoped>
+.data-query-chart-label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.data-query-chart-title {
+  overflow: hidden;
+  color: #294b6d;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-query-chart-unit {
+  color: #6d8195;
+  font-size: 10px;
+}
+
+.data-query-chart {
+  min-height: 260px;
+}
+</style>

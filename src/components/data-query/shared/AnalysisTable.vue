@@ -1,5 +1,5 @@
 <script setup>
-import { Check, ChevronDown, Copy, Download, Maximize2, Minimize2 } from '@lucide/vue'
+import { Check, ChevronDown, ChevronRight, Copy, Download, Maximize2, Minimize2 } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getDataQueryCompanyShortName } from '../../../config/dataQueryCatalog.js'
 import { copyText } from '../../../utils/messageExport.js'
@@ -170,47 +170,20 @@ onBeforeUnmount(() => {
     :data-collapsed="String(!tableExpanded)"
     aria-label="分析明细"
   >
-    <div class="data-query-table-controls">
-      <button
-        type="button"
-        class="data-query-table-toggle"
-        data-testid="analysis-table-toggle"
-        :aria-expanded="String(tableExpanded)"
-        aria-controls="analysis-table-panel"
-        @click="tableExpanded = !tableExpanded"
-      >
-        <span>{{ tableExpanded ? '收起明细数据' : '查看明细数据' }}</span>
-        <ChevronDown :size="15" :class="{ 'is-expanded': tableExpanded }" aria-hidden="true" />
-      </button>
-      <div class="data-query-ranking-toolbar" aria-label="分析明细操作">
-        <button type="button" title="复制数据明细" aria-label="复制数据明细" @click="copyTable">
-          <Check v-if="actionMessage.includes('已复制')" :size="15" />
-          <Copy v-else :size="15" />
-        </button>
-        <button
-          type="button"
-          title="导出数据明细 CSV（Ctrl+Shift+E）"
-          aria-label="导出数据明细 CSV（Ctrl+Shift+E）"
-          aria-keyshortcuts="Control+Shift+E"
-          @click="exportTableCsv"
-        >
-          <Download :size="15" />
-        </button>
-        <button
-          type="button"
-          :title="isMaximized ? '退出最大化' : '最大化查看数据明细'"
-          :aria-label="isMaximized ? '退出最大化' : '最大化查看数据明细'"
-          @click="toggleMaximize"
-        >
-          <Minimize2 v-if="isMaximized" :size="15" />
-          <Maximize2 v-else :size="15" />
-        </button>
-      </div>
-    </div>
-    <div class="data-query-ranking-header">
-      <span>分析明细（{{ normalizedTable.total }} 条）</span>
-    </div>
-    <div v-if="actionMessage" class="data-query-ranking-feedback" aria-live="polite">{{ actionMessage }}</div>
+    <button
+      type="button"
+      class="data-query-table-toggle"
+      data-testid="analysis-table-toggle"
+      :aria-expanded="String(tableExpanded)"
+      aria-controls="analysis-table-panel"
+      @click="tableExpanded = !tableExpanded"
+    >
+      <span class="data-query-table-toggle-copy">
+        <ChevronRight :size="14" :class="{ 'is-expanded': tableExpanded }" aria-hidden="true" />
+        <span>{{ tableExpanded ? '收起月度明细数据' : '查看月度明细数据（折叠抽屉）' }}</span>
+      </span>
+      <ChevronDown :size="14" :class="{ 'is-expanded': tableExpanded }" aria-hidden="true" />
+    </button>
     <Transition name="data-query-table-panel">
       <div
         v-show="tableExpanded"
@@ -218,6 +191,36 @@ onBeforeUnmount(() => {
         class="data-query-table-panel"
         data-testid="analysis-table-panel"
       >
+        <div class="data-query-table-panel-header">
+          <div class="data-query-ranking-header">
+            <span>月度明细数据（{{ normalizedTable.total }} 条）</span>
+          </div>
+          <div class="data-query-ranking-toolbar" aria-label="分析明细操作">
+            <button type="button" title="复制数据明细" aria-label="复制数据明细" @click="copyTable">
+              <Check v-if="actionMessage.includes('已复制')" :size="15" />
+              <Copy v-else :size="15" />
+            </button>
+            <button
+              type="button"
+              title="导出数据明细 CSV（Ctrl+Shift+E）"
+              aria-label="导出数据明细 CSV（Ctrl+Shift+E）"
+              aria-keyshortcuts="Control+Shift+E"
+              @click="exportTableCsv"
+            >
+              <Download :size="15" />
+            </button>
+            <button
+              type="button"
+              :title="isMaximized ? '退出最大化' : '最大化查看数据明细'"
+              :aria-label="isMaximized ? '退出最大化' : '最大化查看数据明细'"
+              @click="toggleMaximize"
+            >
+              <Minimize2 v-if="isMaximized" :size="15" />
+              <Maximize2 v-else :size="15" />
+            </button>
+          </div>
+        </div>
+        <div v-if="actionMessage" class="data-query-ranking-feedback" aria-live="polite">{{ actionMessage }}</div>
         <div class="data-query-ranking-scroll">
           <table>
             <thead>
@@ -253,40 +256,57 @@ onBeforeUnmount(() => {
 <style scoped>
 .data-query-table-toggle {
   display: flex;
-  flex: 1;
+  width: 100%;
   min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid #cfe2f7;
-  border-radius: 9px;
-  color: #176dcc;
-  background: #f5faff;
+  padding: 8px 12px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 6px;
+  color: #294b6d;
+  background: #ffffff;
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.data-query-table-controls {
+.data-query-table-toggle-copy {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
 
 .data-query-table-toggle:hover,
 .data-query-table-toggle:focus-visible {
-  border-color: #9fc8ef;
-  background: #eaf4ff;
+  border-color: #94b8dc;
+  background: #f8fafc;
   outline: none;
 }
 
-.data-query-table-toggle svg {
+.data-query-table-toggle-copy svg {
   transition: transform 0.24s ease;
 }
 
-.data-query-table-toggle svg.is-expanded {
+.data-query-table-toggle-copy svg.is-expanded {
+  transform: rotate(90deg);
+}
+
+.data-query-table-toggle > svg {
+  transition: transform 0.24s ease;
+}
+
+.data-query-table-toggle > svg.is-expanded {
   transform: rotate(180deg);
+}
+
+.data-query-table-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
 }
 
 .data-query-table-panel {

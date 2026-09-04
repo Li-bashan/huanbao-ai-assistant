@@ -4,18 +4,21 @@ import { computed } from 'vue'
 const props = defineProps({
   insights: { type: Array, default: () => [] },
   dataInfo: { type: Object, default: () => ({}) },
+  title: { type: String, default: '' },
 })
 
 const dataInfo = computed(() => (props.dataInfo && typeof props.dataInfo === 'object' ? props.dataInfo : {}))
 
-const insightSubtitle = computed(() => {
+const resolvedTitle = computed(() => {
+  if (props.title) return props.title
+
   const range = dataInfo.value.timeRange
-  const timeRange = range && typeof range === 'object'
+  const periodLabel = range && typeof range === 'object'
     ? String(range.expression || range.label || '').trim()
     : String(range || '').trim()
   const indicatorName = String(dataInfo.value.indicatorName || '').trim()
-  const context = [timeRange, indicatorName].filter(Boolean).join(' · ')
-  return context ? `${context}数据要点` : '本次结果数据要点'
+  if (indicatorName) return `${periodLabel || '近半年'}${indicatorName}数据要点`
+  return periodLabel ? `${periodLabel}数据要点` : '本次结果数据要点'
 })
 
 const normalizedInsights = computed(() => (Array.isArray(props.insights) ? props.insights : []).slice(0, 8).map((insight) => {
@@ -31,12 +34,11 @@ const normalizedInsights = computed(() => (Array.isArray(props.insights) ? props
 <template>
   <section v-if="normalizedInsights.length" class="data-query-insight-section" aria-label="数据要点">
     <div class="data-query-insight-heading">
-      <strong>数据要点</strong>
-      <span class="data-query-insight-subtitle">{{ insightSubtitle }}</span>
+      <strong>{{ resolvedTitle }}</strong>
     </div>
     <ul class="data-query-insight-list" aria-label="关键发现">
       <li v-for="(insight, index) in normalizedInsights" :key="`${insight.type}-${insight.text}-${index}`">
-        <span class="data-query-insight-mark">{{ insight.type === 'attention' ? '!' : '·' }}</span>
+        <span class="data-query-insight-mark">{{ insight.type === 'attention' ? '!' : '•' }}</span>
         <span>{{ insight.text }}</span>
       </li>
     </ul>
@@ -57,11 +59,13 @@ const normalizedInsights = computed(() => (Array.isArray(props.insights) ? props
 }
 
 .data-query-insight-heading strong {
+  color: #183b60;
   font-size: 12px;
+  font-weight: 800;
 }
 
-.data-query-insight-subtitle {
-  color: #6d8195;
-  font-size: 10px;
+.data-query-insight-list {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
 }
 </style>

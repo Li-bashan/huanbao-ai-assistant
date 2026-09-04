@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { ChevronDown, Download, FileText, Maximize2, Minimize2 } from '@lucide/vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AccessBlockedView from './data-query/views/AccessBlockedView.vue'
 import LoadingSkeleton from './data-query/views/LoadingSkeleton.vue'
 import ProtocolFallbackView from './data-query/views/ProtocolFallbackView.vue'
@@ -11,7 +12,6 @@ import ComparisonView from './data-query/views/ComparisonView.vue'
 import AnomalyView from './data-query/views/AnomalyView.vue'
 import DrilldownView from './data-query/views/DrilldownView.vue'
 import OverviewView from './data-query/views/OverviewView.vue'
-import { copyText } from '../utils/messageExport.js'
 
 const EMPTY_STATE_TEXT = '当前统计期间暂无可用数据。'
 const FRIENDLY_FALLBACK_TEXT = '暂未获取到该维度的结构化分析数据，建议尝试按时间趋势或组织排名提问。'
@@ -93,9 +93,13 @@ const normalizedPayload = computed(() => {
 
 const resultActionMessage = ref('')
 let resultActionTimer = null
+const resultShellRef = ref(null)
+const isLocallyMaximized = ref(false)
+const isNativeFullscreen = ref(false)
 
 const resultContent = computed(() => normalizedPayload.value.content)
 const resultMeta = computed(() => normalizedPayload.value.meta)
+const isResultMaximized = computed(() => isLocallyMaximized.value || isNativeFullscreen.value)
 const resultSource = computed(() => readText(
   resultMeta.value.sourceLabel,
   resultMeta.value.sourceName,
@@ -136,15 +140,6 @@ const showResultActionMessage = (message) => {
   }, 1800)
 }
 
-const copyResultReport = async () => {
-  try {
-    await copyText(resultReportText.value)
-    showResultActionMessage('已复制')
-  } catch {
-    showResultActionMessage('复制失败')
-  }
-}
-
 const exportResultReport = () => {
   const title = readText(resultContent.value.title) || '智能问数报告'
   const blob = new Blob([`# ${title}\n\n${resultReportText.value}\n`], { type: 'text/markdown;charset=utf-8' })
@@ -158,6 +153,92 @@ const exportResultReport = () => {
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
   showResultActionMessage('报告已导出')
 }
+
+const escapeCsvCell = (value) => {
+  const text = String(value ?? '')
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+const buildResultCsv = () => {
+  const content = resultContent.value
+  const table = content.table
+  if (table?.columns?.length && Array.isArray(table.rows)) {
+    const headers = table.columns.map((column) => column.label)
+    const rows = table.rows.map((row) => table.columns.map((column) => row[column.key] ?? ''))
+    return [headers, ...rows]
+  }
+
+  const chart = content.chart
+  if (chart?.series?.length) {
+    const categories = Array.isArray(chart.categories) ? chart.categories : []
+    const headers = ['类别', ...chart.series.map((item, index) => item.name || `数值${index + 1}`)]
+    const rows = Array.from({ length: categories.length }, (_, index) => [
+      categories[index] ?? index + 1,
+      ...chart.series.map((item) => item.data?.[index] ?? ''),
+    ])
+    return [headers, ...rows]
+  }
+
+  return []
+}
+
+const exportResultCsv = () => {
+  const rows = buildResultCsv()
+  if (!rows.length) {
+    showResultActionMessage('暂无可导出的结构化数据')
+    return
+  }
+
+  const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\r\n')
+  const title = readText(resultContent.value.title) || '智能问数结果'
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || '智能问数结果'}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  showResultActionMessage('CSV 已导出')
+}
+
+const syncResultFullscreenState = () => {
+  isNativeFullscreen.value = document.fullscreenElement === resultShellRef.value
+}
+
+const toggleResultFullscreen = async () => {
+  if (isNativeFullscreen.value) {
+    await document.exitFullscreen()
+    return
+  }
+
+  if (isLocallyMaximized.value) {
+    isLocallyMaximized.value = false
+    return
+  }
+
+  try {
+    if (resultShellRef.value?.requestFullscreen) {
+      await resultShellRef.value.requestFullscreen()
+      return
+    }
+  } catch {
+    // Cross-origin portal frames can reject native fullscreen; use the in-panel fallback below.
+  }
+
+  isLocallyMaximized.value = true
+  showResultActionMessage('已切换为面板最大化')
+}
+
+onMounted(() => {
+  document.addEventListener('fullscreenchange', syncResultFullscreenState)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', syncResultFullscreenState)
+  window.clearTimeout(resultActionTimer)
+})
 
 const status = computed(() => normalizedPayload.value.status)
 const isNoData = computed(() => NO_DATA_STATUSES.has(status.value))
@@ -222,7 +303,12 @@ const fallbackText = computed(() => {
     <LoadingSkeleton v-else-if="loading" />
 
     <!-- 3. 结构化协议分发：精细视图优先，未知类型安全回退到通用分析视图。 -->
-    <section v-else-if="isValidProtocol" class="data-query-result-card-shell">
+    <section
+      v-else-if="isValidProtocol"
+      ref="resultShellRef"
+      class="data-query-result-card-shell"
+      :class="{ 'data-query-result-card-shell-local-maximized': isLocallyMaximized }"
+    >
       <div class="data-query-result-meta-bar" aria-label="智能问数结果操作">
         <div class="data-query-result-meta-copy">
           <strong>⚡ 智能问数</strong>
@@ -231,8 +317,25 @@ const fallbackText = computed(() => {
         </div>
         <div class="data-query-result-meta-actions">
           <span v-if="resultActionMessage" class="data-query-result-action-feedback" aria-live="polite">{{ resultActionMessage }}</span>
-          <button type="button" title="复制问数报告" aria-label="复制问数报告" @click="copyResultReport">复制</button>
-          <button type="button" title="导出问数报告 Markdown" aria-label="导出问数报告 Markdown" @click="exportResultReport">导出报告</button>
+          <button type="button" title="导出 CSV" aria-label="导出 CSV" @click="exportResultCsv">
+            <Download :size="13" aria-hidden="true" />
+            <span>导出 CSV</span>
+          </button>
+          <button type="button" title="导出问数简报" aria-label="导出问数简报" @click="exportResultReport">
+            <FileText :size="13" aria-hidden="true" />
+            <span>导出简报</span>
+            <ChevronDown :size="13" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            :title="isResultMaximized ? '退出全屏' : '全屏放大'"
+            :aria-label="isResultMaximized ? '退出全屏' : '全屏放大'"
+            @click="toggleResultFullscreen"
+          >
+            <Minimize2 v-if="isResultMaximized" :size="13" aria-hidden="true" />
+            <Maximize2 v-else :size="13" aria-hidden="true" />
+            <span>{{ isResultMaximized ? '退出全屏' : '全屏放大' }}</span>
+          </button>
         </div>
       </div>
       <component
@@ -265,6 +368,22 @@ const fallbackText = computed(() => {
 .data-query-result-card-shell {
   width: 100%;
   min-width: 0;
+  position: relative;
+}
+
+.data-query-result-card-shell-local-maximized {
+  position: absolute;
+  z-index: 40;
+  inset: 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(30, 64, 175, 0.2);
 }
 
 .data-query-result-meta-bar {
@@ -297,6 +416,10 @@ const fallbackText = computed(() => {
 }
 
 .data-query-result-meta-actions button {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 3px 6px;
   border: 1px solid #c9def5;
   border-radius: 6px;

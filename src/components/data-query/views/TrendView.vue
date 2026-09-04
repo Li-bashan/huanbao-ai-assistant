@@ -36,21 +36,44 @@ const evidence = computed(() => (Array.isArray(content.value.evidence) ? content
 const followUps = computed(() => (Array.isArray(content.value.followUps) ? content.value.followUps : []))
 const status = computed(() => String(props.status || '').trim().toUpperCase())
 const isNoData = computed(() => NO_DATA_STATUSES.has(status.value))
-const indicatorName = computed(() => String(dataInfo.value.indicatorName || '指标').trim() || '指标')
-const timeExpression = computed(() => {
-  const timeRange = dataInfo.value.timeRange
-  return isPlainObject(timeRange) ? String(timeRange.expression || '').trim() : ''
+const indicatorName = computed(() => String(
+  props.meta?.indicatorName ||
+  dataInfo.value.indicatorName ||
+  '全厂发电量',
+).trim() || '全厂发电量')
+const organizationName = computed(() => {
+  const metaName = String(props.meta?.organizationName || '').trim()
+  if (metaName) return metaName
+  const scope = dataInfo.value.organizationScope
+  if (Array.isArray(scope?.names)) {
+    return scope.names.filter(Boolean).slice(0, 2).join('、')
+  }
+  return String(scope || '').trim()
 })
-const subtitle = computed(() => `${timeExpression.value}${indicatorName.value}数据要点`)
+const title = computed(() => content.value.title || `${organizationName.value ? `${organizationName.value} · ` : ''}${indicatorName.value}走势`)
+const periodLabel = computed(() => {
+  const metaLabel = String(props.meta?.periodLabel || '').trim()
+  if (metaLabel) return metaLabel
+
+  const timeRange = dataInfo.value.timeRange
+  return isPlainObject(timeRange) ? String(timeRange.expression || timeRange.label || '').trim() : ''
+})
+const insightTitle = computed(() => `${periodLabel.value || '近半年'}${indicatorName.value}数据要点`)
 const summary = computed(() => {
   const value = String(content.value.summary || '').trim()
   return value || (isNoData.value ? '当前统计期间暂无可用数据。' : '查询已完成。')
+})
+const summaryText = computed(() => {
+  const cutoff = String(dataInfo.value.dataCutoffDate || '').trim()
+  return cutoff ? `${summary.value} 当前数据更新至 ${cutoff}` : summary.value
 })
 const statusLabel = computed(() => (isNoData.value ? '暂无数据' : '已校验'))
 const chart = computed(() => {
   const protocolChart = createDataQueryChartOption({ content: content.value })
   return protocolChart || (isPlainObject(props.chartOption) ? props.chartOption : null)
 })
+const chartTitle = computed(() => `${indicatorName.value}走势`)
+const chartUnit = computed(() => String(dataInfo.value.unit || '').trim())
 
 const formatListItem = (item) => {
   if (typeof item === 'string') return item
@@ -97,18 +120,22 @@ const formatDataInfoValue = (value) => {
     <header class="data-query-analysis-header">
       <div>
         <span class="data-query-analysis-kicker">趋势</span>
-        <h3>{{ content.title || `${indicatorName}趋势` }}</h3>
-        <p class="data-query-view-subtitle">{{ subtitle }}</p>
+        <h3>{{ title }}</h3>
       </div>
       <span class="data-query-analysis-status">{{ statusLabel }}</span>
     </header>
 
-    <p class="data-query-analysis-summary">{{ summary }}</p>
-    <div v-if="dataInfo.dataCutoffDate" class="data-query-view-context">数据截至：{{ dataInfo.dataCutoffDate }}</div>
+    <p class="data-query-analysis-summary">{{ summaryText }}</p>
 
     <MetricGrid :metrics="metrics" />
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
-    <InsightList :insights="standardInsights" :data-info="dataInfo" />
+    <DataQueryChart
+      v-if="chart"
+      :option="chart"
+      :title="chartTitle"
+      :unit="chartUnit"
+      :window-view="windowView"
+    />
+    <InsightList :insights="standardInsights" :data-info="dataInfo" :title="insightTitle" />
 
     <section v-if="attentionInsights.length" class="data-query-attention-card" aria-label="值得关注">
       <div class="data-query-attention-title">⚠ 值得关注</div>
@@ -120,6 +147,8 @@ const formatDataInfoValue = (value) => {
     </section>
 
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
+
+    <FollowUpActions :follow-ups="followUps" @select="emit('follow-up', $event)" />
 
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"
@@ -158,25 +187,10 @@ const formatDataInfoValue = (value) => {
         </template>
       </dl>
     </details>
-
-    <FollowUpActions :follow-ups="followUps" @select="emit('follow-up', $event)" />
   </article>
 </template>
 
 <style scoped>
-.data-query-view-subtitle {
-  margin: 3px 0 0;
-  color: #6d8195;
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.data-query-view-context {
-  margin: -3px 0 9px;
-  color: #6d8195;
-  font-size: 11px;
-}
-
 .data-query-attention-card {
   margin-top: 10px;
   padding: 9px 10px;
