@@ -72,7 +72,15 @@ const chart = computed(() => {
   const protocolChart = createDataQueryChartOption({ content: content.value })
   return protocolChart || (isPlainObject(props.chartOption) ? props.chartOption : null)
 })
-const chartTitle = computed(() => `${indicatorName.value}走势`)
+const chartTitle = computed(() => `${indicatorName.value}${periodLabel.value}走势`)
+const chartSubtitle = computed(() => {
+  const timeRange = dataInfo.value.timeRange
+  if (!isPlainObject(timeRange)) return ''
+
+  const start = String(timeRange.start || '').trim()
+  const end = String(timeRange.end || '').trim()
+  return start && end ? `(${start} 至 ${end})` : ''
+})
 const chartUnit = computed(() => String(dataInfo.value.unit || '').trim())
 
 const formatListItem = (item) => {
@@ -132,6 +140,7 @@ const formatDataInfoValue = (value) => {
       v-if="chart"
       :option="chart"
       :title="chartTitle"
+      :subtitle="chartSubtitle"
       :unit="chartUnit"
       :window-view="windowView"
     />
@@ -147,8 +156,6 @@ const formatDataInfoValue = (value) => {
     </section>
 
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-
-    <FollowUpActions :follow-ups="followUps" @select="emit('follow-up', $event)" />
 
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"
@@ -187,6 +194,8 @@ const formatDataInfoValue = (value) => {
         </template>
       </dl>
     </details>
+
+    <FollowUpActions :follow-ups="followUps" @select="emit('follow-up', $event)" />
   </article>
 </template>
 

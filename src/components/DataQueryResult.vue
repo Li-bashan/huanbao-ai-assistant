@@ -33,6 +33,145 @@ const isPlainObject = (value) =>
 
 const readText = (value) => String(value ?? '').trim()
 
+const parseNumber = (value) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  const parsed = Number(String(value ?? '').replace(/[,，%％\s]/g, ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const formatTrendNumber = (value) => Number(value.toFixed(4))
+
+const getTrendPeriodLabel = (period) => {
+  const text = readText(period)
+  const match = text.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/)
+  return match ? `${Number(match[2])}月` : text
+}
+
+const getResultSource = (meta) => readText(
+  meta.sourceLabel ||
+  meta.sourceName ||
+  meta.source,
+)
+
+const getResultDuration = (meta) => {
+  const value = meta.durationMs ?? meta.elapsedMs ?? meta.duration
+  if (value === null || value === undefined || value === '') return ''
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value >= 100 ? (value / 1000).toFixed(1) : value.toFixed(1)}s`
+  }
+  return readText(value)
+}
+
+const buildRecentTrendText = (rows) => {
+  if (rows.length < 2) return ''
+  const latestChange = rows[rows.length - 1].value - rows[rows.length - 2].value
+  if (rows.length >= 3) {
+    const previousChange = rows[rows.length - 2].value - rows[rows.length - 3].value
+    if (latestChange > 0 && previousChange > 0) return '连续回升'
+    if (latestChange < 0 && previousChange < 0) return '连续下降'
+    if (latestChange > 0 && previousChange < 0) return '先降后升'
+    if (latestChange < 0 && previousChange > 0) return '先升后降'
+  }
+  return latestChange > 0 ? '回升' : latestChange < 0 ? '下降' : '持平'
+}
+
+const buildFactTrendContent = (rawContent) => {
+  const table = isPlainObject(rawContent.table) ? rawContent.table : null
+  const columns = Array.isArray(table?.columns) ? table.columns : []
+  const rows = Array.isArray(table?.rows) ? table.rows.filter(isPlainObject) : []
+  if (rows.length < 3) return null
+
+  const columnKeys = new Set(columns.map((column) => readText(column?.key)))
+  if (!columnKeys.has('period') || !columnKeys.has('value')) return null
+
+  const organizations = new Set(rows.map((row) => readText(row.organization)).filter(Boolean))
+  const indicators = new Set(rows.map((row) => readText(row.indicator)).filter(Boolean))
+  if (organizations.size > 1 || indicators.size > 1) return null
+
+  const trendRows = rows.map((row) => {
+    const period = readText(row.period)
+    const value = parseNumber(row.value)
+    return value === null || !period
+      ? null
+      : {
+          period,
+          organization: readText(row.organization),
+          indicator: readText(row.indicator),
+          value,
+          yearOverYearPercent: parseNumber(row.yearOverYearPercent),
+          monthOverMonthPercent: parseNumber(row.monthOverMonthPercent),
+        }
+  })
+  if (trendRows.some((row) => row === null)) return null
+
+  trendRows.sort((left, right) => left.period.localeCompare(right.period))
+  const periods = new Set(trendRows.map((row) => row.period))
+  if (periods.size !== trendRows.length) return null
+
+  const dataInfo = isPlainObject(rawContent.dataInfo) ? rawContent.dataInfo : {}
+  const timeRange = isPlainObject(dataInfo.timeRange) ? dataInfo.timeRange : {}
+  const periodLabel = readText(timeRange.expression) || `近${trendRows.length}个月`
+  const organizationName = trendRows[0].organization || readText(dataInfo.organizationScope?.names?.[0])
+  const indicatorName = trendRows[0].indicator || readText(dataInfo.indicatorName) || '指标'
+  const unit = readText(dataInfo.unit)
+  const latest = trendRows[trendRows.length - 1]
+  const latestMonth = getTrendPeriodLabel(latest.period)
+  const total = trendRows.reduce((sum, row) => sum + row.value, 0)
+  const max = trendRows.reduce((left, right) => (right.value > left.value ? right : left))
+  const min = trendRows.reduce((left, right) => (right.value < left.value ? right : left))
+  const recentTrendText = buildRecentTrendText(trendRows)
+  const latestMom = latest.monthOverMonthPercent
+  const latestMomText = latestMom === null
+    ? '暂无环比数据'
+    : `${latestMom > 0 ? '+' : ''}${latestMom.toFixed(2)}%`
+  const latestMomDirection = latestMom === null
+    ? '变化'
+    : latestMom > 0 ? '增长' : latestMom < 0 ? '下降' : '持平'
+
+  return {
+    title: organizationName ? `${organizationName} · ${indicatorName}` : indicatorName,
+    summary: `${periodLabel}${organizationName || ''}${indicatorName}整体呈波动走势，${latestMonth}较上月${latestMomDirection}${latestMom === null ? '' : ` ${Math.abs(latestMom).toFixed(2)}%`}，最近两个月${recentTrendText}。`,
+    metrics: [
+      { label: `${periodLabel}累计`, value: formatTrendNumber(total), unit },
+      { label: `最新月（${latest.period}）`, value: formatTrendNumber(latest.value), unit },
+      { label: `${latestMonth}同比变动`, value: latest.yearOverYearPercent, unit: '%' },
+      { label: `${latestMonth}环比变动`, value: latestMom, unit: '%' },
+    ].filter((metric) => metric.value !== null && metric.value !== undefined),
+    table: rawContent.table,
+    chart: {
+      type: 'line',
+      title: `${indicatorName}${periodLabel}走势`,
+      xField: 'period',
+      yField: 'value',
+      categories: trendRows.map((row) => getTrendPeriodLabel(row.period)),
+      series: [{
+        name: indicatorName,
+        type: 'line',
+        data: trendRows.map((row) => formatTrendNumber(row.value)),
+      }],
+    },
+    insights: [
+      { type: 'fact', text: `最高月份：${getTrendPeriodLabel(max.period)}（${formatTrendNumber(max.value)}${unit ? ` ${unit}` : ''}）` },
+      { type: 'fact', text: `最低月份：${getTrendPeriodLabel(min.period)}（${formatTrendNumber(min.value)}${unit ? ` ${unit}` : ''}）` },
+      { type: 'fact', text: `最新月环比：${latestMomText}` },
+      { type: 'fact', text: `最近 2 个月：${recentTrendText}` },
+    ],
+    evidence: Array.isArray(rawContent.evidence) ? rawContent.evidence : [],
+    dataInfo,
+    sections: Array.isArray(rawContent.sections) ? rawContent.sections : [],
+    documentMarkdown: readText(rawContent.documentMarkdown),
+    relatedMetrics: Array.isArray(rawContent.relatedMetrics) ? rawContent.relatedMetrics : [],
+    followUps: [
+      { label: `查看项目公司${periodLabel}排名`, query: `查看项目公司${periodLabel}${indicatorName}排名` },
+      { label: '和去年同期比较', query: `${organizationName || ''}${periodLabel}${indicatorName}和去年同期比较` },
+      {
+        label: `查看${latestMonth}环比${latestMom > 0 ? '回升' : latestMom < 0 ? '下降' : '变化'}原因`,
+        query: `查看${latest.period}${organizationName || ''}${indicatorName}环比${latestMom > 0 ? '回升' : latestMom < 0 ? '下降' : '变化'}原因`,
+      },
+    ],
+  }
+}
+
 const props = defineProps({
   // `data` is the canonical v2 input. `protocol` remains for the current App.vue
   // message shape until that caller is migrated to the canonical prop name.
@@ -58,17 +197,21 @@ const sourceData = computed(() => {
 const normalizedPayload = computed(() => {
   const source = sourceData.value
   const rawContent = isPlainObject(source.content) ? source.content : {}
+  const rawAnalysisType = readText(source.analysisType || source.analysis_type).toUpperCase()
+  const trendContent = ['FACT', 'DETAIL'].includes(rawAnalysisType)
+    ? buildFactTrendContent(rawContent)
+    : null
 
   return {
     protocolVersion: readText(source.protocolVersion || source.protocol_version),
     protocolValid: source.protocolValid === true,
     status: readText(source.status).toUpperCase(),
     messageType: readText(source.messageType || source.message_type).toLowerCase(),
-    analysisType: readText(source.analysisType || source.analysis_type).toUpperCase(),
+    analysisType: trendContent ? 'TREND' : rawAnalysisType,
     clarification: isPlainObject(source.clarification) ? source.clarification : null,
     meta: isPlainObject(source.meta) ? source.meta : {},
     // Keep all business fields nested under content. No meta period label is inferred.
-    content: {
+    content: trendContent || {
       title: readText(rawContent.title || rawContent.heading),
       summary: readText(rawContent.summary || rawContent.answer || rawContent.text || rawContent.description),
       metrics: Array.isArray(rawContent.metrics) ? rawContent.metrics : [],
@@ -100,19 +243,8 @@ const isNativeFullscreen = ref(false)
 const resultContent = computed(() => normalizedPayload.value.content)
 const resultMeta = computed(() => normalizedPayload.value.meta)
 const isResultMaximized = computed(() => isLocallyMaximized.value || isNativeFullscreen.value)
-const resultSource = computed(() => readText(
-  resultMeta.value.sourceLabel,
-  resultMeta.value.sourceName,
-  resultMeta.value.source,
-))
-const resultDuration = computed(() => {
-  const value = resultMeta.value.durationMs ?? resultMeta.value.elapsedMs ?? resultMeta.value.duration
-  if (value === null || value === undefined || value === '') return ''
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return `${value >= 100 ? (value / 1000).toFixed(1) : value.toFixed(1)}s`
-  }
-  return readText(value)
-})
+const resultSource = computed(() => getResultSource(resultMeta.value))
+const resultDuration = computed(() => getResultDuration(resultMeta.value))
 const resultReportText = computed(() => {
   const content = resultContent.value
   const metricLines = content.metrics

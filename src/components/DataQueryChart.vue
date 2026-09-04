@@ -57,6 +57,7 @@ use([
 const props = defineProps({
   option: { type: Object, required: true },
   title: { type: String, default: '' },
+  subtitle: { type: String, default: '' },
   unit: { type: String, default: '' },
   windowView: { type: String, default: 'compact' },
 })
@@ -282,6 +283,7 @@ onBeforeUnmount(() => {
     <div class="data-query-chart-header">
       <div class="data-query-chart-label">
         <span class="data-query-chart-title">{{ title || 'ECHARTS' }}</span>
+        <span v-if="subtitle" class="data-query-chart-subtitle">{{ subtitle }}</span>
         <span v-if="unit" class="data-query-chart-unit">单位：{{ unit }}</span>
       </div>
       <div class="data-query-chart-toolbar" aria-label="图表操作">
@@ -324,8 +326,9 @@ onBeforeUnmount(() => {
 .data-query-chart-label {
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 6px;
 }
 
 .data-query-chart-title {
@@ -335,6 +338,11 @@ onBeforeUnmount(() => {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.data-query-chart-subtitle {
+  color: #6d8195;
+  font-size: 10px;
 }
 
 .data-query-chart-unit {
