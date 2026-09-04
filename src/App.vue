@@ -926,6 +926,7 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
     messages.value[index + 1]?.loading,
   )
   if (hasSamePendingQuestion) return
+  window.dispatchEvent(new CustomEvent('huanbao:assistant-request', { detail: { question: content } }))
   if (
     !options.bypassRecentGuard &&
     recentSubmittedQuestion.value === content &&

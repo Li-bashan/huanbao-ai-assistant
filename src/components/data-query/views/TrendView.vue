@@ -127,7 +127,6 @@ const formatDataInfoValue = (value) => {
   <article class="data-query-result data-query-analysis-card data-query-trend-view">
     <header class="data-query-analysis-header">
       <div>
-        <span class="data-query-analysis-kicker">趋势</span>
         <h3>{{ title }}</h3>
       </div>
       <span class="data-query-analysis-status">{{ statusLabel }}</span>

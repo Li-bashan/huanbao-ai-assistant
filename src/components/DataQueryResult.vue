@@ -62,6 +62,31 @@ const getResultDuration = (meta) => {
   return readText(value)
 }
 
+const getResultTokenUsage = (meta) => {
+  const usage = meta.tokenUsage || meta.usage || meta.tokenConsumption
+  if (!usage) return ''
+
+  if (typeof usage === 'number' || typeof usage === 'string') {
+    const value = parseNumber(usage)
+    return value === null ? '' : value.toLocaleString('en-US')
+  }
+
+  if (!isPlainObject(usage)) return ''
+  const totalValue = usage.totalTokens ?? usage.total_tokens ?? usage.tokens ?? usage.total
+  const promptValue = usage.promptTokens ?? usage.prompt_tokens ?? usage.inputTokens ?? usage.input_tokens
+  const completionValue = usage.completionTokens ?? usage.completion_tokens ?? usage.outputTokens ?? usage.output_tokens
+  const total = parseNumber(totalValue)
+  if (total !== null) return total.toLocaleString('en-US')
+
+  const prompt = parseNumber(promptValue)
+  const completion = parseNumber(completionValue)
+  if (prompt !== null || completion !== null) {
+    return ((prompt || 0) + (completion || 0)).toLocaleString('en-US')
+  }
+
+  return ''
+}
+
 const buildRecentTrendText = (rows) => {
   if (rows.length < 2) return ''
   const latestChange = rows[rows.length - 1].value - rows[rows.length - 2].value
@@ -245,6 +270,7 @@ const resultMeta = computed(() => normalizedPayload.value.meta)
 const isResultMaximized = computed(() => isLocallyMaximized.value || isNativeFullscreen.value)
 const resultSource = computed(() => getResultSource(resultMeta.value))
 const resultDuration = computed(() => getResultDuration(resultMeta.value))
+const resultTokenUsage = computed(() => getResultTokenUsage(resultMeta.value))
 const resultReportText = computed(() => {
   const content = resultContent.value
   const metricLines = content.metrics
@@ -363,12 +389,44 @@ const toggleResultFullscreen = async () => {
   showResultActionMessage('已切换为面板最大化')
 }
 
+const exitResultFullscreen = async () => {
+  if (isNativeFullscreen.value) {
+    await document.exitFullscreen()
+    return
+  }
+  isLocallyMaximized.value = false
+}
+
+const handleResultKeydown = (event) => {
+  if (event.key !== 'Escape' || !isResultMaximized.value) return
+  event.preventDefault()
+  exitResultFullscreen()
+}
+
+const handleNewAssistantRequest = () => {
+  if (isResultMaximized.value) exitResultFullscreen()
+}
+
+const handleFollowUp = (followUp) => {
+  exitResultFullscreen()
+  emit('follow-up', followUp)
+}
+
+const handleClarification = (candidate) => {
+  exitResultFullscreen()
+  emit('clarification', candidate)
+}
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', syncResultFullscreenState)
+  document.addEventListener('keydown', handleResultKeydown)
+  window.addEventListener('huanbao:assistant-request', handleNewAssistantRequest)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncResultFullscreenState)
+  document.removeEventListener('keydown', handleResultKeydown)
+  window.removeEventListener('huanbao:assistant-request', handleNewAssistantRequest)
   window.clearTimeout(resultActionTimer)
 })
 
@@ -446,6 +504,7 @@ const fallbackText = computed(() => {
           <strong>⚡ 智能问数</strong>
           <span v-if="resultDuration">耗时 {{ resultDuration }}</span>
           <span v-if="resultSource">· 来源：{{ resultSource }}</span>
+          <span v-if="resultTokenUsage">· Token：{{ resultTokenUsage }}</span>
         </div>
         <div class="data-query-result-meta-actions">
           <span v-if="resultActionMessage" class="data-query-result-action-feedback" aria-live="polite">{{ resultActionMessage }}</span>
@@ -481,8 +540,8 @@ const fallbackText = computed(() => {
         :clarification="normalizedPayload.clarification"
         :chart-option="chartOption"
         :window-view="windowView"
-        @follow-up="emit('follow-up', $event)"
-        @clarification="emit('clarification', $event)"
+        @follow-up="handleFollowUp"
+        @clarification="handleClarification"
       />
     </section>
 
