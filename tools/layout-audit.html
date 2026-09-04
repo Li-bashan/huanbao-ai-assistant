@@ -44,9 +44,10 @@
           title: 'TREND 可见布局审计样本',
           summary: '用于确认图表、KPI、数据要点和折叠明细表的真实页面位置。',
           metrics: [
-            { id: 'total', label: '本期总量', value: 12345, unit: '吨' },
-            { id: 'average', label: '月均值', value: 1028.75, unit: '吨' },
-            { id: 'change', label: '同比变化', value: 8.6, unit: '%' },
+            { id: 'total', label: '近半年累计', value: 8234, unit: '万度' },
+            { id: 'latest', label: '最新月（2026-08）', value: 0.1417, unit: '万度' },
+            { id: 'yoy', label: '8月同比变动', value: 0.11, unit: '%' },
+            { id: 'mom', label: '8月环比变动', value: 13.58, unit: '%' },
           ],
           chart: {
             type: 'line',
@@ -58,7 +59,7 @@
           },
           insights: [
             { type: 'fact', text: '本期指标值较上期保持稳定增长。' },
-            { type: 'attention', text: '建议结合数据截止日期核对最新业务台账。' },
+            { type: 'attention', text: '7月发电量环比下降 21.98%，同期生活垃圾入厂量下降 18.45%。' },
           ],
           table: {
             columns: [
@@ -84,7 +85,7 @@
           ],
         },
         clarification: null,
-        meta: { source: 'visible-layout-audit' },
+        meta: { source: '生产指标库', durationMs: 1200 },
         protocolValid: true,
       }
 

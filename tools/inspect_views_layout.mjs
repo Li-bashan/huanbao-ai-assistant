@@ -49,9 +49,10 @@ const makePayload = (analysisType) => ({
     title: `${analysisType} 自动化巡检样本`,
     summary: '用于核验视图层级、KPI 栅格、洞察排版和明细折叠状态的标准结构化结果。',
     metrics: [
-      { id: 'metric-total', label: '本期总量', value: 12345, unit: '吨' },
-      { id: 'metric-average', label: '月均值', value: 1028.75, unit: '吨' },
-      { id: 'metric-change', label: '同比变化', value: 8.6, unit: '%' },
+      { id: 'metric-total', label: '近半年累计', value: 8234, unit: '万度' },
+      { id: 'metric-latest', label: '最新月（2026-08）', value: 0.1417, unit: '万度' },
+      { id: 'metric-yoy', label: '8月同比变动', value: 0.11, unit: '%' },
+      { id: 'metric-mom', label: '8月环比变动', value: 13.58, unit: '%' },
     ],
     table: {
       columns: [
@@ -78,7 +79,7 @@ const makePayload = (analysisType) => ({
     },
     insights: [
       { type: 'fact', text: '本期指标值较上期保持稳定增长。' },
-      { type: 'attention', text: '建议结合数据截止日期核对最新业务台账。' },
+      { type: 'attention', text: '7月发电量环比下降 21.98%，同期生活垃圾入厂量下降 18.45%。' },
     ],
     evidence: ['数据来自已授权生产指标口径。'],
     dataInfo: {
@@ -102,7 +103,7 @@ const makePayload = (analysisType) => ({
     ],
   },
   clarification: null,
-  meta: { source: 'browser-layout-audit' },
+  meta: { source: '生产指标库', durationMs: 1200 },
   protocolValid: true,
 })
 
@@ -183,6 +184,8 @@ const inspectPage = async (page, analysisType, viewport) => page.evaluate(({ ana
   const followUps = root?.querySelector('.data-query-followups')
   const tablePanel = table?.querySelector('[data-testid="analysis-table-panel"]')
   const tableToggle = table?.querySelector('[data-testid="analysis-table-toggle"]')
+  const tableControls = table?.querySelector('.data-query-table-controls')
+  const tableToolbar = table?.querySelector('.data-query-ranking-toolbar')
   const tableElement = table?.querySelector('table')
   const metricStyle = metricGrid ? getComputedStyle(metricGrid) : null
   const tableStyle = tablePanel ? getComputedStyle(tablePanel) : null
@@ -219,6 +222,11 @@ const inspectPage = async (page, analysisType, viewport) => page.evaluate(({ ana
       panel: readBox(tablePanel),
       table: readBox(tableElement),
       bodyDisplay: tableElement ? getComputedStyle(tableElement.querySelector('tbody'))?.display : null,
+      controlsSameRow: Boolean(tableControls && tableToggle && tableToolbar && tableControls.contains(tableToggle) && tableControls.contains(tableToolbar)),
+    },
+    resultMeta: {
+      exists: Boolean(root?.parentElement?.querySelector('.data-query-result-meta-bar')),
+      text: root?.parentElement?.querySelector('.data-query-result-meta-bar')?.textContent.trim() || null,
     },
     metrics: {
       expected: Number(document.querySelector('[data-audit-expected-metrics]')?.dataset.auditExpectedMetrics || 0),
@@ -257,8 +265,10 @@ const toResult = (probe) => {
   const checks = {
     chartBeforeTable: probe.order.chartBeforeTable,
     tableCollapsed: probe.tableState.exists ? probe.tableState.collapsed : true,
+    tableControls: probe.tableState.exists ? probe.tableState.controlsSameRow : true,
     metricCount: probe.metrics.actual === probe.metrics.expected,
     metricLayout: probe.metrics.isGridOrFlex && probe.metrics.isParallel,
+    resultMeta: probe.resultMeta.exists,
     insightSubtitle: probe.insights.hasSubtitle,
     insightBullets: probe.insights.hasBulletList,
     followUpFilter: !probe.followUps.hasUnsupportedIntent,
@@ -268,7 +278,7 @@ const toResult = (probe) => {
 }
 
 const printMatrix = (results) => {
-  const columns = ['analysisType', 'viewport', 'chartBeforeTable', 'tableCollapsed', 'metricCount', 'metricLayout', 'insightSubtitle', 'insightBullets', 'followUpFilter', 'fallbackLanguage', 'passed']
+  const columns = ['analysisType', 'viewport', 'chartBeforeTable', 'tableCollapsed', 'tableControls', 'metricCount', 'metricLayout', 'resultMeta', 'insightSubtitle', 'insightBullets', 'followUpFilter', 'fallbackLanguage', 'passed']
   console.table(results.map((result) => columns.reduce((row, column) => {
     row[column] = column in result ? result[column] : result.checks[column]
     return row

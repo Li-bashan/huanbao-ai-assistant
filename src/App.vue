@@ -1874,7 +1874,7 @@ watch(
           :class="`data-query-access-state-${dataQueryAccessStatus}`"
           aria-live="polite"
         >
-          <div class="data-query-access-state-icon" aria-hidden="true">{{ dataQueryAccessStatus === 'not-covered' ? '·' : '○' }}</div>
+          <div class="data-query-access-state-icon" aria-hidden="true">{{ dataQueryAccessStatus === 'not-covered' ? '🔒' : '○' }}</div>
           <h2>{{ dataQueryAccessStatus === 'not-covered' ? '当前暂未开放' : '正在确认开放范围' }}</h2>
           <p>{{ dataQueryAccessMessage }}</p>
           <button

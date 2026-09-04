@@ -170,19 +170,18 @@ onBeforeUnmount(() => {
     :data-collapsed="String(!tableExpanded)"
     aria-label="分析明细"
   >
-    <button
-      type="button"
-      class="data-query-table-toggle"
-      data-testid="analysis-table-toggle"
-      :aria-expanded="String(tableExpanded)"
-      aria-controls="analysis-table-panel"
-      @click="tableExpanded = !tableExpanded"
-    >
-      <span>{{ tableExpanded ? '收起明细数据' : '查看明细数据' }}</span>
-      <ChevronDown :size="15" :class="{ 'is-expanded': tableExpanded }" aria-hidden="true" />
-    </button>
-    <div class="data-query-ranking-header">
-      <span>分析明细（{{ normalizedTable.total }} 条）</span>
+    <div class="data-query-table-controls">
+      <button
+        type="button"
+        class="data-query-table-toggle"
+        data-testid="analysis-table-toggle"
+        :aria-expanded="String(tableExpanded)"
+        aria-controls="analysis-table-panel"
+        @click="tableExpanded = !tableExpanded"
+      >
+        <span>{{ tableExpanded ? '收起明细数据' : '查看明细数据' }}</span>
+        <ChevronDown :size="15" :class="{ 'is-expanded': tableExpanded }" aria-hidden="true" />
+      </button>
       <div class="data-query-ranking-toolbar" aria-label="分析明细操作">
         <button type="button" title="复制数据明细" aria-label="复制数据明细" @click="copyTable">
           <Check v-if="actionMessage.includes('已复制')" :size="15" />
@@ -207,6 +206,9 @@ onBeforeUnmount(() => {
           <Maximize2 v-else :size="15" />
         </button>
       </div>
+    </div>
+    <div class="data-query-ranking-header">
+      <span>分析明细（{{ normalizedTable.total }} 条）</span>
     </div>
     <div v-if="actionMessage" class="data-query-ranking-feedback" aria-live="polite">{{ actionMessage }}</div>
     <Transition name="data-query-table-panel">
@@ -251,7 +253,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .data-query-table-toggle {
   display: flex;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -263,6 +266,12 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.data-query-table-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .data-query-table-toggle:hover,

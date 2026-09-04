@@ -30,6 +30,8 @@ const dataInfo = computed(() => (isPlainObject(props.dataInfo) ? props.dataInfo 
 const metrics = computed(() => (Array.isArray(content.value.metrics) ? content.value.metrics : []))
 const table = computed(() => (isPlainObject(content.value.table) ? content.value.table : null))
 const insights = computed(() => (Array.isArray(content.value.insights) ? content.value.insights : []))
+const attentionInsights = computed(() => insights.value.filter((item) => item?.type === 'attention'))
+const standardInsights = computed(() => insights.value.filter((item) => item?.type !== 'attention'))
 const evidence = computed(() => (Array.isArray(content.value.evidence) ? content.value.evidence : []))
 const followUps = computed(() => (Array.isArray(content.value.followUps) ? content.value.followUps : []))
 const status = computed(() => String(props.status || '').trim().toUpperCase())
@@ -106,7 +108,17 @@ const formatDataInfoValue = (value) => {
 
     <MetricGrid :metrics="metrics" />
     <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
-    <InsightList :insights="insights" :data-info="dataInfo" />
+    <InsightList :insights="standardInsights" :data-info="dataInfo" />
+
+    <section v-if="attentionInsights.length" class="data-query-attention-card" aria-label="值得关注">
+      <div class="data-query-attention-title">⚠ 值得关注</div>
+      <ul>
+        <li v-for="(insight, index) in attentionInsights" :key="`${insight.text}-${index}`">
+          {{ formatListItem(insight) }}
+        </li>
+      </ul>
+    </section>
+
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
 
     <section
@@ -163,5 +175,27 @@ const formatDataInfoValue = (value) => {
   margin: -3px 0 9px;
   color: #6d8195;
   font-size: 11px;
+}
+
+.data-query-attention-card {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid #f1d49c;
+  border-radius: 9px;
+  background: #fffaf0;
+  color: #8a5a12;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.data-query-attention-title {
+  font-weight: 800;
+}
+
+.data-query-attention-card ul {
+  display: grid;
+  gap: 4px;
+  margin: 5px 0 0;
+  padding-left: 17px;
 }
 </style>
