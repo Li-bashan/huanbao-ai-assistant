@@ -45,6 +45,32 @@ const formatValue = (value) => {
   return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 4 })
 }
 
+const getPeriodParts = (period) => {
+  const match = String(period || '').match(/^(\d{4})-(\d{2})(?:-\d{2})?$/)
+  return match ? { year: Number(match[1]), month: Number(match[2]) } : null
+}
+
+const formatPeriod = (parts) => `${parts.year}年${parts.month}月`
+
+const getBaselinePeriod = (type) => {
+  const timeRange = dataInfo.value.timeRange
+  const parts = getPeriodParts(timeRange?.end || timeRange?.start)
+  if (!parts) return type === 'yoy' ? '去年同期' : '上月'
+
+  if (type === 'yoy') return formatPeriod({ ...parts, year: parts.year - 1 })
+  const previousMonth = parts.month === 1
+    ? { year: parts.year - 1, month: 12 }
+    : { year: parts.year, month: parts.month - 1 }
+  return formatPeriod(previousMonth)
+}
+
+const displayMetrics = computed(() => metrics.value.slice(1).map((metric) => {
+  const label = String(metric?.label || '')
+  if (/同比/.test(label)) return { ...metric, description: `与${getBaselinePeriod('yoy')}相比` }
+  if (/环比/.test(label)) return { ...metric, description: `与${getBaselinePeriod('mom')}相比` }
+  return metric
+}))
+
 const formatListItem = (item) => {
   if (typeof item === 'string') return item
   if (isPlainObject(item)) return item.text || item.label || item.description || ''
@@ -90,8 +116,7 @@ const formatDataInfoValue = (value) => {
   <article class="data-query-result data-query-analysis-card data-query-fact-view">
     <header class="data-query-analysis-header">
       <div>
-        <span class="data-query-analysis-kicker">事实</span>
-        <h3>{{ content.title || dataInfo.indicatorName || '事实结果' }}</h3>
+        <h3>{{ content.title || dataInfo.indicatorName || '查询结果' }}</h3>
       </div>
       <span class="data-query-analysis-status">{{ statusLabel }}</span>
     </header>
@@ -102,12 +127,12 @@ const formatDataInfoValue = (value) => {
       <span v-if="dataInfo.dataCutoffDate">数据截至：{{ dataInfo.dataCutoffDate }}</span>
     </div>
 
-    <section v-if="primaryMetric" class="data-query-fact-primary" aria-label="核心事实">
+    <section v-if="primaryMetric" class="data-query-fact-primary" aria-label="核心指标">
       <span>{{ primaryMetric.label || dataInfo.indicatorName || '指标' }}</span>
       <strong>{{ formatValue(primaryMetric.value) }}<small v-if="primaryMetric.unit">{{ primaryMetric.unit }}</small>
       </strong>
     </section>
-    <MetricGrid v-if="metrics.length > 1" :metrics="metrics.slice(1)" />
+    <MetricGrid v-if="displayMetrics.length" :metrics="displayMetrics" />
     <InsightList :insights="insights" :data-info="dataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
 

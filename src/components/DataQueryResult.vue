@@ -1,5 +1,5 @@
 <script setup>
-import { ChevronDown, Download, FileText, Maximize2, Minimize2 } from '@lucide/vue'
+import { Download, FileText, Maximize2, Minimize2 } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AccessBlockedView from './data-query/views/AccessBlockedView.vue'
 import LoadingSkeleton from './data-query/views/LoadingSkeleton.vue'
@@ -45,6 +45,16 @@ const getTrendPeriodLabel = (period) => {
   const text = readText(period)
   const match = text.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/)
   return match ? `${Number(match[2])}月` : text
+}
+
+const getPreviousPeriodLabel = (period) => {
+  const match = String(period || '').match(/^(\d{4})-(\d{2})(?:-\d{2})?$/)
+  if (!match) return '上一期'
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const previous = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+  return `${previous.year}年${previous.month}月`
 }
 
 const getResultSource = (meta) => readText(
@@ -159,8 +169,18 @@ const buildFactTrendContent = (rawContent) => {
     metrics: [
       { label: `${periodLabel}累计`, value: formatTrendNumber(total), unit },
       { label: `最新月（${latest.period}）`, value: formatTrendNumber(latest.value), unit },
-      { label: `${latestMonth}同比变动`, value: latest.yearOverYearPercent, unit: '%' },
-      { label: `${latestMonth}环比变动`, value: latestMom, unit: '%' },
+      {
+        label: `${latestMonth}同比变动`,
+        value: latest.yearOverYearPercent,
+        unit: '%',
+        description: `与${latest.period.slice(0, 4) - 1}年${latestMonth}相比`,
+      },
+      {
+        label: `${latestMonth}环比变动`,
+        value: latestMom,
+        unit: '%',
+        description: `与${getPreviousPeriodLabel(latest.period)}相比`,
+      },
     ].filter((metric) => metric.value !== null && metric.value !== undefined),
     table: rawContent.table,
     chart: {
@@ -271,24 +291,6 @@ const isResultMaximized = computed(() => isLocallyMaximized.value || isNativeFul
 const resultSource = computed(() => getResultSource(resultMeta.value))
 const resultDuration = computed(() => getResultDuration(resultMeta.value))
 const resultTokenUsage = computed(() => getResultTokenUsage(resultMeta.value))
-const resultReportText = computed(() => {
-  const content = resultContent.value
-  const metricLines = content.metrics
-    .map((metric) => `${metric.label || '指标'}：${metric.value ?? '-'}${metric.unit || ''}`)
-  const insightLines = content.insights
-    .map((insight) => typeof insight === 'string' ? insight : insight?.text || insight?.label || '')
-    .filter(Boolean)
-  const evidenceLines = content.evidence
-    .map((evidence) => typeof evidence === 'string' ? evidence : evidence?.text || evidence?.label || '')
-    .filter(Boolean)
-  return [
-    content.title,
-    content.summary,
-    metricLines.length ? `核心指标：\n${metricLines.join('\n')}` : '',
-    insightLines.length ? `数据要点：\n${insightLines.map((line) => `- ${line}`).join('\n')}` : '',
-    evidenceLines.length ? `证据与校验：\n${evidenceLines.map((line) => `- ${line}`).join('\n')}` : '',
-  ].filter(Boolean).join('\n\n')
-})
 
 const showResultActionMessage = (message) => {
   resultActionMessage.value = message
@@ -298,18 +300,45 @@ const showResultActionMessage = (message) => {
   }, 1800)
 }
 
+const escapeReportHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
 const exportResultReport = () => {
   const title = readText(resultContent.value.title) || '智能问数报告'
-  const blob = new Blob([`# ${title}\n\n${resultReportText.value}\n`], { type: 'text/markdown;charset=utf-8' })
+  const content = resultContent.value
+  const metrics = Array.isArray(content.metrics) ? content.metrics : []
+  const insights = Array.isArray(content.insights) ? content.insights : []
+  const metricHtml = metrics.length
+    ? `<h2>核心指标</h2><table><thead><tr><th>指标</th><th>数值</th></tr></thead><tbody>${metrics
+      .map((metric) => `<tr><td>${escapeReportHtml(metric.label)}</td><td>${escapeReportHtml(`${metric.value ?? '-'}${metric.unit || ''}`)}</td></tr>`)
+      .join('')}</tbody></table>`
+    : ''
+  const insightHtml = insights.length
+    ? `<h2>数据要点</h2><ul>${insights
+      .map((insight) => `<li>${escapeReportHtml(typeof insight === 'string' ? insight : insight?.text || insight?.label || '')}</li>`)
+      .join('')}</ul>`
+    : ''
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeReportHtml(title)}</title><style>
+body{font-family:"Microsoft YaHei",SimSun,sans-serif;line-height:1.7;color:#1f2937}h1{font-size:22px}h2{font-size:16px;margin-top:20px}.meta{color:#64748b;font-size:13px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px}th{background:#f1f5f9;text-align:left}
+</style></head><body><h1>${escapeReportHtml(title)}</h1><p class="meta">${escapeReportHtml([
+    resultDuration.value ? `耗时：${resultDuration.value}` : '',
+    resultSource.value ? `来源：${resultSource.value}` : '',
+    content.dataInfo?.dataCutoffDate ? `数据截至：${content.dataInfo.dataCutoffDate}` : '',
+  ].filter(Boolean).join('；'))}</p><h2>摘要</h2><p>${escapeReportHtml(content.summary).replace(/\n/g, '<br>')}</p>${metricHtml}${insightHtml}</body></html>`
+  const blob = new Blob([`\uFEFF${html}`], { type: 'application/msword;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 36) || '智能问数报告'}.md`
+  link.download = `${title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || '智能问数报告'}.doc`
   document.body.appendChild(link)
   link.click()
   link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 0)
-  showResultActionMessage('报告已导出')
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  showResultActionMessage('Word 已导出')
 }
 
 const escapeCsvCell = (value) => {
@@ -512,10 +541,9 @@ const fallbackText = computed(() => {
             <Download :size="13" aria-hidden="true" />
             <span>导出 CSV</span>
           </button>
-          <button type="button" title="导出问数简报" aria-label="导出问数简报" @click="exportResultReport">
+          <button type="button" title="导出 Word 简报" aria-label="导出 Word 简报" @click="exportResultReport">
             <FileText :size="13" aria-hidden="true" />
-            <span>导出简报</span>
-            <ChevronDown :size="13" aria-hidden="true" />
+            <span>导出 Word</span>
           </button>
           <button
             type="button"

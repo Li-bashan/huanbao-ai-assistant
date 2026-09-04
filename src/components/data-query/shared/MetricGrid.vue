@@ -51,6 +51,7 @@ const formatMetricValue = (metric) => {
       }"
     >
       <span>{{ metric.label }}</span>
+      <small v-if="metric.description" class="data-query-metric-description">{{ metric.description }}</small>
       <strong>
         <span v-if="getMetricTrend(metric) === 'up'" class="data-query-metric-trend" aria-hidden="true">▲</span>
         <span v-else-if="getMetricTrend(metric) === 'down'" class="data-query-metric-trend" aria-hidden="true">▼</span>
@@ -85,6 +86,18 @@ const formatMetricValue = (metric) => {
   color: #0f172a;
   font-size: 17px;
   font-weight: 800;
+}
+
+.data-query-metric-description {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .data-query-metric-value {
