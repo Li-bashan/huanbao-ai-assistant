@@ -13,7 +13,7 @@ import DrilldownView from './data-query/views/DrilldownView.vue'
 import OverviewView from './data-query/views/OverviewView.vue'
 
 const EMPTY_STATE_TEXT = '当前统计期间暂无可用数据。'
-const PROTOCOL_ERROR_TEXT = '结果协议校验失败，请稍后重试。'
+const FRIENDLY_FALLBACK_TEXT = '暂未获取到该维度的结构化分析数据，建议尝试按时间趋势或组织排名提问。'
 const NO_DATA_STATUSES = new Set([
   'NO_DATA',
   'NO_DATA_IN_PERIOD',
@@ -140,7 +140,7 @@ const resolvedViewComponent = computed(() =>
 
 const fallbackText = computed(() => {
   if (isNoData.value) return normalizedPayload.value.content.summary || EMPTY_STATE_TEXT
-  return normalizedPayload.value.content.summary || props.answer || PROTOCOL_ERROR_TEXT
+  return normalizedPayload.value.content.summary || props.answer || FRIENDLY_FALLBACK_TEXT
 })
 </script>
 

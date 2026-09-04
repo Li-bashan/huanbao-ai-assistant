@@ -148,8 +148,8 @@ const formatDataInfoValue = (value) => {
       </div>
     </section>
 
+    <InsightList :insights="insights" :data-info="dataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-    <InsightList :insights="insights" />
 
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"

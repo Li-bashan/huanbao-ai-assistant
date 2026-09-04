@@ -149,6 +149,21 @@ const warnings = computed(() => {
       <span v-if="dataInfo.dataCutoffDate">数据截至：{{ dataInfo.dataCutoffDate }}</span>
     </div>
 
+    <MetricGrid :metrics="metrics" />
+    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+    <InsightList :insights="insights" :data-info="dataInfo" />
+    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
+
+    <section v-if="evidence.length || warnings.length" class="data-query-evidence-card" aria-label="证据与校验">
+      <div class="data-query-evidence-title">证据与校验</div>
+      <ul v-if="evidence.length" class="data-query-evidence-list">
+        <li v-for="(item, index) in evidence" :key="`${formatListItem(item)}-${index}`">{{ formatListItem(item) }}</li>
+      </ul>
+      <ul v-if="warnings.length" class="data-query-warning-list">
+        <li v-for="(warning, index) in warnings" :key="`${formatListItem(warning)}-${index}`">{{ formatListItem(warning) }}</li>
+      </ul>
+    </section>
+
     <template v-if="sections.length">
       <section class="data-query-overview-sections" aria-label="总览分析分段">
         <OverviewSection
@@ -189,21 +204,6 @@ const warnings = computed(() => {
         <span>{{ candidate.label }}</span>
         <small v-if="candidate.description">{{ candidate.description }}</small>
       </button>
-    </section>
-
-    <MetricGrid :metrics="metrics" />
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
-    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-    <InsightList :insights="insights" />
-
-    <section v-if="evidence.length || warnings.length" class="data-query-evidence-card" aria-label="证据与校验">
-      <div class="data-query-evidence-title">证据与校验</div>
-      <ul v-if="evidence.length" class="data-query-evidence-list">
-        <li v-for="(item, index) in evidence" :key="`${formatListItem(item)}-${index}`">{{ formatListItem(item) }}</li>
-      </ul>
-      <ul v-if="warnings.length" class="data-query-warning-list">
-        <li v-for="(warning, index) in warnings" :key="`${formatListItem(warning)}-${index}`">{{ formatListItem(warning) }}</li>
-      </ul>
     </section>
 
     <FollowUpActions :follow-ups="followUps" @select="emit('follow-up', $event)" />

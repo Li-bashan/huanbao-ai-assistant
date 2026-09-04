@@ -102,6 +102,10 @@ const warnings = computed(() => {
       <span v-if="dataInfo.dataCutoffDate">数据截至：{{ dataInfo.dataCutoffDate }}</span>
     </div>
 
+    <MetricGrid :metrics="metrics" />
+    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+    <InsightList :insights="insights" :data-info="dataInfo" />
+
     <section class="data-query-drilldown-boundary" aria-label="归因诊断边界">
       <strong>同期变动线索</strong>
       <p>{{ indicatorName }}变动期间，同步观察到关联指标变动线索，建议结合现场排查。</p>
@@ -120,6 +124,8 @@ const warnings = computed(() => {
       <p>当前结果未返回 relatedMetrics，仅展示已知数据变动；如需归因，请结合现场记录继续核查。</p>
     </section>
 
+    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
+
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"
       class="data-query-clarification-card"
@@ -137,11 +143,6 @@ const warnings = computed(() => {
         <small v-if="candidate.description">{{ candidate.description }}</small>
       </button>
     </section>
-
-    <MetricGrid :metrics="metrics" />
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
-    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-    <InsightList :insights="insights" />
 
     <section v-if="warnings.length" class="data-query-evidence-card" aria-label="校验提醒">
       <div class="data-query-evidence-title">校验提醒</div>

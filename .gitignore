@@ -31,3 +31,7 @@ local-frontend-*.png
 overview-*.png
 qhd-*.png
 igix-*.har
+
+# 布局审计运行产物，保留在本地供复核，不进入业务提交
+tools/screenshots/
+tools/layout-audit-report-*.json

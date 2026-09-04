@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>环宝问数视图布局审计</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        padding: 16px;
+        box-sizing: border-box;
+        background: #eef6ff;
+      }
+
+      #layout-audit-root {
+        width: min(100%, 980px);
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="layout-audit-root"></main>
+    <script type="module">
+      import { createApp } from '/node_modules/.vite/deps/vue.js'
+      import DataQueryResult from '/src/components/DataQueryResult.vue'
+
+      const rows = Array.from({ length: 12 }, (_, index) => ({
+        organization: `项目公司${index + 1}`,
+        period: `2026-${String(index + 1).padStart(2, '0')}`,
+        value: 1000 - index * 37,
+        rank: index + 1,
+      }))
+
+      const payload = {
+        protocolVersion: '2.0',
+        requestId: 'visible-layout-audit-trend',
+        conversationId: 'visible-layout-audit',
+        status: 'SUCCESS_WITH_DATA',
+        messageType: 'analysis',
+        analysisType: 'TREND',
+        content: {
+          title: 'TREND 可见布局审计样本',
+          summary: '用于确认图表、KPI、数据要点和折叠明细表的真实页面位置。',
+          metrics: [
+            { id: 'total', label: '本期总量', value: 12345, unit: '吨' },
+            { id: 'average', label: '月均值', value: 1028.75, unit: '吨' },
+            { id: 'change', label: '同比变化', value: 8.6, unit: '%' },
+          ],
+          chart: {
+            type: 'line',
+            title: '核心趋势图',
+            xField: 'period',
+            yField: 'value',
+            categories: ['1月', '2月', '3月', '4月', '5月', '6月'],
+            series: [{ name: '指标值', type: 'line', data: [980, 1040, 1010, 1100, 1140, 1230] }],
+          },
+          insights: [
+            { type: 'fact', text: '本期指标值较上期保持稳定增长。' },
+            { type: 'attention', text: '建议结合数据截止日期核对最新业务台账。' },
+          ],
+          table: {
+            columns: [
+              { key: 'organization', label: '项目公司', type: 'text' },
+              { key: 'period', label: '统计期间', type: 'text' },
+              { key: 'value', label: '指标值', type: 'number' },
+              { key: 'rank', label: '排名', type: 'number' },
+            ],
+            rows,
+            total: rows.length,
+            defaultVisibleRows: 10,
+          },
+          evidence: ['数据来自已授权生产指标口径。'],
+          dataInfo: {
+            indicatorName: '生活垃圾入厂量',
+            timeRange: { expression: '今年', label: '今年' },
+            dataCutoffDate: '2026-08-31',
+          },
+          followUps: [
+            { id: 'trend', label: '查看趋势', query: '查看生活垃圾入厂量趋势' },
+            { id: 'ranking', label: '查看项目公司排名', query: '查看项目公司排名' },
+            { id: 'distribution', label: '查看分布', query: '查看生活垃圾入厂量分布' },
+          ],
+        },
+        clarification: null,
+        meta: { source: 'visible-layout-audit' },
+        protocolValid: true,
+      }
+
+      createApp(DataQueryResult, {
+        data: payload,
+        windowView: window.innerWidth <= 520 ? 'compact' : 'full',
+      }).mount('#layout-audit-root')
+    </script>
+  </body>
+</html>

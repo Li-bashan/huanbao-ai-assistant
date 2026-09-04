@@ -125,6 +125,7 @@ const formatDataInfoValue = (value) => {
 
     <MetricGrid :metrics="metrics" />
 
+    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
     <section v-if="comparisonFacts.length" class="data-query-comparison-facts" aria-label="对比事实">
       <div class="data-query-comparison-facts-title">已返回的对比事实</div>
       <div v-for="(fact, index) in comparisonFacts" :key="`${factLabel(fact)}-${index}`" class="data-query-comparison-fact">
@@ -134,10 +135,8 @@ const formatDataInfoValue = (value) => {
         <span v-if="hasValue(fact.monthOverMonthPercent)">环比 {{ formatPercent(fact.monthOverMonthPercent) }}</span>
       </div>
     </section>
-
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+    <InsightList :insights="insights" :data-info="dataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-    <InsightList :insights="insights" />
 
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"

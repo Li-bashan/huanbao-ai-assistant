@@ -106,8 +106,8 @@ const formatDataInfoValue = (value) => {
 
     <MetricGrid :metrics="metrics" />
     <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+    <InsightList :insights="insights" :data-info="dataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-    <InsightList :insights="insights" />
 
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"

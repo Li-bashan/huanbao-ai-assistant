@@ -1,5 +1,5 @@
 <script setup>
-import { Check, Copy, Download, Maximize2, Minimize2 } from '@lucide/vue'
+import { Check, ChevronDown, Copy, Download, Maximize2, Minimize2 } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getDataQueryCompanyShortName } from '../../../config/dataQueryCatalog.js'
 import { copyText } from '../../../utils/messageExport.js'
@@ -40,8 +40,7 @@ const normalizedTable = computed(() => {
 const structuredRows = computed(() => {
   const value = normalizedTable.value
   if (!value) return []
-  if (tableExpanded.value || props.windowView !== 'compact') return value.rows
-  return value.rows.slice(0, value.defaultVisibleRows)
+  return tableExpanded.value ? value.rows : []
 })
 
 const isMaximized = computed(() => isLocallyMaximized.value || isNativeFullscreen.value)
@@ -84,6 +83,16 @@ const showActionMessage = (message) => {
   actionMessageTimer = window.setTimeout(() => {
     actionMessage.value = ''
   }, 2200)
+}
+
+const handleShortcut = (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'e') {
+    event.preventDefault()
+    exportTableCsv()
+  }
+  if (event.key === 'Escape' && tableExpanded.value) {
+    tableExpanded.value = false
+  }
 }
 
 const exportTableCsv = () => {
@@ -140,10 +149,14 @@ const toggleMaximize = async () => {
   showActionMessage('已切换为面板最大化')
 }
 
-onMounted(() => document.addEventListener('fullscreenchange', syncFullscreenState))
+onMounted(() => {
+  document.addEventListener('fullscreenchange', syncFullscreenState)
+  document.addEventListener('keydown', handleShortcut)
+})
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState)
+  document.removeEventListener('keydown', handleShortcut)
   window.clearTimeout(actionMessageTimer)
 })
 </script>
@@ -154,8 +167,20 @@ onBeforeUnmount(() => {
     ref="tableCardRef"
     class="data-query-ranking-card data-query-structured-table-card"
     :class="{ 'data-query-ranking-card-local-maximized': isLocallyMaximized }"
+    :data-collapsed="String(!tableExpanded)"
     aria-label="分析明细"
   >
+    <button
+      type="button"
+      class="data-query-table-toggle"
+      data-testid="analysis-table-toggle"
+      :aria-expanded="String(tableExpanded)"
+      aria-controls="analysis-table-panel"
+      @click="tableExpanded = !tableExpanded"
+    >
+      <span>{{ tableExpanded ? '收起明细数据' : '查看明细数据' }}</span>
+      <ChevronDown :size="15" :class="{ 'is-expanded': tableExpanded }" aria-hidden="true" />
+    </button>
     <div class="data-query-ranking-header">
       <span>分析明细（{{ normalizedTable.total }} 条）</span>
       <div class="data-query-ranking-toolbar" aria-label="分析明细操作">
@@ -163,7 +188,13 @@ onBeforeUnmount(() => {
           <Check v-if="actionMessage.includes('已复制')" :size="15" />
           <Copy v-else :size="15" />
         </button>
-        <button type="button" title="导出数据明细 CSV" aria-label="导出数据明细 CSV" @click="exportTableCsv">
+        <button
+          type="button"
+          title="导出数据明细 CSV（Ctrl+Shift+E）"
+          aria-label="导出数据明细 CSV（Ctrl+Shift+E）"
+          aria-keyshortcuts="Control+Shift+E"
+          @click="exportTableCsv"
+        >
           <Download :size="15" />
         </button>
         <button
@@ -178,40 +209,91 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div v-if="actionMessage" class="data-query-ranking-feedback" aria-live="polite">{{ actionMessage }}</div>
-    <div class="data-query-ranking-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th v-for="column in normalizedTable.columns" :key="column.key" :data-column-key="column.key">
-              {{ column.label }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!structuredRows.length">
-            <td :colspan="normalizedTable.columns.length">暂无明细数据</td>
-          </tr>
-          <tr v-for="(row, rowIndex) in structuredRows" :key="row.id || rowIndex">
-            <td
-              v-for="column in normalizedTable.columns"
-              :key="column.key"
-              :data-column-key="column.key"
-              :title="column.key === 'organization' ? String(row[column.key] || '') : undefined"
-              :class="{ 'data-query-number-cell': column.type === 'number' }"
-            >
-              {{ formatCell(row[column.key], column) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <button
-      v-if="normalizedTable.rows.length > structuredRows.length"
-      type="button"
-      class="data-query-table-more"
-      @click="tableExpanded = true"
-    >
-      查看全部 {{ normalizedTable.total }} 条
-    </button>
+    <Transition name="data-query-table-panel">
+      <div
+        v-show="tableExpanded"
+        id="analysis-table-panel"
+        class="data-query-table-panel"
+        data-testid="analysis-table-panel"
+      >
+        <div class="data-query-ranking-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th v-for="column in normalizedTable.columns" :key="column.key" :data-column-key="column.key">
+                  {{ column.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!structuredRows.length">
+                <td :colspan="normalizedTable.columns.length">暂无明细数据</td>
+              </tr>
+              <tr v-for="(row, rowIndex) in structuredRows" :key="row.id || rowIndex">
+                <td
+                  v-for="column in normalizedTable.columns"
+                  :key="column.key"
+                  :data-column-key="column.key"
+                  :title="column.key === 'organization' ? String(row[column.key] || '') : undefined"
+                  :class="{ 'data-query-number-cell': column.type === 'number' }"
+                >
+                  {{ formatCell(row[column.key], column) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Transition>
   </section>
 </template>
+
+<style scoped>
+.data-query-table-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #cfe2f7;
+  border-radius: 9px;
+  color: #176dcc;
+  background: #f5faff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.data-query-table-toggle:hover,
+.data-query-table-toggle:focus-visible {
+  border-color: #9fc8ef;
+  background: #eaf4ff;
+  outline: none;
+}
+
+.data-query-table-toggle svg {
+  transition: transform 0.24s ease;
+}
+
+.data-query-table-toggle svg.is-expanded {
+  transform: rotate(180deg);
+}
+
+.data-query-table-panel {
+  overflow: hidden;
+}
+
+.data-query-table-panel-enter-active,
+.data-query-table-panel-leave-active {
+  max-height: 460px;
+  opacity: 1;
+  transition: max-height 0.24s ease, opacity 0.18s ease;
+}
+
+.data-query-table-panel-enter-from,
+.data-query-table-panel-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+</style>

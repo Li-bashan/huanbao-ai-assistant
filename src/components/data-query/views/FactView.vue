@@ -1,11 +1,9 @@
 <script setup>
 import { computed } from 'vue'
-import DataQueryChart from '../../DataQueryChart.vue'
 import MetricGrid from '../shared/MetricGrid.vue'
 import AnalysisTable from '../shared/AnalysisTable.vue'
 import InsightList from '../shared/InsightList.vue'
 import FollowUpActions from '../shared/FollowUpActions.vue'
-import { createDataQueryChartOption } from '../../../utils/dataQueryProtocol.js'
 
 const NO_DATA_STATUSES = new Set(['NO_DATA', 'NO_DATA_IN_PERIOD', 'SUCCESS_EMPTY', 'EMPTY'])
 
@@ -40,10 +38,6 @@ const summary = computed(() => {
   return value || (isNoData.value ? '当前统计期间暂无可用数据。' : '查询已完成。')
 })
 const statusLabel = computed(() => (isNoData.value ? '暂无数据' : '已校验'))
-const chart = computed(() => {
-  const protocolChart = createDataQueryChartOption({ content: content.value })
-  return protocolChart || (isPlainObject(props.chartOption) ? props.chartOption : null)
-})
 
 const formatValue = (value) => {
   if (value === null || value === undefined || value === '') return '-'
@@ -110,10 +104,11 @@ const formatDataInfoValue = (value) => {
 
     <section v-if="primaryMetric" class="data-query-fact-primary" aria-label="核心事实">
       <span>{{ primaryMetric.label || dataInfo.indicatorName || '指标' }}</span>
-      <strong>{{ formatValue(primaryMetric.value) }}<small v-if="primaryMetric.unit">{{ primaryMetric.unit }}</small></strong>
+      <strong>{{ formatValue(primaryMetric.value) }}<small v-if="primaryMetric.unit">{{ primaryMetric.unit }}</small>
+      </strong>
     </section>
     <MetricGrid v-if="metrics.length > 1" :metrics="metrics.slice(1)" />
-
+    <InsightList :insights="insights" :data-info="dataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
 
     <section
@@ -134,7 +129,6 @@ const formatDataInfoValue = (value) => {
       </button>
     </section>
 
-    <InsightList :insights="insights" />
     <section v-if="evidence.length || warnings.length" class="data-query-evidence-card" aria-label="证据与校验">
       <div class="data-query-evidence-title">证据与校验</div>
       <ul v-if="evidence.length" class="data-query-evidence-list">
@@ -144,8 +138,6 @@ const formatDataInfoValue = (value) => {
         <li v-for="(warning, index) in warnings" :key="`${formatListItem(warning)}-${index}`">{{ formatListItem(warning) }}</li>
       </ul>
     </section>
-
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
 
     <details v-if="dataInfoEntries.length" class="data-query-data-info">
       <summary>数据说明</summary>

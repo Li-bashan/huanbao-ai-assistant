@@ -129,7 +129,8 @@ const dataInfoEntries = computed(() => Object.entries(resolvedDataInfo.value))
     </div>
 
     <MetricGrid :metrics="metrics" />
-
+    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+    <InsightList :insights="insights" :data-info="resolvedDataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
 
     <section
@@ -150,8 +151,6 @@ const dataInfoEntries = computed(() => Object.entries(resolvedDataInfo.value))
       </button>
     </section>
 
-    <InsightList :insights="insights" />
-
     <section v-if="evidence.length || warnings.length" class="data-query-evidence-card" aria-label="证据与校验">
       <div class="data-query-evidence-title">证据与校验</div>
       <ul v-if="evidence.length" class="data-query-evidence-list">
@@ -161,8 +160,6 @@ const dataInfoEntries = computed(() => Object.entries(resolvedDataInfo.value))
         <li v-for="(warning, index) in warnings" :key="`${formatListItem(warning)}-${index}`">{{ formatListItem(warning) }}</li>
       </ul>
     </section>
-
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
 
     <details v-if="dataInfoEntries.length" class="data-query-data-info">
       <summary>数据说明</summary>

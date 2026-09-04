@@ -93,6 +93,10 @@ const warnings = computed(() => {
       <span v-if="dataInfo.dataCutoffDate">数据截至：{{ dataInfo.dataCutoffDate }}</span>
     </div>
 
+    <MetricGrid :metrics="metrics" />
+    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
+    <InsightList :insights="otherInsights" :data-info="dataInfo" />
+
     <section v-if="attentionInsights.length" class="data-query-anomaly-attention" aria-label="关注信息与指标偏离提示">
       <div class="data-query-anomaly-section-title">关注信息与指标偏离提示</div>
       <ul>
@@ -109,6 +113,8 @@ const warnings = computed(() => {
         当前协议未提供独立异常点、阈值或异常序列，以上内容仅作为同期数据关注线索。建议核对原始数据、统计口径与现场记录。
       </p>
     </section>
+
+    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
 
     <section
       v-if="messageType === 'clarification' && clarification?.candidates?.length"
@@ -127,11 +133,6 @@ const warnings = computed(() => {
         <small v-if="candidate.description">{{ candidate.description }}</small>
       </button>
     </section>
-
-    <MetricGrid :metrics="metrics" />
-    <DataQueryChart v-if="chart" :option="chart" :window-view="windowView" />
-    <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
-    <InsightList :insights="otherInsights" />
 
     <section v-if="evidence.length || warnings.length" class="data-query-evidence-card" aria-label="证据与校验">
       <div class="data-query-evidence-title">证据与校验</div>
