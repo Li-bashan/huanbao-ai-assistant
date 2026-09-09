@@ -148,6 +148,12 @@ public class DataQueryIdentityService {
             }
             return fromContext(request.userContext(), false, "BODY_TRIAL");
         }
+
+        if (PERMISSIVE_MODE.equals(properties.safeIdentityMode())
+            && !hasSignedIdentityHeaders(signedIdentity, timestamp, signature)) {
+            return resolvePermissiveContext(request == null ? null : request.userContext(), null);
+        }
+
         return resolveSignedContext(signedIdentity, timestamp, signature);
     }
 

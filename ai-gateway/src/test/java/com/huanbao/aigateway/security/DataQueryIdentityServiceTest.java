@@ -10,6 +10,7 @@ import com.huanbao.aigateway.config.DataQueryProperties;
 import com.huanbao.aigateway.dto.DataQueryChatRequest;
 import com.huanbao.aigateway.dto.DataQueryUserContext;
 import com.huanbao.aigateway.exception.BusinessException;
+import com.huanbao.aigateway.dto.MasterChatRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -122,6 +123,23 @@ class DataQueryIdentityServiceTest {
         );
 
         assertEquals("IDENTITY_UNVERIFIED", exception.getCode());
+    }
+
+    @Test
+    void permissiveModeResolvesMasterRequestFromUntrustedContext() {
+        MasterChatRequest request = new MasterChatRequest(
+            "写一份系统维护通知", "", new DataQueryUserContext(
+                "portal-user", "portal-code", "迟全虎", "ORG-1", "组织一", "企业信息系统"
+            ), java.util.Map.of(), null
+        );
+
+        DataQueryIdentity identity = service("PERMISSIVE", false)
+            .resolve(request, "", "", "");
+
+        assertFalse(identity.verified());
+        assertEquals("PERMISSIVE", identity.source());
+        assertEquals("chi_quanhu", identity.userId());
+        assertEquals("迟全虎", identity.userName());
     }
 
     private DataQueryChatRequest request() {
