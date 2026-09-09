@@ -99,6 +99,25 @@ const mergeText = (current, incoming) => {
   return previous + next
 }
 
+const normalizeSource = (source, index) => {
+  if (!source || typeof source !== 'object') return null
+
+  return {
+    id: String(source.id || source.document_id || source.segment_id || `source-${index + 1}`),
+    documentName: String(source.documentName || source.document_name || source.title || '制度知识库'),
+    datasetName: String(source.datasetName || source.dataset_name || ''),
+    content: String(source.content || ''),
+    documentId: String(source.document_id || source.documentId || ''),
+    segmentId: String(source.segment_id || source.segmentId || ''),
+  }
+}
+
+const normalizeSources = (sources) => (
+  Array.isArray(sources)
+    ? sources.map(normalizeSource).filter(Boolean)
+    : []
+)
+
 const buildSseResult = (answer, responseConversationId, requestId, messageId, options, suggestedActions = []) => ({
   answer: answer || '当前未获取到有效回答，请稍后重试。',
   // This is the local conversation key. Dify conversation IDs never leave the Gateway.
@@ -133,12 +152,13 @@ export async function sendGatewayPolicyMessage(question, options = {}) {
   if (!response.ok) throw await readError(response)
   const bodyResponse = await response.json()
   const data = bodyResponse?.data || {}
+  const sources = normalizeSources(data.retrieverResources || data.sources || [])
   return {
     answer: data.answer || '当前未获取到有效回答，请稍后重试。',
     conversationId: data.conversationId || data.clientConversationId || body.conversationId,
     messageId: data.messageId || '',
     requestId: data.requestId || body.requestId,
-    sources: data.retrieverResources || data.sources || [],
+    sources,
     noHit: false,
   }
 }
@@ -268,7 +288,7 @@ export async function streamGatewayMasterMessage(question, options = {}) {
     if (eventName === 'analysis_result') {
       answer = String(data.answer || answer)
       suggestedActions = Array.isArray(data.suggestedActions) ? data.suggestedActions : []
-      sources = Array.isArray(data.sources) ? data.sources : []
+      sources = normalizeSources(data.sources)
       const parsed = (() => {
         try { return JSON.parse(answer) } catch { return null }
       })()
