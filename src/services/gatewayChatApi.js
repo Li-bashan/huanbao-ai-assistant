@@ -15,13 +15,13 @@ const gatewayBaseUrl = () =>
 const createRequestId = () =>
   globalThis.crypto?.randomUUID?.() || `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-const normalizeClientContext = (user = {}) => ({
-  userId: String(user.userId || '').trim(),
-  userCode: String(user.code || user.userCode || '').trim(),
-  userName: String(user.name || user.userName || '').trim(),
-  orgCode: String(user.orgCode || user.orgId || '').trim(),
-  orgName: String(user.orgName || user.unitName || '').trim(),
-  tenantId: String(user.tenantId || '').trim(),
+const normalizeClientContext = (user) => ({
+  userId: String(user?.userId || '').trim(),
+  userCode: String(user?.code || user?.userCode || '').trim(),
+  userName: String(user?.name || user?.userName || '').trim(),
+  orgCode: String(user?.orgCode || user?.orgId || '').trim(),
+  orgName: String(user?.orgName || user?.unitName || '').trim(),
+  tenantId: String(user?.tenantId || '').trim(),
 })
 
 const readError = async (response) => {

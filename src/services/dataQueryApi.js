@@ -25,13 +25,13 @@ const createRequestId = () => {
   return `data-query-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-const normalizeUserContext = (user = {}) => ({
-  userId: String(user.userId || '').trim(),
-  userCode: String(user.code || user.userCode || '').trim(),
-  userName: String(user.name || user.userName || '').trim(),
-  orgCode: String(user.orgCode || user.orgId || '').trim(),
-  orgName: String(user.orgName || user.unitName || '').trim(),
-  tenantId: String(user.tenantId || '').trim(),
+const normalizeUserContext = (user) => ({
+  userId: String(user?.userId || '').trim(),
+  userCode: String(user?.code || user?.userCode || '').trim(),
+  userName: String(user?.name || user?.userName || '').trim(),
+  orgCode: String(user?.orgCode || user?.orgId || '').trim(),
+  orgName: String(user?.orgName || user?.unitName || '').trim(),
+  tenantId: String(user?.tenantId || '').trim(),
 })
 
 const mergeStreamText = (current = '', incoming = '') => {
