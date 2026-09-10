@@ -52,6 +52,18 @@ function buildWorkflowText(workflowCard) {
   return lines.join('\n')
 }
 
+function buildPolicyEvidenceText(policyEvidence = []) {
+  if (!policyEvidence.length) return ''
+
+  return [
+    '制度原文：',
+    ...policyEvidence.map((source, index) => {
+      const title = String(index + 1) + '. ' + (source.documentName || '制度知识库')
+      return title + '\n' + (source.content || '')
+    }),
+  ].join('\n\n')
+}
+
 function buildSourcesText(sources = []) {
   if (!sources.length) return ''
 
@@ -80,9 +92,11 @@ export function getPlainMessageText(message, modeLabel = '') {
   const parts = [message.content || '']
   const workflowText = buildWorkflowText(message.workflowCard)
   const sourcesText = buildSourcesText(message.sources || [])
+  const policyEvidenceText = buildPolicyEvidenceText(message.policyEvidence || [])
 
   if (workflowText) parts.push(workflowText)
   if (sourcesText) parts.push(sourcesText)
+  if (policyEvidenceText) parts.push(policyEvidenceText)
   if (modeLabel) parts.unshift(`模式：${modeLabel}`)
 
   return parts.filter(Boolean).join('\n\n')
@@ -115,6 +129,7 @@ export async function copyText(text) {
 export function exportMarkdown(message, modeLabel, conversationTitle) {
   const now = formatDateTime()
   const sourcesText = buildSourcesText(message.sources || [])
+  const policyEvidenceText = buildPolicyEvidenceText(message.policyEvidence || [])
   const workflowText = buildWorkflowText(message.workflowCard)
   const content = [
     '# 环宝助手回复',
@@ -125,6 +140,7 @@ export function exportMarkdown(message, modeLabel, conversationTitle) {
     '## 回复内容',
     '',
     message.content || '',
+    policyEvidenceText ? '\n## 制度原文\n\n' + policyEvidenceText.replace('制度原文：\n', '') : '',
     sourcesText ? `\n## 引用来源\n\n${sourcesText.replace('引用来源：\n', '')}` : '',
     workflowText ? `\n## 流程动作\n\n${workflowText.replace('流程动作：\n', '')}` : '',
   ]
@@ -141,6 +157,7 @@ export function exportMarkdown(message, modeLabel, conversationTitle) {
 export function exportWordHtml(message, modeLabel, conversationTitle) {
   const now = formatDateTime()
   const sources = message.sources || []
+  const policyEvidence = message.policyEvidence || []
   const workflowCard = message.workflowCard
   const bodyContent = escapeHtml(message.content || '').replace(/\n/g, '<br />')
 
@@ -153,6 +170,21 @@ export function exportWordHtml(message, modeLabel, conversationTitle) {
             }</li>`,
         )
         .join('')}</ul>`
+    : ''
+
+  const policyEvidenceHtml = policyEvidence.length
+    ? '<h2>制度原文</h2>' + policyEvidence
+        .map(
+          (source, index) =>
+            '<h3>' +
+            String(index + 1) +
+            '. ' +
+            escapeHtml(source.documentName || '制度知识库') +
+            '</h3><pre>' +
+            escapeHtml(source.content || '') +
+            '</pre>',
+        )
+        .join('')
     : ''
 
   const workflowHtml = workflowCard
@@ -193,6 +225,7 @@ export function exportWordHtml(message, modeLabel, conversationTitle) {
   <h2>回复内容</h2>
   <p>${bodyContent}</p>
   ${sourcesHtml}
+  ${policyEvidenceHtml}
   ${workflowHtml}
 </body>
 </html>`

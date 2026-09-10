@@ -1,6 +1,7 @@
 <script setup>
 import {
   Check,
+  ChevronDown,
   Copy,
   Expand,
   FileDown,
@@ -54,7 +55,6 @@ import { getIgixCurrentUser } from './utils/igixUser'
 import { createIgixAssistantWindow } from './utils/igixAssistantWindow'
 import {
   createDataQueryChartOptionFromAnswer,
-  removeDataQueryChartPayload,
 } from './utils/dataQueryChart'
 import { renderMarkdown } from './utils/markdown'
 import {
@@ -732,6 +732,74 @@ const getFollowUpLabel = (followUp) =>
 
 const getFollowUpPrompt = (followUp) =>
   typeof followUp === 'string' ? followUp : followUp?.prompt || followUp?.label || ''
+
+const hasMarkdownStructure = (text = '') =>
+  /(^|\n)\s*(?:#{1,6}\s|[-*]\s|\d+[.)、]\s|\|)/m.test(text)
+
+const formatPolicyAnswer = (content = '') => {
+  const text = String(content || '').trim()
+  if (!text || text.length < 80 || text.includes('\n') || hasMarkdownStructure(text)) return content
+
+  return text.replace(/([。！？])\s*(?=[^\n])/g, '$1\n\n')
+}
+
+const getMessageDisplayContent = (message) =>
+  message?.modeKey === 'policy' ? formatPolicyAnswer(message.content) : message?.content || ''
+
+const normalizePolicyEvidence = (sources = []) =>
+  (Array.isArray(sources) ? sources : [])
+    .filter((source) => String(source?.content || '').trim())
+    .slice(0, 3)
+    .map((source, index) => ({
+      id: String(source.id || 'policy-evidence-' + (index + 1)),
+      documentName: String(source.documentName || '制度知识库'),
+      datasetName: String(source.datasetName || ''),
+      content: String(source.content || '').trim(),
+    }))
+
+const appendPolicyEvidenceMessage = async (message) => {
+  const evidence = normalizePolicyEvidence(message?.sources)
+  const capabilityKeys = getCapabilityKeysFromMessage(message)
+
+  messages.value.push({
+    id: createMessageId(),
+    role: 'user',
+    content: '查看相关制度依据',
+    loading: false,
+    ...getCapabilityFields('policy', capabilityKeys),
+  })
+  messages.value.push({
+    id: createMessageId(),
+    role: 'assistant',
+    content: evidence.length
+      ? '以下是本次回答命中的知识库原文片段。'
+      : '当前回答没有返回可展示的知识库原文片段，请重新提问或联系管理员。',
+    loading: false,
+    streaming: false,
+    sources: [],
+    policyEvidence: evidence,
+    messageId: '',
+    expandedSourceId: '',
+    actionPills: [],
+    messageFollowUps: [],
+    followUps: [],
+    ...getCapabilityFields('policy', capabilityKeys),
+  })
+  await scrollToBottom()
+}
+
+const handleMessageFollowUp = async (message, followUp) => {
+  const label = getFollowUpLabel(followUp)
+  if (!label || isChatBusy.value) return
+
+  if (message?.modeKey === 'policy' && label === '查看相关制度依据') {
+    await appendPolicyEvidenceMessage(message)
+    return
+  }
+
+  const prompt = getFollowUpPrompt(followUp)
+  if (prompt) await sendMessage(prompt, { bypassRecentGuard: true })
+}
 
 const appendAssistantMessage = async (content, modeKey = currentMode.value.key) => {
   messages.value.push({
@@ -1982,10 +2050,17 @@ watch(
                 <span class="message-status-dots" aria-hidden="true"><i></i><i></i><i></i></span>
               </div>
               <div
-                v-else-if="message.role === 'assistant' && !message.messageType && message.modeKey !== 'data-query'"
+                v-if="message.role === 'assistant' && !message.messageType && !message.loading && message.modeKey === 'policy' && message.content"
+                class="message-answer-meta"
+              >
+                <span class="message-answer-label">{{ message.policyEvidence?.length ? '制度原文' : '回答' }}</span>
+                <span class="message-answer-mode">制度问答</span>
+              </div>
+              <div
+                v-if="message.role === 'assistant' && !message.messageType && !message.loading && message.modeKey !== 'data-query'"
                 class="markdown-body markdown-content"
-                :class="{ 'data-query-answer': message.modeKey === 'data-query' }"
-                v-html="renderMarkdown(message.modeKey === 'data-query' ? removeDataQueryChartPayload(message.content) : message.content)"
+                :class="{ 'policy-answer': message.modeKey === 'policy' }"
+                v-html="renderMarkdown(getMessageDisplayContent(message))"
               ></div>
               <template v-else-if="message.role === 'user'">{{ message.content }}</template>
 
@@ -2034,12 +2109,20 @@ watch(
                   @click="toggleSource(message, message.sources[0].id)"
                 >
                   <span class="source-drawer-trigger-copy">
-                    <span class="source-drawer-icon" aria-hidden="true">📎</span>
-                    <span>参考依据：《{{ message.sources[0].documentName || '制度知识库' }}》</span>
+                    <span class="source-drawer-icon" aria-hidden="true">
+                      <FileText :size="14" :stroke-width="1.8" />
+                    </span>
+                    <span class="source-drawer-label">参考依据</span>
+                    <span class="source-drawer-name">《{{ message.sources[0].documentName || '制度知识库' }}》</span>
+                    <span class="source-drawer-count">{{ message.sources.length }} 条</span>
                   </span>
-                  <span class="source-toggle" aria-hidden="true">
-                    {{ message.expandedSourceId ? '⌃' : '⌄' }}
-                  </span>
+                  <ChevronDown
+                    class="source-toggle"
+                    :class="{ 'source-toggle-open': message.expandedSourceId }"
+                    :size="16"
+                    :stroke-width="1.8"
+                    aria-hidden="true"
+                  />
                 </button>
                 <Transition name="source-drawer">
                   <div v-if="message.expandedSourceId" class="source-drawer-panel">
@@ -2062,6 +2145,25 @@ watch(
                   </div>
                 </Transition>
               </div>
+
+              <section
+                v-if="message.role === 'assistant' && message.policyEvidence?.length"
+                class="policy-evidence"
+                aria-label="制度原文"
+              >
+                <div class="policy-evidence-heading">
+                  <span>制度原文</span>
+                  <span>本次回答命中的知识库片段</span>
+                </div>
+                <article v-for="source in message.policyEvidence" :key="source.id" class="policy-evidence-source">
+                  <div class="policy-evidence-source-title">
+                    <FileText :size="14" :stroke-width="1.8" aria-hidden="true" />
+                    <span>{{ source.documentName }}</span>
+                    <span v-if="source.datasetName" class="source-dataset">{{ source.datasetName }}</span>
+                  </div>
+                  <pre class="policy-evidence-content">{{ source.content }}</pre>
+                </article>
+              </section>
 
               <section
                 v-if="message.role === 'assistant' && message.missingInput"
@@ -2105,7 +2207,8 @@ watch(
                     :key="getFollowUpLabel(followUp)"
                     type="button"
                     class="message-followup"
-                    @click="sendMessage(getFollowUpPrompt(followUp))"
+                    :disabled="isChatBusy"
+                    @click="handleMessageFollowUp(message, followUp)"
                   >
                     {{ getFollowUpLabel(followUp) }}
                   </button>

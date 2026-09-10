@@ -366,6 +366,17 @@ export function sanitizeMessages(messages = []) {
             position: source.position,
           }))
         : [],
+      policyEvidence: Array.isArray(message.policyEvidence)
+        ? message.policyEvidence
+            .map((source, index) => ({
+              id: String(source.id || 'policy-evidence-' + (index + 1)),
+              documentName: String(source.documentName || '制度知识库').slice(0, 240),
+              datasetName: String(source.datasetName || '').slice(0, 160),
+              content: String(source.content || '').slice(0, 20000),
+            }))
+            .filter((source) => source.content.trim())
+            .slice(0, 3)
+        : [],
     }))
 
   return sanitizedMessages.filter((message, index) => {
