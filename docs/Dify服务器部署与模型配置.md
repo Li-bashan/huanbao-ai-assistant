@@ -15,7 +15,7 @@
 | 内核 | Linux 5.15.0-179-generic x86_64 |
 | SSH 地址 | `121.237.178.23:22` |
 | SSH 用户 | `root` |
-| 环宝助手部署目录 | `/LBSops/huanbao-ai-assistant` |
+| 环宝助手部署目录 | `/opt/huanbao-ai-assistant` |
 | Dify 部署目录 | `/root/dify/dify-main/docker` |
 | Dify 版本 | `1.16.1` |
 | Docker | 29.5.2 |

@@ -119,7 +119,7 @@ git status
 
 ## 部署流程
 
-必须先本地 push，再服务器 pull：
+必须先本地 push，再把构建产物同步到服务器静态目录：
 
 ```bash
 # 本地
@@ -128,10 +128,11 @@ git add .
 git commit -m "说明"
 git push
 
-# 服务器
-cd /LBSops/huanbao-ai-assistant
-git pull
-npm ci
-npm run build
-systemctl reload nginx
+# 服务器（121.237.178.23，服务器不是 Git 工作区）
+# 先通过 scp 上传到 /opt/huanbao-ai-assistant/.release-stage-<release-id>
+cd /opt/huanbao-ai-assistant
+tar -czf backups/dist-<release-id>.tar.gz -C . dist
+rsync -a --delete .release-stage-<release-id>/dist/ dist/
+docker exec docker-nginx-1 nginx -t
+docker exec docker-nginx-1 nginx -s reload
 ```

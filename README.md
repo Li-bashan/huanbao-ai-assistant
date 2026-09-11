@@ -102,11 +102,13 @@ VITE_DATA_QUERY_DEFAULT_PERIOD=今年
 ~/company-projects/huanbao-ai-assistant
 ```
 
-服务器路径：
+服务器静态发布目录：
 
 ```text
-/LBSops/huanbao-ai-assistant
+/opt/huanbao-ai-assistant
 ```
+
+前端由服务器上的 `docker-nginx-1` 容器挂载该目录的 `dist/` 提供服务；服务器不是该项目的 Git 工作区。
 
 访问地址：
 
@@ -143,21 +145,23 @@ git add .
 git commit -m "说明"
 git push
 
-# 服务器
-cd /LBSops/huanbao-ai-assistant
-git pull
-npm ci
-npm run build
-systemctl reload nginx
+# 服务器：将 <release-id> 替换为本次发布编号
+scp -r dist root@121.237.178.23:/opt/huanbao-ai-assistant/.release-stage-<release-id>
+ssh root@121.237.178.23
+cd /opt/huanbao-ai-assistant
+tar -czf backups/dist-<release-id>.tar.gz -C . dist
+rsync -a --delete .release-stage-<release-id>/dist/ dist/
+docker exec docker-nginx-1 nginx -t
+docker exec docker-nginx-1 nginx -s reload
 ```
 
-服务器 `git pull` 拉的是远程仓库，不会读取本地工作区。如果本地显示领先 `origin/main`，必须先 `git push`。
+服务器只托管构建后的 `dist/`，不执行 `git pull`、`npm ci` 或重新构建。发布前必须先推送本地提交，并保留服务器上的压缩备份。
 
 ## 常见问题
 
 - 办公智能报 `Agent Chat App does not support blocking mode`：说明错误使用 blocking，请确认 Gateway/前端走 streaming 和 `response_mode: streaming`。
 - 401：通常是 Dify API Key 错误或环境变量未生效。
-- 页面仍是旧版本：确认本地已 push、服务器已 pull，浏览器强刷缓存。
+- 页面仍是旧版本：确认本地已 push、服务器已同步 `dist/`，并检查容器内 Nginx 配置后强刷浏览器缓存。
 - 历史记录不互通：历史使用浏览器 localStorage，本地、服务器、不同浏览器之间不会同步。
 
 ## 后续开发方向
