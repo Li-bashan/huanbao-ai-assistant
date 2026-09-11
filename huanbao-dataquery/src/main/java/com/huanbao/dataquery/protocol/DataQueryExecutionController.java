@@ -121,11 +121,14 @@ public final class DataQueryExecutionController {
                     "messageId", UUID.randomUUID().toString()));
         } catch (Exception exception) {
             LOGGER.error("Query execution failed, requestId={}", requestId, exception);
+            boolean unsupported = exception instanceof IllegalArgumentException;
             streamDispatcher.send(emitter, "error", Map.of(
                     "requestId", requestId,
                     "conversationId", conversationId,
-                    "code", "QUERY_EXECUTION_FAILED",
-                    "message", "智能问数执行失败，请稍后重试。"));
+                    "code", unsupported ? "QUERY_NOT_SUPPORTED" : "QUERY_EXECUTION_FAILED",
+                    "message", unsupported
+                            ? "暂未识别出可查询的生产指标，请换用指标库中的名称重试。"
+                            : "智能问数执行失败，请稍后重试。"));
         } finally {
             streamDispatcher.complete(emitter);
         }

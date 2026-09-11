@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智能问数界面预览</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #eef6ff;
+      }
+
+      .preview-shell {
+        width: min(100%, 760px);
+        margin: 0 auto;
+      }
+
+      .preview-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .preview-toolbar button {
+        min-height: 30px;
+        padding: 0 12px;
+        border: 1px solid #b9dcf8;
+        border-radius: 6px;
+        color: #176dcc;
+        background: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .preview-toolbar button.is-active,
+      .preview-toolbar button:hover {
+        border-color: #74aee6;
+        background: #eaf4ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview-shell">
+      <div class="preview-toolbar">
+        <button type="button" data-scenario="trend" class="is-active">TREND 场景</button>
+        <button type="button" data-scenario="fact">FACT 单值</button>
+      </div>
+      <div id="preview-root"></div>
+    </main>
+
+    <script type="module">
+      import { createApp } from 'vue'
+      import DataQueryResult from '/src/components/DataQueryResult.vue'
+
+      const rows = [
+        { period: '2026-03', organization: '秦皇岛公司', indicator: '发电量', value: 0.1141, yearOverYearPercent: -6.47, monthOverMonthPercent: -0.08 },
+        { period: '2026-04', organization: '秦皇岛公司', indicator: '发电量', value: 0.1479, yearOverYearPercent: 6.7, monthOverMonthPercent: 29.7 },
+        { period: '2026-05', organization: '秦皇岛公司', indicator: '发电量', value: 0.1599, yearOverYearPercent: 45.47, monthOverMonthPercent: 8.08 },
+        { period: '2026-06', organization: '秦皇岛公司', indicator: '发电量', value: 0.1449, yearOverYearPercent: 21.97, monthOverMonthPercent: -9.38 },
+        { period: '2026-07', organization: '秦皇岛公司', indicator: '发电量', value: 0.1247, yearOverYearPercent: -21.54, monthOverMonthPercent: -13.92 },
+        { period: '2026-08', organization: '秦皇岛公司', indicator: '发电量', value: 0.1417, yearOverYearPercent: 0.11, monthOverMonthPercent: 13.58 },
+      ]
+
+      const columns = [
+        { key: 'period', label: '周期', type: 'text' },
+        { key: 'organization', label: '对象', type: 'text' },
+        { key: 'indicator', label: '指标', type: 'text' },
+        { key: 'value', label: '数值', type: 'number' },
+        { key: 'yearOverYearPercent', label: '同比', type: 'number' },
+        { key: 'monthOverMonthPercent', label: '环比', type: 'number' },
+      ]
+
+      const dataInfo = {
+        analysisType: 'FACT',
+        indicatorName: '发电量',
+        indicatorCode: '1001',
+        unit: '万度',
+        timeRange: { expression: '近半年', start: '2026-03', end: '2026-08', endExclusive: true },
+        dataCutoffDate: '2026-08-31',
+        aggregation: 'SUM',
+        organizationScope: { type: 'PROJECT_COMPANY', names: ['秦皇岛公司'], codes: ['10004024'] },
+        rowCount: rows.length,
+        validation: { status: 'SUCCESS_WITH_DATA', dataPresent: true },
+      }
+
+      const scenarios = {
+        trend: {
+          protocolVersion: '2.0',
+          status: 'SUCCESS_WITH_DATA',
+          messageType: 'analysis',
+          analysisType: 'FACT',
+          protocolValid: true,
+          meta: { sourceLabel: '生产指标库', durationMs: 1200, tokenUsage: { totalTokens: 1234 } },
+          content: {
+            title: '发电量分析',
+            summary: '发电量查询完成，共返回6条经过校验的数据。',
+            metrics: [{ label: '发电量', value: 0.1417, unit: '万度' }],
+            table: { columns, rows, total: rows.length },
+            dataInfo,
+          },
+        },
+        fact: {
+          protocolVersion: '2.0',
+          status: 'SUCCESS_WITH_DATA',
+          messageType: 'analysis',
+          analysisType: 'FACT',
+          protocolValid: true,
+          meta: { sourceLabel: '生产指标库', durationMs: 800 },
+          content: {
+            title: '2026年8月秦皇岛公司发电量',
+            summary: '2026年8月秦皇岛公司发电量为0.1417万度，同比上升0.11%，环比上升13.58%。',
+            metrics: [
+              { label: '发电量', value: 0.1417, unit: '万度' },
+              { label: '同比', value: 0.11, unit: '%' },
+              { label: '环比', value: 13.58, unit: '%' },
+            ],
+            table: null,
+            dataInfo: {
+              ...dataInfo,
+              timeRange: { expression: '2026年8月', start: '2026-08', end: '2026-08', endExclusive: true },
+              rowCount: 1,
+            },
+          },
+        },
+      }
+
+      const mount = (scenario) => {
+        document.querySelector('#preview-root').innerHTML = ''
+        createApp(DataQueryResult, {
+          data: scenarios[scenario],
+          windowView: 'full',
+        }).mount('#preview-root')
+      }
+
+      mount('trend')
+
+      document.querySelectorAll('.preview-toolbar button').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('.preview-toolbar button').forEach((item) => item.classList.remove('is-active'))
+          button.classList.add('is-active')
+          mount(button.dataset.scenario)
+        })
+      })
+    </script>
+  </body>
+</html>

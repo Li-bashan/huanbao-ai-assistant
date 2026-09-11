@@ -119,6 +119,19 @@ class IntentClassifierTest {
     }
 
     @Test
+    void recognizesCommonWasteProcessingAlias() {
+        expectRequest().andRespond(withServerError());
+
+        AnalysisPlanDto plan = classifier.classify("查询今年各项目公司垃圾处理量排名，展示前十名。");
+
+        assertEquals("DATA_QUERY", plan.primaryIntent());
+        assertEquals(List.of("垃圾处理量"), plan.metricInputs());
+        assertEquals(List.of("项目公司"), plan.orgInputs());
+        assertEquals("今年", plan.timeExpression());
+        assertEquals("RANKING", plan.analysisType());
+    }
+
+    @Test
     void keepsSystemPromptWithin250CharactersAndInjectsControlledTerms() {
         String prompt = classifier.buildSystemPrompt("秦皇岛今年发电量排名");
 

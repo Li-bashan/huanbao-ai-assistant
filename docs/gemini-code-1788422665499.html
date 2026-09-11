@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>环宝 AI 智能助手前端体验升级与组件治理方案</title>
+  <style>
+    :root {
+      --primary: #1e50a2;
+      --primary-dark: #0f326a;
+      --primary-light: #e8f0fe;
+      --success: #137333;
+      --warning: #b06000;
+      --danger: #c5221f;
+      --gray-50: #f8f9fa;
+      --gray-100: #f1f3f4;
+      --gray-200: #e8eaed;
+      --gray-300: #dadce0;
+      --gray-700: #3c4043;
+      --gray-900: #202124;
+      --code-bg: #1e1e1e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--gray-900);
+      background-color: var(--gray-50);
+      line-height: 1.6;
+      display: flex;
+    }
+    nav.toc {
+      width: 300px;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      border-right: 1px solid var(--gray-300);
+      padding: 24px 16px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    nav.toc h2 { font-size: 15px; color: var(--primary); margin-bottom: 12px; font-weight: 700; }
+    nav.toc ul { list-style: none; }
+    nav.toc li { margin-bottom: 6px; }
+    nav.toc a {
+      color: var(--gray-700);
+      text-decoration: none;
+      font-size: 13px;
+      display: block;
+      padding: 6px 10px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    nav.toc a:hover { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+    main.content {
+      flex-grow: 1;
+      max-width: 1100px;
+      padding: 40px 48px;
+      background: #fff;
+      margin: 20px auto;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 24px; color: var(--primary-dark); border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-bottom: 20px; }
+    h2 { font-size: 18px; color: var(--primary); margin: 30px 0 14px; border-left: 4px solid var(--primary); padding-left: 10px; }
+    h3 { font-size: 15px; color: var(--gray-900); margin: 18px 0 10px; font-weight: 600; }
+    p, ul, ol { margin-bottom: 14px; font-size: 13.5px; color: var(--gray-700); }
+    ul, ol { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    th, td { border: 1px solid var(--gray-300); padding: 9px 12px; text-align: left; }
+    th { background: var(--gray-100); font-weight: 600; color: var(--gray-900); }
+    pre {
+      background: var(--code-bg);
+      color: #d4d4d4;
+      padding: 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      margin: 14px 0;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+    .badge-primary { background: var(--primary-light); color: var(--primary); }
+    .badge-success { background: #e6f4ea; color: var(--success); }
+    .badge-danger { background: #fce8e6; color: var(--danger); }
+    .callout {
+      border-left: 4px solid var(--primary);
+      background: var(--primary-light);
+      padding: 12px 16px;
+      border-radius: 0 4px 4px 0;
+      margin: 16px 0;
+      font-size: 13px;
+    }
+    .callout.danger { border-left-color: var(--danger); background: #fce8e6; }
+    .callout.success { border-left-color: var(--success); background: #e6f4ea; }
+    .prompt-box {
+      background: #282c34;
+      color: #abb2bf;
+      border-radius: 6px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+    .prompt-header {
+      display: flex;
+      justify-content: space-between;
+      color: #61afef;
+      font-size: 12px;
+      font-weight: bold;
+      border-bottom: 1px solid #3e4451;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="toc">
+    <h2>升级方案索引</h2>
+    <ul>
+      <li><a href="#sec-1">1. 建设定调与生产基线</a></li>
+      <li><a href="#sec-2">2. 能力架构：4大业务+2项平台</a></li>
+      <li><a href="#sec-3">3. 智能问数：Generative UI 矩阵</a></li>
+      <li><a href="#sec-4">4. 跨能力协同：数据到公文闭环</a></li>
+      <li><a href="#sec-5">5. 组件治理原则：不造平行轮子</a></li>
+      <li><a href="#sec-6">6. 交互原型与客观公文呈现</a></li>
+      <li><a href="#sec-7">7. 流程助手动作回执与审计闭环</a></li>
+      <li><a href="#sec-8">8. Codex 分步执行提示词（带状态机）</a></li>
+      <li><a href="#sec-9">9. 生产签收级验收标准</a></li>
+    </ul>
+  </nav>
+
+  <main class="content">
+    <h1>环宝 AI 智能助手前端体验升级与组件治理方案</h1>
+    <div class="callout success">
+      <strong>基准声明：</strong>本项目已于 2026-09-03 通过生产验收签收（Final Sign-off: APPROVED）。<br>
+      任何实施必须以保持 <code>ai-gateway(8088)</code>、<code>huanbao-dataquery(8089)</code>、10/10 实库回归基线与 Aviator 字典契约为第一原则，严禁推倒重写已验收链路！
+    </div>
+
+    <!-- 章节 1 -->
+    <h2 id="sec-1">一、 建设定调：从“全量重构”转向“体验升级与组件治理”</h2>
+    <p>由于后端微服务微内核（huanbao-dataquery）已经稳态运行，涵盖 DomainSemanticProvider、SQL AST 组织注入、只读 KingbaseES、46 项指标语义及 63 家实体厂闭环。前端核心任务已明确为：</p>
+    <ul>
+      <li><strong>定调降维</strong>：严禁使用“前端全量重构”这一危险口号，正式定名为<strong>《前端体验升级与组件治理方案》</strong>，防止代码生成工具对生产链路造成“改退化”；</li>
+      <li><strong>渐进增强</strong>：保留现有的 <code>DataQueryResult.vue</code>、<code>DataQueryChart.vue</code>、<code>dataQueryProtocol.js</code> 和 SSE 管道，在其基础上向上做多分析类型适配与细节打磨；</li>
+      <li><strong>动态驱动</strong>：消灭死板的单一问数模板，改为由后端的 <code>analysisType</code> 动态驱动 Generative UI。</li>
+    </ul>
+
+    <!-- 章节 2 -->
+    <h2 id="sec-2">二、 能力架构：四大业务能力 + 两项平台通用支撑</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>分类</th>
+          <th>能力名称</th>
+          <th>生产链路与协议</th>
+          <th>治理与增强重点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="4"><strong>四大业务能力</strong></td>
+          <td><strong>制度问答 (policy)</strong></td>
+          <td>Gateway 代理 Dify 知识库检索</td>
+          <td>保留现有 Dify 知识库资产；强化 Markdown 排版与原文来源抽屉，过滤 <code>&lt;think&gt;</code>。</td>
+        </tr>
+        <tr>
+          <td><strong>办公智能 (office-ai)</strong></td>
+          <td>Gateway 代理 Master SSE 流式服务</td>
+          <td>严禁在低代码平台上写死业务逻辑；保障打字机实时流，卡片提供复制、Word 导出。</td>
+        </tr>
+        <tr>
+          <td><strong>流程助手 (workflow)</strong></td>
+          <td>前端卡片 + iGIX postMessage 桥</td>
+          <td>动态发现菜单；仅 verified 单据展示按钮，补齐父页面 ACK 确认与动作审计落库。</td>
+        </tr>
+        <tr>
+          <td><strong>智能问数 (data-query)</strong></td>
+          <td>Gateway 签名身份 + huanbao-dataquery 微服务</td>
+          <td>扩展 FACT、TREND、RANKING 等多视图；拒绝派生指标前端 AVG；未授权极简阻断。</td>
+        </tr>
+        <tr>
+          <td rowspan="2"><strong>两项平台支撑</strong></td>
+          <td><strong>智能自适应 (adaptive)</strong></td>
+          <td>前端 UI 提示 + Gateway 统一分发</td>
+          <td>定位为全局路由交互层，消除中心区写死子助手的误导；负责会话上下文平滑流转。</td>
+        </tr>
+        <tr>
+          <td><strong>文件支持池 (File Hub)</strong></td>
+          <td>前端轻量抽取 + Gateway 文档接口</td>
+          <td>定位为通用附件工具；一期仅服务公文背景提取与表格预览，不直接混入生产指标库。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 章节 3 -->
+    <h2 id="sec-3">三、 智能问数 Generative UI 矩阵（彻底解耦单一模板）</h2>
+    <p>拒绝所有问题硬套“近半年累计+最新月+同比+环比”；前端 <code>DataQueryResult.vue</code> 必须按微服务返回的 <code>analysisType</code> 动态渲染对应的视觉呈现：</p>
+    <table>
+      <thead>
+        <tr>
+          <th>analysisType</th>
+          <th>业务场景示例</th>
+          <th>动态 Generative UI 呈现规范</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>FACT</code> / <code>DETAIL</code></td>
+          <td>秦皇岛8月份发电量是多少</td>
+          <td>单值 KPI 胶囊 + 当期数据口径说明 + 历史同比/环比标签。不强行画多月折线图。</td>
+        </tr>
+        <tr>
+          <td><code>TREND</code></td>
+          <td>查询秦皇岛近半年的全厂发电量</td>
+          <td><strong>方案 A 模板</strong>：近半年累计 + 当期值 + 同环比 KPI；连续折线图；副标题“【周期】【指标】数据要点”（最高、最低、最新环比、走势）。</td>
+        </tr>
+        <tr>
+          <td><code>RANKING</code></td>
+          <td>今年项目公司发电量排名</td>
+          <td>TopN 排名柱状图 + 紧凑排行事实清单（排名、企业名称、数值、占比）+ 导出 CSV。</td>
+        </tr>
+        <tr>
+          <td><code>COMPARISON</code></td>
+          <td>秦皇岛与保定8月发电量对比</td>
+          <td>双主体对标 KPI 组 + 并排柱状对比图 + 差异额与幅度计算。</td>
+        </tr>
+        <tr>
+          <td><code>ANOMALY</code></td>
+          <td>秦皇岛近期数据波动异常排查</td>
+          <td>异常警示卡（⚠ 值得关注）+ 环比异动明细 + 关联指标线索（仅在查得实测值时出现）。</td>
+        </tr>
+        <tr>
+          <td><code>OVERVIEW</code></td>
+          <td>集团垃圾焚烧板块经营总览</td>
+          <td>多板块 KPI 矩阵 + 产能与电量大盘分布 + 经营简报公文块。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 章节 4 -->
+    <h2 id="sec-4">四、 跨能力协同：经营分析向办公公文的受控闭环</h2>
+    <p>为满足“查近三个月垃圾入厂量，帮我做一份分析简报”等复合需求，正式确立跨模块协同链路：</p>
+    <div class="callout">
+      <strong>协同铁律：问数负责事实，办公负责表达。</strong><br>
+      1. 统一中枢分流至 <code>composite_data_to_doc</code>；<br>
+      2. <code>huanbao-dataquery</code> 执行只读查询与统计审计，输出确凿的数据 JSON；<br>
+      3. 将结构化事实注入 Office AI，生成公文级简报；<br>
+      4. 前端既挂载 KPI 与趋势图，下方又无缝衔接简报正文，并支持一键导出带图表的正式报告。
+    </div>
+
+    <!-- 章节 5 -->
+    <h2 id="sec-5">五、 组件治理原则：基于现有资产演进，不造平行轮子</h2>
+    <div class="callout danger">
+      <strong>禁止重造平行组件：</strong><br>
+      严禁新建 <code>DataQueryResultCard.vue</code>、<code>OldDataQueryCard.vue</code>！所有问数体验升级必须在既有 <code>src/components/DataQueryResult.vue</code> 与 <code>DataQueryChart.vue</code> 内通过条件插槽实现。历史记录功能必须保留现有非抽屉形态，严禁违反交接文档将其改成右侧抽屉式。
+    </div>
+
+    <!-- 章节 6 -->
+    <h2 id="sec-6">六、 核心交互原型与客观公文呈现</h2>
+
+    <h3>1. 全员智能自适应欢迎面板（权限透明感知）</h3>
+    <pre>
++-----------------------------------------------------------------------------+
+|  环宝 AI 智能助手  ● 在线服务中               [能力: 4项] [ 智能自适应 ▾ ] [⤢] [✕] |
++-----------------------------------------------------------------------------+
+|                                                                             |
+|      🤖                                                                     |
+|   您好，李巴山！我是环宝 AI 智能助手                                        |
+|   已接入规章制度知识库、办公公文助手、生产智能问数及业务办理流程。          |
+|                                                                             |
+|   +-------------------+  +-------------------+                              |
+|   | 📖 规章制度查询   |  | 📊 生产智能问数   |                              |
+|   | · 差旅住宿报销标准|  | · 各电厂发电量查询| (未授权用户显示: 🔒 需授权)  |
+|   | · 公务用车管理规定|  | · 项目公司生产排名|                              |
+|   +-------------------+  +-------------------+                              |
+|   +-------------------+  +-------------------+                              |
+|   | 📝 办公公文起草   |  | ⚡ 业务流程指引   |                              |
+|   | · 起草系统维护通知|  | · 打开采购请示单  |                              |
+|   | · 规范会议纪要格式|  | · 查阅我的待办任务|                              |
+|   +-------------------+  +-------------------+                              |
+|                                                                             |
++-----------------------------------------------------------------------------+
+| [📎 上传文件]  需要协助处理什么事项？输入问题或拖入文件...       [ 发送 ⬆ ] |
++-----------------------------------------------------------------------------+
+    </pre>
+
+    <h3>2. TREND 场景已授权卡片（方案 A：无 AI 腔公文 + 动态截止日）</h3>
+    <pre>
++-----------------------------------------------------------------------------+
+| [⚡ 智能问数] 耗时 1.2s · 来源: 生产指标库                 [ 导出 CSV ] [ 导出简报 ▾ ] [⤢] |
++-----------------------------------------------------------------------------+
+|  中节能（秦皇岛）环保能源有限公司 · 全厂发电量                              |
+|                                                                             |
+|  近半年秦皇岛公司全厂发电量整体呈波动走势，8月较上月增长 13.58%，最近两个月   |
+|  连续回升。当前数据更新至 {{ dynamicDataCutoffDate }}。                     |
+|                                                                             |
+|  +--------------------+  +--------------------+  +--------------------+  +--------------------+
+|  | 近半年累计         |  | 最新月 (2026-08)   |  | 8月同比变动        |  | 8月环比变动        |
+|  | 0.8234 万度        |  | 0.1417 万度        |  | +0.11%  ▲          |  | +13.58% ▲          |
+|  +--------------------+  +--------------------+  +--------------------+  +--------------------+
+|                                                                             |
+|  全厂发电量近半年走势 (2026-03 至 2026-08)              单位: 万度          |
+|   0.16 ┤          ╭─╮                                                       |
+|   0.14 ┤    ╭─╮  │ │       ╭─●                                             |
+|   0.12 ┤  ╭─╯ ╰──╯ ╰───╮   │                                                |
+|   0.10 ┤──╯             ╰──╯                                                |
+|        └────┬─────┬─────┬─────┬─────┬────                                   |
+|           03月  04月  05月  06月  07月  08月                                |
+|          (0.1141) (0.1479) (0.1599) (0.1449) (0.1247) (0.1417)              |
+|                                                                             |
+|  近半年发电量数据要点                                                       |
+|  • 最高月份：5月 (0.1599 万度)                                              |
+|  • 最低月份：3月 (0.1141 万度)                                              |
+|  • 最新月环比：+13.58%                                                      |
+|  • 最近 2 个月：连续回升                                                    |
+|                                                                             |
+|  ⚠ 值得关注 (仅在环比异动且实测得同期入厂垃圾量等关联数据时显示，否则物理隐藏)|
+|  • 7月发电量环比下降 21.98%                                                 |
+|  • 同期生活垃圾入厂量下降 18.45%                                            |
+|                                                                             |
+|  [▶ 查看月度明细数据 (折叠抽屉) ▾]                                          |
+|                                                                             |
+|  后续分析 (严格由当前分析计划推导)：                                        |
+|  [查看项目公司近半年排名]   [和去年同期比较]   [查看8月环比回升原因]          |
++-----------------------------------------------------------------------------+
+    </pre>
+
+    <!-- 章节 7 -->
+    <h2 id="sec-7">七、 流程助手动作回执与审计闭环</h2>
+    <p>消灭“前端 postMessage 发出即代表表单打开”的假闭环漏洞，规范三方握手与审计：</p>
+    <pre>
+环宝助手 (actionBridge)
+   │
+   │  1. postMessage(IGIX_AI_ACTION, payload + actionId) [显式 portalOrigin]
+   ▼
+iGIX 门户父页面
+   │
+   │  2. 权限校验、openMenu、打开业务表单
+   │  3. 回传 postMessage(IGIX_AI_ACTION_ACK, { actionId, status: 'success' | 'failed' })
+   ▼
+环宝助手
+   │
+   │  4. 收到 ACK：更新卡片状态为“已在门户中打开”
+   │  5. 异步调用 POST /api/ai/action-audits，完成真实落库
+    </pre>
+
+    <!-- 章节 8 -->
+    <h2 id="sec-8">八、 Codex 单一演进流任务卡（避免失忆与代码回退）</h2>
+    <p>为杜绝多会话失忆造成系统改退化，所有 Codex 执行严格依赖 <code>docs/implementation-state.md</code> 状态留痕，按步演进：</p>
+
+    <!-- Task 1 -->
+    <div class="prompt-box">
+      <div class="prompt-header">
+        <span>Task 1：自适应欢迎工作台与基础布局治理</span>
+        <span>阶段：Checkpoint 1</span>
+      </div>
+      <pre>
+你现在是环宝 AI 智能助手的前端资深研发工程师。
+请在绝对不破坏现有生产微服务、Dify 代理与组件资产的前提下，执行 Task 1。
+
+【前置检查与上下文】
+1. 阅读 docs/00-项目总览/FINAL_DELIVERY_REPORT.md 与 项目总览与交接.md。
+2. 确认当前架构：ai-gateway(8088) + huanbao-dataquery(8089) 稳态运行中。
+3. 检查 git status，严禁修改任何 Java 后端与 SQL 目录。
+
+【执行目标】
+1. 优化 src/App.vue 欢迎展示区：
+   - 彻底消除“我是环宝制度问答助手”的偏向文案；
+   - 替换为全局中立欢迎文案：“您好，[用户名]！我是环宝 AI 智能助手”；
+   - 平级展示四大能力（制度、公文、问数、流程），问数卡片对未授权用户标注“🔒 需授权”；
+   - 严禁把历史功能改成抽屉式，保持当前面板原生交互，补齐搜索与模式 Tag 过滤。
+2. 规范 responsive.css，确保在 400px iframe 下不出现横向滚动条。
+3. 执行 npm run build 确保构建通过。
+4. 更新 docs/implementation-state.md 记录变更。
+      </pre>
+    </div>
+
+    <!-- Task 2 -->
+    <div class="prompt-box">
+      <div class="prompt-header">
+        <span>Task 2：DataQueryResult.vue 多分析类型与方案 A 增强</span>
+        <span>阶段：Checkpoint 2</span>
+      </div>
+      <pre>
+你现在是环宝 AI 智能助手的前端资深研发工程师。
+请执行 Task 2：智能问数结果卡片的多分析类型 Generative UI 增强。
+
+【严禁行为】
+- 严禁新建 DataQueryResultCard.vue 等平行文件！所有逻辑必须在既有 src/components/DataQueryResult.vue 与 DataQueryChart.vue 内演进！
+- 严禁前端自行求 AVG() 派生指标，必须严格消费后端 Aviator 加权计算值！
+- 严禁硬编码截止日期（必须动态读取后端 dataCutoffDate）！
+
+【执行目标】
+1. 增强 DataQueryResult.vue：
+   - 根据 analysisType（FACT, TREND, RANKING, COMPARISON, ANOMALY）条件渲染不同视图；
+   - TREND 类型下落地“方案 A”：
+     * 展示“近半年累计 + 当期值 + 同比 + 环比”4 核心 KPI；
+     * 图表下方副标题为：“近半年发电量数据要点”，客观展示最高月、最低月、最新环比、连续走势；
+     * 仅在检测到异常且包含实测关联数据时展示“⚠ 值得关注”；
+     * 彻底过滤掉“运行特征摘要”等虚词。
+   - 当 access 鉴权未通过时，展示极简锁图标阻断态并禁用输入框。
+2. 执行 npm run build。
+3. 更新 docs/implementation-state.md。
+      </pre>
+    </div>
+
+    <!-- Task 3 -->
+    <div class="prompt-box">
+      <div class="prompt-header">
+        <span>Task 3：流程助手 ACK 闭环与通用文件支持</span>
+        <span>阶段：Checkpoint 3</span>
+      </div>
+      <pre>
+你现在是环宝 AI 智能助手的前端资深研发工程师。
+请执行 Task 3：流程动作回执闭环与通用文件辅助接入。
+
+【执行目标】
+1. 治理 src/utils/actionBridge.js：
+   - 确保 postMessage 使用显式 portalOrigin，绝不使用 '*'；
+   - 注入唯一 actionId，并新增 window.addEventListener('message') 监听 IGIX_AI_ACTION_ACK；
+   - 收到成功回执后再将卡片置为“已在门户中打开”，并异步调用 /api/ai/action-audits 记账。
+2. 接入通用文件上传面板（输入框附件池）：
+   - 支持 PDF / Word 文本抽取，透传至公文起草助手作为上下文；
+   - 引入 xlsx 轻量解析用户私有 Excel 表头预览，不混入指标生产库。
+3. 执行 npm run build。
+4. 全量回归 10/10 生产用例，更新 docs/implementation-state.md。
+      </pre>
+    </div>
+
+    <!-- 章节 9 -->
+    <h2 id="sec-9">九、 生产签收级验收标准（决不妥协的北极星指标）</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>验收维度</th>
+          <th>生产稳态基线</th>
+          <th>本次升级验收红线</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>实库业务场景</strong></td>
+          <td>10 大核心业务场景 10/10 PASS</td>
+          <td><strong>10/10 PASS，0 failure，0 error</strong>。核心问数逻辑与连续追问绝对不退化。</td>
+        </tr>
+        <tr>
+          <td><strong>指标与组织口径</strong></td>
+          <td>46 项指标语义覆盖、63 家电厂范围闭环</td>
+          <td>Aviator 计算公式保持生效，严禁前端自行平均，63 家电厂白名单权限有效。</td>
+        </tr>
+        <tr>
+          <td><strong>并发与响应性能</strong></td>
+          <td>20 并发，P95 &lt; 4.384 秒，错误率 0%</td>
+          <td>前端组件治理不得引入重型渲染阻塞，20 并发下 <strong>错误率必须保持 0%</strong>，10 秒决策达成率 100%。</td>
+        </tr>
+        <tr>
+          <td><strong>网络与数据安全</strong></td>
+          <td>SIGNED_HEADER + HMAC 鉴权</td>
+          <td>控制台无 Dify Key、无前端直传 SQL，postMessage 严格使用明确 Origin。</td>
+        </tr>
+      </tbody>
+    </table>
+
+  </main>
+</body>
+</html>

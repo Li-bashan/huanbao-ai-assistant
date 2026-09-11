@@ -31,6 +31,7 @@ import DataQueryHome from './components/DataQueryHome.vue'
 import DataQueryUserAdmin from './components/DataQueryUserAdmin.vue'
 import PromptStarters from './components/PromptStarters.vue'
 import WorkflowActionCard from './components/WorkflowActionCard.vue'
+import WorkflowSelectionCard from './components/WorkflowSelectionCard.vue'
 import HuanbaoWelcome from './components/welcome/HuanbaoWelcome.vue'
 import { sendMasterChatMessage, stopChatMessage } from './services/chatApi'
 import { streamDataQueryMessage } from './services/dataQueryApi.js'
@@ -612,6 +613,21 @@ const createWorkflowCardMessage = (workflowResult, capabilityKeys = ['workflow']
   },
 })
 
+const createWorkflowSelectionMessage = (workflowResult, capabilityKeys = ['workflow']) => ({
+  id: createMessageId(),
+  role: 'assistant',
+  content: workflowResult.content || '请选择要打开的业务入口。',
+  loading: false,
+  streaming: false,
+  sources: [],
+  messageId: '',
+  expandedSourceId: '',
+  ...getCapabilityFields('workflow', capabilityKeys),
+  workflowSelection: {
+    groups: workflowResult.workflowGroups || [],
+  },
+})
+
 const inputRequestPattern = /^(请|需要|请您|请将|请把).{0,24}(提供|补充|粘贴|上传|输入)/
 const businessActionNames = new Set([
   'open_policy',
@@ -831,25 +847,17 @@ const sendWorkflowMessage = async (content, capabilityKeys = ['workflow']) => {
 
   if (workflowResult.matched) {
     if (workflowResult.type === 'workflow_list') {
-      messages.value.push({
-        id: createMessageId(),
-        role: 'assistant',
-        content: workflowResult.content,
-        loading: false,
-        streaming: false,
-        sources: [],
-        messageId: '',
-        expandedSourceId: '',
-        ...getCapabilityFields('workflow', capabilityKeys),
-      })
+      messages.value.push(createWorkflowSelectionMessage(workflowResult, capabilityKeys))
     } else {
       messages.value.push(createWorkflowCardMessage(workflowResult, capabilityKeys))
     }
+  } else if (workflowResult.type === 'workflow_selection') {
+    messages.value.push(createWorkflowSelectionMessage(workflowResult, capabilityKeys))
   } else {
     messages.value.push({
       id: createMessageId(),
       role: 'assistant',
-      content: `我已收到您的流程办理需求：“${content}”。请补充您要办理的具体表单或流程名称，例如采购请示单、合同评审流程、我的待办等。`,
+      content: '请直接输入或选择要打开的表单或流程名称。',
       loading: false,
       streaming: false,
       sources: [],
@@ -862,6 +870,14 @@ const sendWorkflowMessage = async (content, capabilityKeys = ['workflow']) => {
   inputValue.value = ''
   conversationId.value = ''
   await scrollToBottom()
+}
+
+const handleWorkflowSelection = (workflow) => {
+  const workflowName = String(workflow?.workflowName || '').trim()
+  if (!workflowName || isChatBusy.value) return
+
+  inputValue.value = `打开${workflowName}`
+  sendMessage(inputValue.value, { bypassRecentGuard: true })
 }
 
 const sendDataQueryExplorationMessage = async (content, exploration) => {
@@ -1607,11 +1623,23 @@ const switchMode = async (modeKey) => {
   if (isChatBusy.value) return
   if (nextMode.key === currentMode.value.key) return
 
+  const activeConversation = saveActiveConversation()
+  if (activeConversation) {
+    conversationHistory.value = saveConversationToHistory(activeConversation)
+  }
+
+  messages.value = []
+  inputValue.value = ''
+  inputAssistPlaceholder.value = ''
+  conversationId.value = ''
+  conversationIds.value = {}
+  dataQueryAnalysisState.value = ''
+  currentConversationId.value = createConversationId()
+  clearCurrentConversation()
   currentModeKey.value = nextMode.key
   isModeLocked.value = true
   saveModeLock(true)
   saveModeKey(nextMode.key)
-  conversationId.value = getModeConversationId(nextMode.key)
   await scrollToBottom()
 }
 
@@ -2104,6 +2132,12 @@ watch(
                 v-if="message.workflowCard"
                 :card="message.workflowCard"
                 @action="handleWorkflowActionClick(message.workflowCard, $event)"
+              />
+
+              <WorkflowSelectionCard
+                v-if="message.workflowSelection?.groups?.length"
+                :groups="message.workflowSelection.groups"
+                @select="handleWorkflowSelection"
               />
 
               <div

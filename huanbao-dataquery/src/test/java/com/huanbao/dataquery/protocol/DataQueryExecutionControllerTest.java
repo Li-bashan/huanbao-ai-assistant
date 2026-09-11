@@ -89,4 +89,41 @@ class DataQueryExecutionControllerTest {
         verify(pipeline, never()).execute(anyString(), any(), anyString(), any());
         verify(dispatcher).complete(emitter);
     }
+
+    @Test
+    void returnsActionableErrorWhenQueryCannotBeResolved() {
+        IntentClassifier classifier = mock(IntentClassifier.class);
+        DataToDocPipelineService pipeline = mock(DataToDocPipelineService.class);
+        ProtocolAssembler assembler = mock(ProtocolAssembler.class);
+        SseStreamDispatcher dispatcher = mock(SseStreamDispatcher.class);
+        SseEmitter emitter = mock(SseEmitter.class);
+        AnalysisPlanDto plan = new AnalysisPlanDto(
+                "DATA_QUERY", List.of(), List.of("项目公司"), "今年", "FACT", List.of());
+
+        when(dispatcher.createEmitter()).thenReturn(emitter);
+        when(dispatcher.send(any(), anyString(), any())).thenReturn(true);
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(1)).run();
+            return null;
+        }).when(dispatcher).dispatch(eq(emitter), any(Runnable.class));
+        when(classifier.classify("查一个未知指标")).thenReturn(plan);
+        when(pipeline.execute(anyString(), eq(plan), eq("查一个未知指标"), eq(List.of("10004024"))))
+                .thenThrow(new IllegalArgumentException("The analysis plan has no metric input"));
+
+        DataQueryExecutionController controller = new DataQueryExecutionController(
+                classifier, pipeline, assembler, dispatcher);
+        controller.execute(
+                new QueryExecuteRequest("查一个未知指标", "conversation"),
+                "user-7",
+                "10004024");
+
+        var payload = forClass(Object.class);
+        verify(dispatcher).send(eq(emitter), eq("error"), payload.capture());
+        Map<?, ?> error = (Map<?, ?>) payload.getValue();
+        org.junit.jupiter.api.Assertions.assertEquals("QUERY_NOT_SUPPORTED", error.get("code"));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "暂未识别出可查询的生产指标，请换用指标库中的名称重试。",
+                error.get("message"));
+        verify(dispatcher).complete(emitter);
+    }
 }

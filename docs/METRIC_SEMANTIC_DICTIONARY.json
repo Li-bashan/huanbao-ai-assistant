@@ -163,7 +163,7 @@
     {
       "indicatorCode": "1201",
       "formalName": "生活垃圾入厂量",
-      "aliases": ["进厂垃圾量", "入厂垃圾量", "垃圾入厂量", "生活垃圾进厂量", "生活垃圾入厂总量"],
+      "aliases": ["进厂垃圾量", "入厂垃圾量", "垃圾入厂量", "生活垃圾进厂量", "生活垃圾入厂总量", "垃圾处理量", "生活垃圾处理量"],
       "category": "产量",
       "metricType": "ATOMIC",
       "isNonAdditive": false,

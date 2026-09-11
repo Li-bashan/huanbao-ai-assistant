@@ -156,6 +156,29 @@ function sanitizeExecutionProcess(process) {
   }
 }
 
+function sanitizeWorkflowSelection(selection) {
+  if (!selection || !Array.isArray(selection.groups)) return null
+
+  const groups = selection.groups
+    .map((group) => ({
+      moduleName: String(group?.moduleName || '').trim(),
+      workflows: Array.isArray(group?.workflows)
+        ? group.workflows
+            .slice(0, 30)
+            .map((workflow) => ({
+              id: String(workflow?.id || workflow?.workflowName || '').trim(),
+              workflowName: String(workflow?.workflowName || workflow?.name || '').trim(),
+              description: String(workflow?.description || '').trim(),
+              status: String(workflow?.status || 'pending').trim(),
+            }))
+            .filter((workflow) => workflow.id && workflow.workflowName)
+        : [],
+    }))
+    .filter((group) => group.moduleName && group.workflows.length)
+
+  return groups.length ? { groups } : null
+}
+
 function sanitizeFollowUps(followUps) {
   if (!Array.isArray(followUps)) return []
 
@@ -266,6 +289,7 @@ export function sanitizeMessages(messages = []) {
         message.role === 'assistant' &&
         !content &&
         !message.workflowCard &&
+        !message.workflowSelection &&
         !chartOption &&
         !message.missingInput &&
         !executionProcess?.nodes?.length &&
@@ -356,6 +380,7 @@ export function sanitizeMessages(messages = []) {
             unavailableReason: message.workflowCard.unavailableReason || '',
           }
         : null,
+      workflowSelection: sanitizeWorkflowSelection(message.workflowSelection),
       sources: Array.isArray(message.sources)
         ? message.sources.map((source) => ({
             id: source.id,

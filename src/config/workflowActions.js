@@ -230,7 +230,7 @@ const workflowMappings = [
     status: 'pending',
     supportPrefill: false,
     description: '打开领导人员外出报备入口。',
-    keywords: ['领导人员外出', '领导人员外出报备', '外出报备'],
+    keywords: ['领导人员外出', '领导人员外出报备', '领导外出报备', '外出报备'],
   },
   {
     businessModule: '综合模块',
@@ -401,6 +401,17 @@ function getMatchedModuleName(content) {
 }
 
 function isWorkflowListQuery(content) {
+  const todoListIntent = [
+    '查看我的待办',
+    '查看待办',
+    '我的待办',
+    '待办任务',
+    '待办事项',
+    '我有哪些待办',
+  ].some((keyword) => content.includes(keyword))
+
+  if (todoListIntent) return true
+
   const listIntent = [
     '有什么流程',
     '有哪些流程',
@@ -441,7 +452,11 @@ export function buildWorkflowListMarkdown(workflows, options = {}) {
   const groups = groupWorkflows(workflows)
   const lines = []
 
-  lines.push('当前展示的是已配置入口状态，实际可办理权限以 iGIX 权限为准。')
+  lines.push(
+    options.todo
+      ? '当前还不能直接读取您的个人待办，先为您列出可定位的业务入口；实际待办和可办理权限以 iGIX 为准。'
+      : '当前展示的是已配置入口状态，实际可办理权限以 iGIX 为准。',
+  )
   lines.push('')
 
   if (!groups.length) {
@@ -450,6 +465,7 @@ export function buildWorkflowListMarkdown(workflows, options = {}) {
   }
 
   lines.push('当前已配置流程入口如下：')
+  lines.push('请点击下方入口名称继续。')
   lines.push('')
 
   groups.forEach((group) => {
@@ -470,6 +486,14 @@ export function detectWorkflowAction(text = '', options = {}) {
   const content = String(text || '').trim()
 
   if (isWorkflowListQuery(content)) {
+    const todoListIntent = [
+      '查看我的待办',
+      '查看待办',
+      '我的待办',
+      '待办任务',
+      '待办事项',
+      '我有哪些待办',
+    ].some((keyword) => content.includes(keyword))
     const moduleName = getMatchedModuleName(content)
     const matchedWorkflows = moduleName
       ? workflowActions.filter((workflow) => workflow.businessModule === moduleName)
@@ -478,7 +502,7 @@ export function detectWorkflowAction(text = '', options = {}) {
     return {
       matched: true,
       type: 'workflow_list',
-      content: buildWorkflowListMarkdown(matchedWorkflows),
+      content: buildWorkflowListMarkdown(matchedWorkflows, { todo: todoListIntent }),
       workflowGroups: groupWorkflows(matchedWorkflows),
     }
   }
@@ -498,6 +522,9 @@ export function detectWorkflowAction(text = '', options = {}) {
   if (!matchedWorkflow) {
     return {
       matched: false,
+      type: 'workflow_selection',
+      content: '我还没有定位到具体入口，请从下面选择要打开的业务表单或流程。',
+      workflowGroups: groupWorkflows(workflowActions),
     }
   }
 

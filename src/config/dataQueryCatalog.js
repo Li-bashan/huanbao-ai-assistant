@@ -24,6 +24,7 @@ export const DATA_QUERY_INDICATOR_GROUPS = [
     indicators: [
       createIndicator('waste_inbound', '生活垃圾入厂量', '产量指标', [
         '入厂垃圾量', '垃圾入厂量', '垃圾进厂量', '生活垃圾量', '垃圾量', '入厂量',
+        '垃圾处理量', '生活垃圾处理量',
       ]),
       createIndicator('power_generation', '发电量', '产量指标', [
         '全厂发电量', '总发电量', '发电总量', '发电', '电量',
