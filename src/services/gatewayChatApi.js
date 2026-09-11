@@ -283,6 +283,7 @@ export async function streamGatewayMasterMessage(question, options = {}) {
     }
     if (eventName === 'text_delta') {
       answer = mergeText(answer, data.delta || data.text || '')
+      if (answer) options.onMessage?.(answer, { replace: true })
       return
     }
     if (eventName === 'analysis_result') {
