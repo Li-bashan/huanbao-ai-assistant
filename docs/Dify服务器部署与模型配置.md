@@ -14,6 +14,8 @@
 | 操作系统 | Ubuntu 22.04.5 LTS |
 | 内核 | Linux 5.15.0-179-generic x86_64 |
 | SSH 地址 | `121.237.178.23:22` |
+| SSH 用户 | `root` |
+| 环宝助手部署目录 | `/LBSops/huanbao-ai-assistant` |
 | Dify 部署目录 | `/root/dify/dify-main/docker` |
 | Dify 版本 | `1.16.1` |
 | Docker | 29.5.2 |
@@ -24,7 +26,7 @@
 | 宿主机 Swap | 91 GiB |
 | 防火墙 | `ufw` 当前 inactive，需由云安全组或其他主机策略承担边界防护 |
 
-服务器运行时间较长，最近一次核验时已连续运行约 91 天。Dify 服务器与前端静态站点服务器不是同一台机器；前端部署目录 `/LBSops/huanbao-ai-assistant` 和访问地址 `http://192.168.245.138:8090` 不要误写成 Dify 的部署位置。
+当前 Dify、Gateway 和环宝助手前端统一以 `121.237.178.23` 作为生产服务器；前端通过该服务器的 Nginx 对外提供 `http://121.237.178.23:9002`。服务器运行时间较长，最近一次核验时已连续运行约 91 天。登录密码不写入本文或 Git。
 
 ## 2. Docker Compose 运行拓扑
 

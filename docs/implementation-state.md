@@ -194,7 +194,7 @@
 ### 8B.2 Nginx 动态探测、备份与发布边界
 
 - 本机执行 `nginx -T`：失败，原因是 Windows 本机未安装或未暴露 `nginx` 命令；`127.0.0.1:9002` 与 `127.0.0.1:8090` 均 connection refused，仅 `127.0.0.1:5173` 为本地 Vite 开发服务。
-- 现场只读 HTTP 探测：`http://192.168.245.138:8090/` 返回 200，`http://121.237.178.23:9002/` 也返回前端 HTML；但 `192.168.245.138:22` connection refused，无法进入远端执行 `nginx -T`、读取真实 `root/alias` 或复制文件。
+- 现场只读 HTTP 探测：`http://121.237.178.23:9002/` 返回前端 HTML；当时未完成服务器侧 `nginx -T`、真实 `root/alias` 和静态文件复制核验。
 - 动态路径：`WEB_ROOT = UNRESOLVED`；未从真实 Nginx `server` block 读取到路径。
 - 现场备份：`BACKUP_DIR = NOT_CREATED`。由于没有真实 `WEB_ROOT`，没有执行 `cp -r`、静态资源覆盖、`nginx -t` 或 `nginx -s reload`，避免误拷贝到未知目录。
 - Nginx 步骤仅生成以下标准 Linux 发布/回滚脚本，未在本机执行：
@@ -249,7 +249,7 @@ printf 'Rollback: cp -r "%s"/. "%s"/ && nginx -s reload\n' "$BACKUP_DIR" "$WEB_R
 
 - 本地候选 `dist/index.html` 与其引用文件严格一致，引用文件均存在。
 - `127.0.0.1:9002/`：connection refused，无法完成用户指定的本机线上 HTML 对账。
-- `192.168.245.138:8090/` 返回 `/assets/index-CSOSpz8D.js`、`/assets/index-DP1OF6Md.css`；`121.237.178.23:9002/` 返回 `/assets/index-CRzxlC43.js`、`/assets/index-BUA8lWxQ.css`。两套线上引用均与候选 `index-BtasfnsH.js`、`index-CdoNN_K4.css` 严格不一致；线上现状判定为 `HASH_MISMATCH / CANDIDATE_NOT_DEPLOYED`，不宣称发布已覆盖。
+- `121.237.178.23:9002/` 曾返回 `/assets/index-CRzxlC43.js`、`/assets/index-BUA8lWxQ.css`，与当时候选 `index-BtasfnsH.js`、`index-CdoNN_K4.css` 严格不一致；当时线上现状判定为 `HASH_MISMATCH / CANDIDATE_NOT_DEPLOYED`，不宣称发布已覆盖。
 
 ### 8B.4 真实环境与隔离 UI 冒烟矩阵
 

@@ -132,10 +132,12 @@ git status
 ## 部署注意事项
 
 - 本地提交后必须 `git push`。
+- 生产服务器：`121.237.178.23:22`，SSH 用户：`root`。
 - 服务器通过 `git pull` 拉远程仓库。
 - 服务器路径：`/LBSops/huanbao-ai-assistant`。
 - Nginx 配置：`/etc/nginx/conf.d/huanbao-ai-assistant.conf`。
-- 访问地址：`http://192.168.245.138:8090`。
+- 访问地址：`http://121.237.178.23:9002`。
+- 登录密码不写入仓库，使用服务器凭据或密码管理工具保管。
 
 ## 后续路线
 

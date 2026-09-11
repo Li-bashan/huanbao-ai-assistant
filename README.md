@@ -111,7 +111,7 @@ VITE_DATA_QUERY_DEFAULT_PERIOD=今年
 访问地址：
 
 ```text
-http://192.168.245.138:8090
+http://121.237.178.23:9002
 ```
 
 Dify 地址：
@@ -125,6 +125,12 @@ Nginx 配置：
 ```text
 /etc/nginx/conf.d/huanbao-ai-assistant.conf
 ```
+
+服务器登录：
+
+- SSH 地址：`121.237.178.23:22`
+- SSH 用户：`root`
+- 登录密码不写入仓库，使用服务器凭据或密码管理工具保管。
 
 部署流程：
 
@@ -145,7 +151,7 @@ npm run build
 systemctl reload nginx
 ```
 
-服务器 `git pull` 拉的是远程仓库，不会读取 Mac 本地工作区。如果本地显示领先 `origin/main`，必须先 `git push`。
+服务器 `git pull` 拉的是远程仓库，不会读取本地工作区。如果本地显示领先 `origin/main`，必须先 `git push`。
 
 ## 常见问题
 
