@@ -369,6 +369,32 @@ const saveActiveConversation = () => {
   return conversation
 }
 
+const startNewConversation = async ({ modeKey = defaultAssistantModeKey, modeLocked = false } = {}) => {
+  if (isChatBusy.value) return false
+
+  const activeConversation = saveActiveConversation()
+  if (activeConversation) {
+    conversationHistory.value = saveConversationToHistory(activeConversation)
+  }
+
+  messages.value = []
+  inputValue.value = ''
+  inputAssistPlaceholder.value = ''
+  conversationId.value = ''
+  conversationIds.value = {}
+  dataQueryAnalysisState.value = ''
+  currentConversationId.value = createConversationId()
+  currentModeKey.value = getModeByKey(modeKey).key
+  isModeLocked.value = modeLocked
+  saveModeLock(modeLocked)
+  saveModeKey(currentModeKey.value)
+  showHistory.value = false
+  showCapabilityMenu.value = false
+  clearCurrentConversation()
+  await scrollToBottom()
+  return true
+}
+
 const formatHistoryTime = (timestamp) => {
   if (!timestamp) return ''
 
@@ -1443,24 +1469,16 @@ const handleActionPillClick = (action) => {
 }
 
 const restoreAdaptiveMode = () => {
-  isModeLocked.value = false
-  saveModeLock(false)
+  return startNewConversation({ modeKey: defaultAssistantModeKey, modeLocked: false })
 }
 
 const handleModeRecovery = async (message) => {
   const recovery = message?.recovery
   if (!recovery?.question) return
 
-  const messageIndex = messages.value.findIndex((item) => item.id === message.id)
-  if (messageIndex >= 0) messages.value.splice(messageIndex, 1)
-
   const targetMode = getModeByKey(recovery.targetModeKey)
-  isModeLocked.value = false
-  saveModeLock(false)
-  currentModeKey.value = targetMode.key
-  saveModeKey(targetMode.key)
-  conversationId.value = getModeConversationId(targetMode.key)
-  await sendMessage(recovery.question, { bypassRecentGuard: true, reuseLatestUser: true })
+  await startNewConversation({ modeKey: targetMode.key, modeLocked: false })
+  await sendMessage(recovery.question, { bypassRecentGuard: true })
 }
 
 const handleDataExplorationItem = (item, type) => {
@@ -1608,39 +1626,19 @@ const updateCapabilityMenu = (open) => {
 }
 
 const switchMode = async (modeKey) => {
+  if (isChatBusy.value) return
+
   if (modeKey === 'adaptive') {
     showCapabilityMenu.value = false
-    if (isChatBusy.value) return
-    isModeLocked.value = false
-    saveModeLock(false)
-    await scrollToBottom()
+    await startNewConversation({ modeKey: defaultAssistantModeKey, modeLocked: false })
     return
   }
 
   const nextMode = getModeByKey(modeKey)
 
   showCapabilityMenu.value = false
-  if (isChatBusy.value) return
-  if (nextMode.key === currentMode.value.key) return
-
-  const activeConversation = saveActiveConversation()
-  if (activeConversation) {
-    conversationHistory.value = saveConversationToHistory(activeConversation)
-  }
-
-  messages.value = []
-  inputValue.value = ''
-  inputAssistPlaceholder.value = ''
-  conversationId.value = ''
-  conversationIds.value = {}
-  dataQueryAnalysisState.value = ''
-  currentConversationId.value = createConversationId()
-  clearCurrentConversation()
-  currentModeKey.value = nextMode.key
-  isModeLocked.value = true
-  saveModeLock(true)
-  saveModeKey(nextMode.key)
-  await scrollToBottom()
+  if (nextMode.key === currentMode.value.key && isModeLocked.value) return
+  await startNewConversation({ modeKey: nextMode.key, modeLocked: true })
 }
 
 const restoreConversation = async (conversation) => {
@@ -1679,28 +1677,7 @@ const clearAllHistory = () => {
   conversationHistory.value = []
 }
 
-const newChat = async () => {
-  const conversation = saveActiveConversation()
-  if (conversation) {
-    conversationHistory.value = saveConversationToHistory(conversation)
-  }
-
-  messages.value = []
-  inputValue.value = ''
-  inputAssistPlaceholder.value = ''
-  currentModeKey.value = defaultAssistantModeKey
-  isModeLocked.value = false
-  saveModeLock(false)
-  saveModeKey(defaultAssistantModeKey)
-  conversationId.value = ''
-  conversationIds.value = {}
-  dataQueryAnalysisState.value = ''
-  currentConversationId.value = createConversationId()
-  showHistory.value = false
-  showCapabilityMenu.value = false
-  clearCurrentConversation()
-  await scrollToBottom()
-}
+const newChat = () => startNewConversation({ modeKey: defaultAssistantModeKey, modeLocked: false })
 
 onMounted(async () => {
   if (isDataQueryAdminPage) return
