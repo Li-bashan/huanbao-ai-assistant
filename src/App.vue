@@ -1159,6 +1159,7 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
   const requestModeKey = requestMode.key
   const loadingMessageId = createMessageId()
   const shouldStream = requestModeKey === 'data-query' || requestModeKey === 'office-ai'
+  const hasExecutionProcess = requestMode.apiMode === 'dify' || requestModeKey === 'data-query'
 
   if (!options.reuseLatestUser) {
     messages.value.push({
@@ -1172,7 +1173,7 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
   messages.value.push({
     id: loadingMessageId,
     role: 'assistant',
-    content: shouldStream ? '' : '环宝正在思考中...',
+    content: hasExecutionProcess ? '' : '环宝正在思考中...',
     loading: true,
     streaming: shouldStream,
     status:
@@ -1186,20 +1187,19 @@ const sendMessage = async (question = inputValue.value, options = {}) => {
     expandedSourceId: '',
     chartOption: null,
     actionPills: [],
-    executionProcess:
-      (requestMode.apiMode === 'dify' || requestModeKey === 'data-query')
-        ? createDifyExecutionProcess({
-            modeKey: requestModeKey,
-            visible: requestModeKey !== 'policy',
-            capabilities: capabilityKeys.map((key) => executionCapabilityLabelsByMode[key]),
-            stage:
-              requestModeKey === 'policy'
-                ? '正在检索制度依据...'
-                : requestModeKey === 'data-query'
-                  ? '正在分析生产指标...'
-                  : '正在拟制办公材料...',
-          })
-        : null,
+    executionProcess: hasExecutionProcess
+      ? createDifyExecutionProcess({
+          modeKey: requestModeKey,
+          visible: true,
+          capabilities: capabilityKeys.map((key) => executionCapabilityLabelsByMode[key]),
+          stage:
+            requestModeKey === 'policy'
+              ? '正在检索制度依据...'
+              : requestModeKey === 'data-query'
+                ? '正在分析生产指标...'
+                : '正在拟制办公材料...',
+        })
+      : null,
     ...getCapabilityFields(requestModeKey, capabilityKeys),
   })
 
