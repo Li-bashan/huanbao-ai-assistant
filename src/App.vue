@@ -2057,9 +2057,17 @@ watch(
                 <span class="message-answer-mode">制度问答</span>
               </div>
               <div
-                v-if="message.role === 'assistant' && !message.messageType && !message.loading && message.modeKey !== 'data-query'"
+                v-if="
+                  message.role === 'assistant' &&
+                  !message.messageType &&
+                  message.modeKey !== 'data-query' &&
+                  (message.content || !message.loading)
+                "
                 class="markdown-body markdown-content"
-                :class="{ 'policy-answer': message.modeKey === 'policy' }"
+                :class="{
+                  'policy-answer': message.modeKey === 'policy',
+                  'message-answer-loading': message.loading,
+                }"
                 v-html="renderMarkdown(getMessageDisplayContent(message))"
               ></div>
               <template v-else-if="message.role === 'user'">{{ message.content }}</template>

@@ -1176,8 +1176,7 @@ button {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-  opacity: 0;
-  transition: opacity 0.18s ease;
+  opacity: 1;
 }
 
 .workflow-card-status {
@@ -1195,11 +1194,6 @@ button {
 .workflow-card-status-pending {
   color: #9a620e;
   background: #fff5df;
-}
-
-.message-assistant:hover .message-toolbar,
-.message-toolbar:focus-within {
-  opacity: 1;
 }
 
 .message-toolbar button {
@@ -1249,6 +1243,10 @@ button {
 .message-answer-mode {
   padding-left: 7px;
   border-left: 1px solid #dbe8f4;
+}
+
+.message-answer-loading {
+  color: #6b829a;
 }
 
 .policy-answer {
