@@ -125,9 +125,20 @@ class IntentClassifierTest {
         AnalysisPlanDto plan = classifier.classify("查询今年各项目公司垃圾处理量排名，展示前十名。");
 
         assertEquals("DATA_QUERY", plan.primaryIntent());
-        assertEquals(List.of("垃圾处理量"), plan.metricInputs());
+        assertEquals(List.of("生活垃圾入厂量"), plan.metricInputs());
         assertEquals(List.of("项目公司"), plan.orgInputs());
         assertEquals("今年", plan.timeExpression());
+        assertEquals("RANKING", plan.analysisType());
+    }
+
+    @Test
+    void overridesModelDriftForExplicitCompanyComparisonAndCanonicalizesAlias() throws Exception {
+        respondWith(new AnalysisPlanDto(
+                "DATA_QUERY", List.of("垃圾处理量"), List.of("项目公司"), "今年", "FACT", List.of()));
+
+        AnalysisPlanDto plan = classifier.classify("查询本月生活垃圾入厂量完成情况，并按项目公司对比");
+
+        assertEquals(List.of("生活垃圾入厂量"), plan.metricInputs());
         assertEquals("RANKING", plan.analysisType());
     }
 

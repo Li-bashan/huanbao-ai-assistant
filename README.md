@@ -157,6 +157,8 @@ docker exec docker-nginx-1 nginx -s reload
 
 服务器只托管构建后的 `dist/`，不执行 `git pull`、`npm ci` 或重新构建。发布前必须先推送本地提交，并保留服务器上的压缩备份。
 
+日常发布已配置为 GitLab CI：提交到默认分支后自动执行前端、Gateway、`huanbao-dataquery` 的测试和打包，再使用 GitLab CI/CD Variables 中的 SSH 部署密钥发布到生产。发布脚本会备份前端和两个后端 Jar，重启服务并检查 `8089`、`8088`、`9002`；健康检查失败会自动回滚。首次启用必须先配置 `PROD_SSH_PRIVATE_KEY`、`PROD_SSH_KNOWN_HOSTS`、`PROD_DATAQUERY_SERVICE`、`PROD_DATAQUERY_JAR_PATH`、`PROD_GATEWAY_SERVICE`、`PROD_GATEWAY_JAR_PATH`，详见 `docs/部署说明.md`。
+
 ## 常见问题
 
 - 办公智能报 `Agent Chat App does not support blocking mode`：说明错误使用 blocking，请确认 Gateway/前端走 streaming 和 `response_mode: streaming`。

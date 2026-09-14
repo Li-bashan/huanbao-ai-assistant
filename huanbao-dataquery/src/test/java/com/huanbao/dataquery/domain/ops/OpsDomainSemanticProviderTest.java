@@ -1,11 +1,13 @@
 package com.huanbao.dataquery.domain.ops;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.huanbao.dataquery.core.spi.DataQueryRequest;
 import com.huanbao.dataquery.core.spi.DomainSemanticProviderRegistry;
 import com.huanbao.dataquery.core.spi.EntityMapping;
 import com.huanbao.dataquery.core.spi.MetricDefinition;
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +28,24 @@ class OpsDomainSemanticProviderTest {
         assertEquals("TON_ELEC_GEN", metric.indicatorCode());
         assertEquals("1001", metric.baseMetricRefs().get(0));
         assertEquals("1201", metric.baseMetricRefs().get(1));
+    }
+
+    @Test
+    void resolvesCommonWasteProcessingAliasToFormalMetric() {
+        MetricDefinition metric = provider.getMetric("垃圾处理量");
+
+        assertEquals("1201", metric.indicatorCode());
+        assertEquals("生活垃圾入厂量", metric.formalName());
+    }
+
+    @Test
+    void packagesTheSemanticDictionaryWithTheRuntimeArtifact() throws Exception {
+        try (InputStream input = getClass().getClassLoader()
+                .getResourceAsStream("semantic/METRIC_SEMANTIC_DICTIONARY.json")) {
+            assertTrue(input != null, "semantic dictionary must be packaged in the runtime classpath");
+            JsonNode dictionary = new com.fasterxml.jackson.databind.ObjectMapper().readTree(input);
+            assertTrue(dictionary.path("indicators").toString().contains("垃圾处理量"));
+        }
     }
 
     @Test

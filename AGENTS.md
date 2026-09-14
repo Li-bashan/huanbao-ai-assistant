@@ -119,7 +119,7 @@ git status
 
 ## 部署流程
 
-必须先本地 push，再把构建产物同步到服务器静态目录：
+正式发布走 GitLab CI：必须先本地验证并 push，流水线自动测试、构建、备份、同步、重启和健康检查；生产 SSH 私钥、主机指纹、服务名和 Jar 路径只能配置在 GitLab CI/CD Variables。流水线脚本位于 `tools/deploy-production.sh`，失败会自动回滚。手工应急流程如下：
 
 ```bash
 # 本地

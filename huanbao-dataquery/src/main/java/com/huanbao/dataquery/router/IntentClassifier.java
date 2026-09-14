@@ -55,15 +55,18 @@ public class IntentClassifier {
     private static final List<String> DATA_QUERY_KEYWORDS = List.of(
             "查询", "查一下", "查查", "统计", "数据", "多少", "排名", "排行", "最高", "最低", "同比", "环比");
     private static final Pattern TIME_PATTERN = Pattern.compile(
-            "近(?:最)?(?:半|[0-9一二三四五六七八九十百千万]+)(?:个月|月|年)|"
+            "近(?:最)?(?:半|[0-9一二三四五六七八九十百千万两]+)(?:个月|月|年)|"
                     + "(?:今年|去年|前年)(?:[0-9]{1,2}个?月?份?|全年)?|"
                     + "[0-9]{4}年[0-9]{1,2}个?月?份?|"
                     + "[0-9一二三四五六七八九十]+月份?|本月|上月|本季度|上季度|去年同期|今年|去年");
     private static final Pattern RANKING_PATTERN = Pattern.compile(
-            "排名|排行|最高|最低|top\\s*[0-9]+|前[0-9一二三四五六七八九十]+|倒数",
+            "排名|排行|最高|最低|top\\s*[0-9一二三四五六七八九十百千万两]+|前[0-9一二三四五六七八九十百千万两]+|倒数",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMPANY_COMPARISON_PATTERN = Pattern.compile(
+            "(?:按|各|所有|全部)?项目公司(?:进行|做)?(?:对比|比较)|项目公司(?:对比|比较)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern TREND_PATTERN = Pattern.compile(
-            "趋势|走势|变化|增长|下降|同比|环比|近[0-9一二三四五六七八九十]+年|各月|月度");
+            "趋势|走势|变化|增长|下降|同比|环比|近[0-9一二三四五六七八九十两]+年|各月|月度");
 
     private final RestClient vllmRestClient;
     private final ObjectMapper objectMapper;
@@ -71,6 +74,7 @@ public class IntentClassifier {
     private final List<String> organizationTerms;
     private final Set<String> metricTermSet;
     private final Set<String> organizationTermSet;
+    private final OpsDomainSemanticProvider semanticProvider;
     private final String model;
 
     @Value("${dataquery.fast-path-enabled:false}")
@@ -100,7 +104,7 @@ public class IntentClassifier {
             String model) {
         this.vllmRestClient = Objects.requireNonNull(vllmRestClient, "vllmRestClient");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
-        Objects.requireNonNull(semanticProvider, "semanticProvider");
+        this.semanticProvider = Objects.requireNonNull(semanticProvider, "semanticProvider");
         this.metricTerms = buildMetricTerms(semanticProvider.getMetrics());
         this.organizationTerms = buildOrganizationTerms(semanticProvider.getOrganizations());
         this.metricTermSet = normalizedSet(metricTerms);
@@ -260,9 +264,13 @@ public class IntentClassifier {
         if (metrics.isEmpty()) {
             metrics = extractMatches(query, metricTerms);
         }
+        metrics = canonicalMetricNames(metrics);
         List<String> organizations = knownTerms(plan.orgInputs(), organizationTermSet);
         if (organizations.isEmpty()) {
             organizations = extractMatches(query, organizationTerms);
+        }
+        if (organizations.isEmpty() && COMPANY_COMPARISON_PATTERN.matcher(query).find()) {
+            organizations = List.of("项目公司");
         }
         // 路由模型可能已将最近半年等时间表达式归一化为近6个月；不能因为
         // 归一化后的文本未逐字出现在原问题中而丢弃它，否则流水线会退化为单月锚点。
@@ -270,7 +278,10 @@ public class IntentClassifier {
         if (timeExpression == null || timeExpression.isBlank()) {
             timeExpression = extractTimeExpression(query);
         }
-        String analysisType = enumValue(plan.analysisType(), ANALYSIS_TYPES);
+        String analysisType = explicitAnalysisType(query);
+        if (analysisType.isEmpty()) {
+            analysisType = enumValue(plan.analysisType(), ANALYSIS_TYPES);
+        }
         if (analysisType.isEmpty()) {
             analysisType = fallbackAnalysisType(query);
         }
@@ -282,7 +293,7 @@ public class IntentClassifier {
     }
 
     private AnalysisPlanDto fallback(String query) {
-        List<String> metrics = extractMatches(query, metricTerms);
+        List<String> metrics = canonicalMetricNames(extractMatches(query, metricTerms));
         List<String> organizations = extractMatches(query, organizationTerms);
         boolean hasData = !metrics.isEmpty()
                 || (containsAny(query, DATA_QUERY_KEYWORDS)
@@ -318,6 +329,9 @@ public class IntentClassifier {
         if (RANKING_PATTERN.matcher(query).find()) {
             return "RANKING";
         }
+        if (COMPANY_COMPARISON_PATTERN.matcher(query).find()) {
+            return "RANKING";
+        }
         if (TREND_PATTERN.matcher(query).find()) {
             return "TREND";
         }
@@ -325,6 +339,29 @@ public class IntentClassifier {
             return "REPORT";
         }
         return "FACT";
+    }
+
+    private String explicitAnalysisType(String query) {
+        if (RANKING_PATTERN.matcher(query).find()
+                || COMPANY_COMPARISON_PATTERN.matcher(query).find()) {
+            return "RANKING";
+        }
+        if (TREND_PATTERN.matcher(query).find()) {
+            return "TREND";
+        }
+        if (containsAny(query, List.of("简报", "报告", "汇报材料"))) {
+            return "REPORT";
+        }
+        return "";
+    }
+
+    private List<String> canonicalMetricNames(Collection<String> inputs) {
+        return inputs.stream()
+                .map(semanticProvider::getMetric)
+                .filter(Objects::nonNull)
+                .map(MetricDefinition::formalName)
+                .distinct()
+                .toList();
     }
 
     private static String extractTimeExpression(String query) {

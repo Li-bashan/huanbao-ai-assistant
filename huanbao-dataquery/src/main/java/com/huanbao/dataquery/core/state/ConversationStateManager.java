@@ -36,16 +36,16 @@ public class ConversationStateManager {
     public static final Duration STATE_TTL = Duration.ofMinutes(30);
 
     private static final Pattern TOP_N_PATTERN = Pattern.compile(
-            "(?:前\\s*([0-9]+|[一二三四五六七八九十百千万]+)|top\\s*([0-9]+|[一二三四五六七八九十百千万]+))",
+            "(?:前\\s*([0-9]+|[一二三四五六七八九十百千万两]+)|top\\s*([0-9]+|[一二三四五六七八九十百千万两]+))",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME_PATTERN = Pattern.compile(
-            "近(?:最)?(?:半|[0-9一二三四五六七八九十百千万]+)(?:个月|月|年)|"
+            "近(?:最)?(?:半|[0-9一二三四五六七八九十百千万两]+)(?:个月|月|年)|"
                     + "(?:今年|去年|前年)(?:[0-9]{1,2}个?月?份?|全年)?|"
                     + "[0-9]{4}年[0-9]{1,2}个?月?份?|"
-                    + "[0-9一二三四五六七八九十百千万]+月份?|本月|上月|本季度|上季度|去年同期|今年|去年",
+                    + "[0-9一二三四五六七八九十百千万两]+月份?|本月|上月|本季度|上季度|去年同期|今年|去年",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern RANKING_PATTERN = Pattern.compile(
-            "排名|排行|top\\s*[0-9一二三四五六七八九十百千万]+|前[0-9一二三四五六七八九十百千万]+|"
+            "排名|排行|top\\s*[0-9一二三四五六七八九十百千万两]+|前[0-9一二三四五六七八九十百千万两]+|"
                     + "倒数|最高|最低",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern REGION_SCOPE_PATTERN = Pattern.compile(
@@ -251,7 +251,8 @@ public class ConversationStateManager {
                 organizations,
                 state.timeExpression() == null ? "" : state.timeExpression(),
                 analysisType == null ? "" : analysisType,
-                original.subTasks());
+                original.subTasks(),
+                state.topN());
     }
 
     private List<String> projectOrganizations(
@@ -455,9 +456,11 @@ public class ConversationStateManager {
                 return 0;
             }
         }
-        Map<Character, Integer> digits = Map.of(
-                '一', 1, '二', 2, '三', 3, '四', 4, '五', 5,
-                '六', 6, '七', 7, '八', 8, '九', 9, '零', 0);
+        Map<Character, Integer> digits = Map.ofEntries(
+                Map.entry('一', 1), Map.entry('二', 2), Map.entry('三', 3),
+                Map.entry('四', 4), Map.entry('五', 5), Map.entry('六', 6),
+                Map.entry('七', 7), Map.entry('八', 8), Map.entry('九', 9),
+                Map.entry('零', 0), Map.entry('两', 2));
         if (value.length() == 1 && digits.containsKey(value.charAt(0))) {
             return digits.get(value.charAt(0));
         }

@@ -605,6 +605,7 @@ public final class ProtocolAssembler {
         state.put("metricInputs", plan.metricInputs());
         state.put("orgInputs", plan.orgInputs());
         state.put("timeExpression", plan.timeExpression());
+        state.put("topN", plan.topN());
         return state;
     }
 

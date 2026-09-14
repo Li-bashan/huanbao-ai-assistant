@@ -16,7 +16,18 @@ public record AnalysisPlanDto(
         List<String> orgInputs,
         String timeExpression,
         String analysisType,
-        List<String> subTasks) {
+        List<String> subTasks,
+        Integer topN) {
+
+    public AnalysisPlanDto(
+            String primaryIntent,
+            List<String> metricInputs,
+            List<String> orgInputs,
+            String timeExpression,
+            String analysisType,
+            List<String> subTasks) {
+        this(primaryIntent, metricInputs, orgInputs, timeExpression, analysisType, subTasks, null);
+    }
 
     public AnalysisPlanDto {
         primaryIntent = textOrEmpty(primaryIntent);
@@ -25,6 +36,9 @@ public record AnalysisPlanDto(
         timeExpression = textOrEmpty(timeExpression);
         analysisType = textOrEmpty(analysisType);
         subTasks = copy(subTasks);
+        if (topN != null && topN <= 0) {
+            throw new IllegalArgumentException("topN must be positive");
+        }
     }
 
     private static List<String> copy(List<String> values) {

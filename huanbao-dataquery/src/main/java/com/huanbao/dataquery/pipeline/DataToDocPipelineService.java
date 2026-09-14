@@ -51,6 +51,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 问数查库到办公拟写简报的双阶段流水线。
@@ -68,7 +69,7 @@ public final class DataToDocPipelineService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DataToDocPipelineService.class);
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final Pattern RECENT_PATTERN = Pattern.compile(
-            "近(?:最)?\\s*(半|\\d+|[一二三四五六七八九十百千万]+)\\s*(个?月|年)");
+            "近(?:最)?\\s*(半|\\d+|[一二三四五六七八九十百千万两]+)\\s*(个?月|年)");
     private static final Pattern RELATIVE_MONTH_PATTERN = Pattern.compile(
             "(今年|去年|前年)\\s*([0-9]{1,2})个?月?份?");
     private static final Pattern ABSOLUTE_MONTH_PATTERN = Pattern.compile(
@@ -155,6 +156,7 @@ public final class DataToDocPipelineService {
         AnalysisPlanDto latestPlan = stateManager.applyState(conversationKey, plan, rawQuery);
         List<MetricDefinition> metrics = resolveMetrics(latestPlan);
         MetricDefinition primaryMetric = metrics.get(0);
+        Integer topN = latestPlan.topN();
         List<YearMonth> targetPeriods = resolveTargetPeriods(
                 latestPlan.timeExpression(), rawQuery);
         List<SubjectScope> subjects = resolveSubjects(latestPlan, normalizedAllowedOrgs);
@@ -184,7 +186,10 @@ public final class DataToDocPipelineService {
                 RankingResult rankingResult = ranking
                         ? rankingForPeriod(subjects, values, period, metric.indicatorCode())
                         : new RankingResult(List.of());
-                for (SubjectScope subject : subjects) {
+                List<SubjectScope> outputSubjects = ranking
+                        ? rankedSubjects(subjects, rankingResult, topN)
+                        : subjects;
+                for (SubjectScope subject : outputSubjects) {
                     CalculationResult current = resultAt(
                             values, subject.subject(), period, metric.indicatorCode());
                     if (ranking && current.value() == null) {
@@ -223,7 +228,8 @@ public final class DataToDocPipelineService {
         }
 
         Map<String, Object> chartConfig = ranking
-                ? buildRankingChart(primaryMetric, subjects, values, targetPeriods.get(targetPeriods.size() - 1))
+                ? buildRankingChart(
+                        primaryMetric, subjects, values, targetPeriods.get(targetPeriods.size() - 1), topN)
                 : buildTrendChart(primaryMetric, subjects, values, targetPeriods);
         boolean needDocument = "COMPOSITE".equalsIgnoreCase(latestPlan.primaryIntent())
                 || latestPlan.subTasks().contains("DRAFT_BRIEF")
@@ -700,6 +706,27 @@ public final class DataToDocPipelineService {
         return analysisEngine.calculateRanking(current, previous);
     }
 
+    private List<SubjectScope> rankedSubjects(
+            List<SubjectScope> subjects,
+            RankingResult ranking,
+            Integer topN) {
+        if (topN == null) {
+            return subjects;
+        }
+        Map<String, SubjectScope> subjectsByName = subjects.stream()
+                .collect(Collectors.toMap(
+                        SubjectScope::subject,
+                        subject -> subject,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        return ranking.stream()
+                .limit(topN)
+                .map(RankingItem::company)
+                .map(subjectsByName::get)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private AnalysisEvidenceResult buildEvidence(
             String subject,
             String metric,
@@ -777,17 +804,21 @@ public final class DataToDocPipelineService {
             MetricDefinition metric,
             List<SubjectScope> subjects,
             Map<String, Map<YearMonth, Map<String, CalculationResult>>> values,
-            YearMonth period) {
+            YearMonth period,
+            Integer topN) {
         Map<String, Object> chart = baseChart(
                 "RANKING", "bar", metric.formalName() + "排名（" + period + "）", metric.unit());
         RankingResult ranking = rankingForPeriod(subjects, values, period, metric.indicatorCode());
-        chart.put("xAxis", Map.of("type", "category", "data", ranking.stream()
+        List<RankingItem> visibleRanking = ranking.stream()
+                .limit(topN == null ? ranking.size() : topN)
+                .toList();
+        chart.put("xAxis", Map.of("type", "category", "data", visibleRanking.stream()
                 .map(RankingItem::company).toList()));
         chart.put("yAxis", Map.of("type", "value", "name", metric.unit()));
         Map<String, Object> bar = new LinkedHashMap<>();
         bar.put("name", metric.formalName());
         bar.put("type", "bar");
-        bar.put("data", ranking.stream().map(RankingItem::value).toList());
+        bar.put("data", visibleRanking.stream().map(RankingItem::value).toList());
         chart.put("series", List.of(bar));
         return chart;
     }
@@ -977,9 +1008,11 @@ public final class DataToDocPipelineService {
         if (value.chars().allMatch(Character::isDigit)) {
             return Integer.parseInt(value);
         }
-        Map<Character, Integer> digits = Map.of(
-                '一', 1, '二', 2, '三', 3, '四', 4, '五', 5,
-                '六', 6, '七', 7, '八', 8, '九', 9, '零', 0);
+        Map<Character, Integer> digits = Map.ofEntries(
+                Map.entry('一', 1), Map.entry('二', 2), Map.entry('三', 3),
+                Map.entry('四', 4), Map.entry('五', 5), Map.entry('六', 6),
+                Map.entry('七', 7), Map.entry('八', 8), Map.entry('九', 9),
+                Map.entry('零', 0), Map.entry('两', 2));
         int total = 0;
         int section = 0;
         int number = 0;

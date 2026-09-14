@@ -36,15 +36,16 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class DataToDocPipelineServiceTest {
 
     private static final String CONVERSATION_KEY = "tenant-a:user-7:pipeline-1";
-    private static final String QUERY = "查近三个月垃圾入厂量，帮我做一份分析简报";
+    private static final String QUERY = "查近三个月垃圾处理量，帮我做一份分析简报";
 
     private MockRestServiceServer vllmServer;
     private DataToDocPipelineService service;
+    private JdbcDataSource dataSource;
 
     @BeforeEach
     void setUp() {
         OpsDomainSemanticProvider provider = new OpsDomainSemanticProvider();
-        JdbcDataSource dataSource = new JdbcDataSource();
+        dataSource = new JdbcDataSource();
         dataSource.setURL("jdbc:h2:mem:pipeline;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         createDatabase(dataSource);
 
@@ -86,7 +87,7 @@ class DataToDocPipelineServiceTest {
                 CONVERSATION_KEY,
                 new AnalysisPlanDto(
                         "COMPOSITE",
-                        List.of("垃圾入厂量"),
+                        List.of("垃圾处理量"),
                         List.of("项目公司"),
                         "近三个月",
                         "REPORT",
@@ -115,7 +116,7 @@ class DataToDocPipelineServiceTest {
                 CONVERSATION_KEY,
                 new AnalysisPlanDto(
                         "COMPOSITE",
-                        List.of("垃圾入厂量"),
+                        List.of("垃圾处理量"),
                         List.of("项目公司"),
                         "近三个月",
                         "REPORT",
@@ -129,6 +130,29 @@ class DataToDocPipelineServiceTest {
         assertEquals("TREND", result.chartConfig().get("chartType"));
         assertEquals(3, result.tableRows().size());
         assertTrue(result.tableRows().stream().allMatch(row -> row.get("currentValue") != null));
+    }
+
+    @Test
+    void returnsOnlyRequestedTopNRowsAndChartCategoriesForRanking() {
+        org.springframework.jdbc.core.JdbcTemplate jdbc =
+                new org.springframework.jdbc.core.JdbcTemplate(dataSource);
+        insertMapping(jdbc, "10004025", "测试甲公司");
+        insertMapping(jdbc, "10004026", "测试乙公司");
+        insert(jdbc, "CGXTAPPMISDate_2026_12", "2026-08-15", "500000", "10004025");
+        insert(jdbc, "CGXTAPPMISDate_2026_12", "2026-08-15", "400000", "10004026");
+
+        CompositeExecutionResult result = service.execute(
+                CONVERSATION_KEY + "-ranking",
+                new AnalysisPlanDto(
+                        "DATA_QUERY", List.of("生活垃圾入厂量"), List.of("项目公司"),
+                        "今年", "RANKING", List.of()),
+                "查询今年各项目公司生活垃圾入厂量排名，展示前两名",
+                List.of("10004024", "10004025", "10004026"));
+
+        assertEquals(2, result.tableRows().size());
+        assertEquals(2, ((List<?>) ((Map<?, ?>) result.chartConfig().get("xAxis")).get("data")).size());
+        assertEquals("测试甲公司", result.tableRows().get(0).get("subject"));
+        assertEquals(1, result.tableRows().get(0).get("rank"));
     }
 
     private static void createDatabase(JdbcDataSource dataSource) {
@@ -163,9 +187,26 @@ class DataToDocPipelineServiceTest {
             String table,
             String date,
             String value) {
+        insert(jdbc, table, date, value, "10004024");
+    }
+
+    private static void insert(
+            org.springframework.jdbc.core.JdbcTemplate jdbc,
+            String table,
+            String date,
+            String value,
+            String orgCode) {
         jdbc.update("INSERT INTO MSOKFPT.\"" + table
                         + "\" (\"newIndicator\", \"ZBRQ\", \"ZBZ\", \"orgcode\")"
-                        + " VALUES ('1201', ?, ?, '10004024')",
-                java.sql.Date.valueOf(date), value);
+                        + " VALUES ('1201', ?, ?, ?)",
+                java.sql.Date.valueOf(date), value, orgCode);
+    }
+
+    private static void insertMapping(
+            org.springframework.jdbc.core.JdbcTemplate jdbc,
+            String formalCode,
+            String shortName) {
+        jdbc.update("INSERT INTO MSOKFPT.\"dim_org_mapping\" VALUES (?, ?, ?, ?, ?, ?)",
+                formalCode, shortName, shortName, "垃圾焚烧发电项目", "华北大区", true);
     }
 }
