@@ -2100,6 +2100,7 @@ watch(
                 :answer="message.content"
                 :protocol="message.protocol"
                 :chart-option="message.chartOption"
+                :loading="message.loading"
                 :window-view="windowState.view"
                 @follow-up="handleDataQueryFollowUp"
                 @clarification="handleDataQueryClarification(message, $event)"
