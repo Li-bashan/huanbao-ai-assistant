@@ -70,7 +70,6 @@ trap cleanup EXIT
 [[ -s "$DATAQUERY_UPLOAD" ]] || die "dataquery upload is missing"
 [[ -s "$GATEWAY_UPLOAD" ]] || die "gateway upload is missing"
 command -v systemctl >/dev/null || die "systemctl is not available"
-command -v rsync >/dev/null || die "rsync is not available"
 command -v curl >/dev/null || die "curl is not available"
 systemctl cat "$DATAQUERY_SERVICE" >/dev/null 2>&1 || die "dataquery service not found: $DATAQUERY_SERVICE"
 docker inspect "$GATEWAY_CONTAINER" >/dev/null 2>&1 || die "gateway container not found: $GATEWAY_CONTAINER"
@@ -97,7 +96,7 @@ rollback() {
   local status=0
   ROLLBACK_DIR="$(mktemp -d /tmp/huanbao-rollback.XXXXXX)"
   if ! tar -xzf "$DIST_BACKUP" -C "$ROLLBACK_DIR"; then status=1; fi
-  if ! rsync -a --delete "$ROLLBACK_DIR/dist/" "$WEB_ROOT/dist/"; then status=1; fi
+  if ! rm -rf -- "$WEB_ROOT/dist" || ! cp -a -- "$ROLLBACK_DIR/dist" "$WEB_ROOT/dist"; then status=1; fi
   if ! install -m 0644 "$BACKUP_DIR/$(basename -- "$DATAQUERY_JAR_PATH")" "$DATAQUERY_JAR_PATH"; then status=1; fi
   if ! install -m 0644 "$BACKUP_DIR/$(basename -- "$GATEWAY_JAR_PATH")" "$GATEWAY_JAR_PATH"; then status=1; fi
   if ! systemctl restart "$DATAQUERY_SERVICE"; then status=1; fi
@@ -110,7 +109,8 @@ rollback() {
 apply_release() {
   install -m 0644 "$DATAQUERY_UPLOAD" "$DATAQUERY_JAR_PATH"
   install -m 0644 "$GATEWAY_UPLOAD" "$GATEWAY_JAR_PATH"
-  rsync -a --delete "$REMOTE_STAGE/dist/" "$WEB_ROOT/dist/"
+  rm -rf -- "$WEB_ROOT/dist"
+  cp -a -- "$REMOTE_STAGE/dist" "$WEB_ROOT/dist"
   systemctl restart "$DATAQUERY_SERVICE"
   docker restart "$GATEWAY_CONTAINER" >/dev/null
   docker exec "$NGINX_CONTAINER" nginx -t
