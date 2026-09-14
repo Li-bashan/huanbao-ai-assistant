@@ -132,8 +132,9 @@ git push
 # 先通过 scp 上传到 /opt/huanbao-ai-assistant/.release-stage-<release-id>
 cd /opt/huanbao-ai-assistant
 tar -czf backups/dist-<release-id>.tar.gz -C . dist
-rm -rf dist
-cp -a .release-stage-<release-id>/dist dist
+# Nginx bind-mounts dist，保留目录本身，只替换目录内容
+find dist -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+cp -a .release-stage-<release-id>/dist/. dist/
 docker exec docker-nginx-1 nginx -t
 docker exec docker-nginx-1 nginx -s reload
 ```

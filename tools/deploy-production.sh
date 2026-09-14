@@ -66,6 +66,7 @@ trap cleanup EXIT
 [[ "$DATAQUERY_JAR_PATH" == /* && "$DATAQUERY_JAR_PATH" != *..* ]] || die "unsafe dataquery jar path"
 [[ "$GATEWAY_JAR_PATH" == /* && "$GATEWAY_JAR_PATH" != *..* ]] || die "unsafe gateway jar path"
 [[ -d "$WEB_ROOT" && "$WEB_ROOT" != / ]] || die "web root does not exist"
+[[ -d "$WEB_ROOT/dist" ]] || die "frontend dist directory does not exist"
 [[ -d "$REMOTE_STAGE/dist" && -f "$REMOTE_STAGE/dist/index.html" ]] || die "staged frontend is incomplete"
 [[ -s "$DATAQUERY_UPLOAD" ]] || die "dataquery upload is missing"
 [[ -s "$GATEWAY_UPLOAD" ]] || die "gateway upload is missing"
@@ -96,7 +97,7 @@ rollback() {
   local status=0
   ROLLBACK_DIR="$(mktemp -d /tmp/huanbao-rollback.XXXXXX)"
   if ! tar -xzf "$DIST_BACKUP" -C "$ROLLBACK_DIR"; then status=1; fi
-  if ! rm -rf -- "$WEB_ROOT/dist" || ! cp -a -- "$ROLLBACK_DIR/dist" "$WEB_ROOT/dist"; then status=1; fi
+  if ! sync_dist_in_place "$ROLLBACK_DIR/dist"; then status=1; fi
   if ! install -m 0644 "$BACKUP_DIR/$(basename -- "$DATAQUERY_JAR_PATH")" "$DATAQUERY_JAR_PATH"; then status=1; fi
   if ! install -m 0644 "$BACKUP_DIR/$(basename -- "$GATEWAY_JAR_PATH")" "$GATEWAY_JAR_PATH"; then status=1; fi
   if ! systemctl restart "$DATAQUERY_SERVICE"; then status=1; fi
@@ -106,11 +107,19 @@ rollback() {
   return "$status"
 }
 
+sync_dist_in_place() {
+  local source_dir="$1"
+  local target_dir="$WEB_ROOT/dist"
+  [[ -d "$source_dir" && -d "$target_dir" ]] || return 1
+  find "$target_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  cp -a -- "$source_dir"/. "$target_dir"/
+}
+
 apply_release() {
   install -m 0644 "$DATAQUERY_UPLOAD" "$DATAQUERY_JAR_PATH"
   install -m 0644 "$GATEWAY_UPLOAD" "$GATEWAY_JAR_PATH"
-  rm -rf -- "$WEB_ROOT/dist"
-  cp -a -- "$REMOTE_STAGE/dist" "$WEB_ROOT/dist"
+  # Nginx bind-mounts this directory; keep its inode and replace only contents.
+  sync_dist_in_place "$REMOTE_STAGE/dist"
   systemctl restart "$DATAQUERY_SERVICE"
   docker restart "$GATEWAY_CONTAINER" >/dev/null
   docker exec "$NGINX_CONTAINER" nginx -t
