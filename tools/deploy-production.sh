@@ -6,14 +6,14 @@ die() {
   exit 1
 }
 
-[[ $# -eq 9 ]] || die "usage: $0 RELEASE_ID WEB_ROOT NGINX_CONTAINER DATAQUERY_SERVICE DATAQUERY_JAR_PATH GATEWAY_SERVICE GATEWAY_JAR_PATH SSH_TARGET SSH_ARGS"
+[[ $# -eq 9 ]] || die "usage: $0 RELEASE_ID WEB_ROOT NGINX_CONTAINER DATAQUERY_SERVICE DATAQUERY_JAR_PATH GATEWAY_CONTAINER GATEWAY_JAR_PATH SSH_TARGET SSH_ARGS"
 
 RELEASE_ID="$1"
 WEB_ROOT="$2"
 NGINX_CONTAINER="$3"
 DATAQUERY_SERVICE="$4"
 DATAQUERY_JAR_PATH="$5"
-GATEWAY_SERVICE="$6"
+GATEWAY_CONTAINER="$6"
 GATEWAY_JAR_PATH="$7"
 SSH_TARGET="$8"
 SSH_ARGS="$9"
@@ -43,7 +43,7 @@ WEB_ROOT="$2"
 NGINX_CONTAINER="$3"
 DATAQUERY_SERVICE="$4"
 DATAQUERY_JAR_PATH="$5"
-GATEWAY_SERVICE="$6"
+GATEWAY_CONTAINER="$6"
 GATEWAY_JAR_PATH="$7"
 REMOTE_STAGE="$WEB_ROOT/.release-stage-$RELEASE_ID"
 DATAQUERY_UPLOAD="/tmp/huanbao-dataquery-$RELEASE_ID.jar"
@@ -73,7 +73,7 @@ command -v systemctl >/dev/null || die "systemctl is not available"
 command -v rsync >/dev/null || die "rsync is not available"
 command -v curl >/dev/null || die "curl is not available"
 systemctl cat "$DATAQUERY_SERVICE" >/dev/null 2>&1 || die "dataquery service not found: $DATAQUERY_SERVICE"
-systemctl cat "$GATEWAY_SERVICE" >/dev/null 2>&1 || die "gateway service not found: $GATEWAY_SERVICE"
+docker inspect "$GATEWAY_CONTAINER" >/dev/null 2>&1 || die "gateway container not found: $GATEWAY_CONTAINER"
 [[ -f "$DATAQUERY_JAR_PATH" ]] || die "dataquery jar target not found: $DATAQUERY_JAR_PATH"
 [[ -f "$GATEWAY_JAR_PATH" ]] || die "gateway jar target not found: $GATEWAY_JAR_PATH"
 [[ -d "$(dirname -- "$DATAQUERY_JAR_PATH")" ]] || die "dataquery jar directory not found"
@@ -101,7 +101,7 @@ rollback() {
   if ! install -m 0644 "$BACKUP_DIR/$(basename -- "$DATAQUERY_JAR_PATH")" "$DATAQUERY_JAR_PATH"; then status=1; fi
   if ! install -m 0644 "$BACKUP_DIR/$(basename -- "$GATEWAY_JAR_PATH")" "$GATEWAY_JAR_PATH"; then status=1; fi
   if ! systemctl restart "$DATAQUERY_SERVICE"; then status=1; fi
-  if ! systemctl restart "$GATEWAY_SERVICE"; then status=1; fi
+  if ! docker restart "$GATEWAY_CONTAINER" >/dev/null; then status=1; fi
   if ! docker exec "$NGINX_CONTAINER" nginx -t; then status=1; fi
   if ! docker exec "$NGINX_CONTAINER" nginx -s reload; then status=1; fi
   return "$status"
@@ -112,7 +112,7 @@ apply_release() {
   install -m 0644 "$GATEWAY_UPLOAD" "$GATEWAY_JAR_PATH"
   rsync -a --delete "$REMOTE_STAGE/dist/" "$WEB_ROOT/dist/"
   systemctl restart "$DATAQUERY_SERVICE"
-  systemctl restart "$GATEWAY_SERVICE"
+  docker restart "$GATEWAY_CONTAINER" >/dev/null
   docker exec "$NGINX_CONTAINER" nginx -t
   docker exec "$NGINX_CONTAINER" nginx -s reload
 }
@@ -154,4 +154,4 @@ REMOTE_SCRIPT
 
 cat "$REMOTE_PAYLOAD" | ssh $SSH_ARGS "$SSH_TARGET" bash -s -- \
   "$RELEASE_ID" "$WEB_ROOT" "$NGINX_CONTAINER" "$DATAQUERY_SERVICE" "$DATAQUERY_JAR_PATH" \
-  "$GATEWAY_SERVICE" "$GATEWAY_JAR_PATH"
+  "$GATEWAY_CONTAINER" "$GATEWAY_JAR_PATH"

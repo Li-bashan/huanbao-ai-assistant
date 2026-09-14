@@ -70,7 +70,7 @@ deploy_production:
     - test -n "${PROD_SSH_KNOWN_HOSTS:-}" || (echo "PROD_SSH_KNOWN_HOSTS is not configured" >&2; exit 1)
     - test -n "${PROD_DATAQUERY_SERVICE:-}" || (echo "PROD_DATAQUERY_SERVICE is not configured" >&2; exit 1)
     - test -n "${PROD_DATAQUERY_JAR_PATH:-}" || (echo "PROD_DATAQUERY_JAR_PATH is not configured" >&2; exit 1)
-    - test -n "${PROD_GATEWAY_SERVICE:-}" || (echo "PROD_GATEWAY_SERVICE is not configured" >&2; exit 1)
+    - test -n "${PROD_GATEWAY_CONTAINER:-}" || (echo "PROD_GATEWAY_CONTAINER is not configured" >&2; exit 1)
     - test -n "${PROD_GATEWAY_JAR_PATH:-}" || (echo "PROD_GATEWAY_JAR_PATH is not configured" >&2; exit 1)
     - export PROD_SSH_HOST="${PROD_SSH_HOST:-121.237.178.23}"
     - export PROD_SSH_USER="${PROD_SSH_USER:-root}"
@@ -95,4 +95,4 @@ deploy_production:
     - test -f "$GATEWAY_JAR"
     - ssh $SSH_ARGS "$PROD_TARGET" "cat > '/tmp/huanbao-dataquery-$RELEASE_ID.jar'" < "$DATAQUERY_JAR"
     - ssh $SSH_ARGS "$PROD_TARGET" "cat > '/tmp/ai-gateway-$RELEASE_ID.jar'" < "$GATEWAY_JAR"
-    - bash tools/deploy-production.sh "$RELEASE_ID" "$PROD_WEB_ROOT" "$PROD_NGINX_CONTAINER" "$PROD_DATAQUERY_SERVICE" "$PROD_DATAQUERY_JAR_PATH" "$PROD_GATEWAY_SERVICE" "$PROD_GATEWAY_JAR_PATH" "$PROD_TARGET" "$SSH_ARGS"
+    - bash tools/deploy-production.sh "$RELEASE_ID" "$PROD_WEB_ROOT" "$PROD_NGINX_CONTAINER" "$PROD_DATAQUERY_SERVICE" "$PROD_DATAQUERY_JAR_PATH" "$PROD_GATEWAY_CONTAINER" "$PROD_GATEWAY_JAR_PATH" "$PROD_TARGET" "$SSH_ARGS"
