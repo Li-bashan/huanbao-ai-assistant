@@ -58,13 +58,10 @@ public final class CalculationEngine {
             if (rawValue == null) {
                 return null;
             }
-            // 1001 在实库 ZBZ 中以度存储，业务口径要求展示为万度。
-            // 其它原子量沿用各自实库核验口径，避免把吨值再次缩放。
-            if ("1001".equals(metric.indicatorCode())) {
-                return evaluator.evaluate(metric.formulaText(), Map.of(
-                        "base_" + metric.indicatorCode(), rawValue));
-            }
-            return rawValue;
+            // 原子指标也必须执行语义字典里的公式。例如 1201 的实库值按吨存储，
+            // 展示口径是 base_1201 / 10000 万吨；不能用指标编码写特例绕过字典。
+            return evaluator.evaluate(metric.formulaText(), Map.of(
+                    "base_" + metric.indicatorCode(), rawValue));
         }
 
         Map<String, Object> variables = new LinkedHashMap<>();

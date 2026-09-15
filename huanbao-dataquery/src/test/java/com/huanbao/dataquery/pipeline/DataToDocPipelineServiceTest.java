@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -169,6 +170,19 @@ class DataToDocPipelineServiceTest {
         assertEquals(12, result.tableRows().size());
         assertEquals("2025-01", result.tableRows().get(0).get("period"));
         assertEquals("2025-12", result.tableRows().get(11).get("period"));
+        assertEquals(0, new BigDecimal("0.80").compareTo(valueForPeriod(result, "2025-06")));
+        assertEquals(0, new BigDecimal("0.90").compareTo(valueForPeriod(result, "2025-07")));
+        assertEquals(0, new BigDecimal("1.00").compareTo(valueForPeriod(result, "2025-08")));
+    }
+
+    private static BigDecimal valueForPeriod(
+            CompositeExecutionResult result,
+            String period) {
+        return (BigDecimal) result.tableRows().stream()
+                .filter(row -> period.equals(row.get("period")))
+                .findFirst()
+                .orElseThrow()
+                .get("currentValue");
     }
 
     private static void createDatabase(JdbcDataSource dataSource) {

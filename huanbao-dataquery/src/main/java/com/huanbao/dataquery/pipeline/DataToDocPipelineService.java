@@ -164,7 +164,7 @@ public final class DataToDocPipelineService {
         List<SubjectScope> subjects = resolveSubjects(latestPlan, normalizedAllowedOrgs);
         String queryEntity = resolveQueryEntity(latestPlan);
         boolean ranking = "RANKING".equalsIgnoreCase(latestPlan.analysisType());
-        boolean yearToDate = isYearExpression(latestPlan.timeExpression(), rawQuery);
+        boolean yearToDate = shouldUseYearToDate(latestPlan, rawQuery);
 
         Set<YearMonth> queryPeriods = comparisonPeriods(targetPeriods);
         MatrixFetchResult matrix = fetchValues(
@@ -568,6 +568,17 @@ public final class DataToDocPipelineService {
                 : timeExpression.trim();
         return YEAR_PATTERN.matcher(expression).find()
                 || ABSOLUTE_YEAR_PATTERN.matcher(expression).find();
+    }
+
+    private static boolean shouldUseYearToDate(AnalysisPlanDto plan, String rawQuery) {
+        if (!isYearExpression(plan.timeExpression(), rawQuery)) {
+            return false;
+        }
+        // 排名和经营概览需要在最后一个期间展示年度累计值；普通事实/趋势结果
+        // 返回月度增量，避免前端把累计序列再次求和。
+        return "RANKING".equalsIgnoreCase(plan.analysisType())
+                || "REPORT".equalsIgnoreCase(plan.analysisType())
+                || "COMPOSITE".equalsIgnoreCase(plan.primaryIntent());
     }
 
     private List<YearMonth> resolveTargetPeriods(String timeExpression, String rawQuery) {
