@@ -7,6 +7,7 @@ import com.huanbao.dataquery.core.analysis.ClueItem;
 import com.huanbao.dataquery.core.analysis.FactItem;
 import com.huanbao.dataquery.domain.ops.OpsDomainSemanticProvider;
 import com.huanbao.dataquery.pipeline.CompositeExecutionResult;
+import com.huanbao.dataquery.pipeline.DataValueSemantics;
 import com.huanbao.dataquery.pipeline.StructuredFactPayload;
 import com.huanbao.dataquery.router.AnalysisPlanDto;
 import org.junit.jupiter.api.Test;
@@ -117,5 +118,48 @@ class ProtocolAssemblerTest {
         assertTrue(content.path("insights").isArray());
         assertTrue(content.path("followUps").isArray());
         assertEquals(0, content.path("followUps").size());
+    }
+
+    @Test
+    void buildsAnnualFactKpiFromMonthlyRowsAndPublishesValueSemantics() {
+        OpsDomainSemanticProvider provider = new OpsDomainSemanticProvider();
+        AnalysisPlanDto plan = new AnalysisPlanDto(
+                "DATA_QUERY", List.of("生活垃圾入厂量"), List.of("集团"),
+                "2025年", "FACT", List.of());
+        DataValueSemantics semantics = DataValueSemantics.forPlan(
+                provider.getMetric("生活垃圾入厂量"), plan, true, false);
+        CompositeExecutionResult result = new CompositeExecutionResult(
+                plan,
+                Map.of(
+                        "type", "line",
+                        "title", Map.of("text", "生活垃圾入厂量走势"),
+                        "xAxis", Map.of("data", List.of("2025-01", "2025-02")),
+                        "series", List.of(Map.of(
+                                "name", "集团", "type", "line",
+                                "data", List.of(new BigDecimal("100"), new BigDecimal("200"))))),
+                List.of(
+                        Map.of("subject", "集团", "metric", "生活垃圾入厂量",
+                                "period", "2025-01", "currentValue", new BigDecimal("100")),
+                        Map.of("subject", "集团", "metric", "生活垃圾入厂量",
+                                "period", "2025-02", "currentValue", new BigDecimal("200"))),
+                "", false, "", List.of(), List.of(), semantics);
+
+        PresentationResponseV2 response = new ProtocolAssembler(provider).assemble(
+                result,
+                new UserOrganizationContext("user-7", List.of("10004024")),
+                LocalDate.of(2026, 8, 31),
+                "request-annual",
+                "conversation-annual");
+        JsonNode content = new ObjectMapper().valueToTree(response).path("content");
+
+        assertEquals(0, new BigDecimal("300").compareTo(
+                new BigDecimal(content.path("metrics").get(0).path("value").asText())));
+        assertEquals("万吨", content.path("metrics").get(0).path("unit").asText());
+        assertEquals("ANNUAL_SUM", content.path("dataInfo").path("valueSemantics")
+                .path("requestedMeasure").asText());
+        assertEquals("PERIOD_INCREMENT", content.path("dataInfo").path("valueSemantics")
+                .path("timeSemantics").asText());
+        assertEquals(0, new BigDecimal("100").compareTo(
+                content.path("table").path("rows").get(0).path("value").decimalValue()));
     }
 }

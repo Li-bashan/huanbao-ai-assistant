@@ -101,6 +101,7 @@ const dataInfoLabels = {
   timeRange: '统计期间',
   dataCutoffDate: '数据截止',
   aggregation: '聚合口径',
+  valueSemantics: '数值语义',
   organizationScope: '组织范围',
   rowCount: '数据行数',
   statistics: '统计摘要',

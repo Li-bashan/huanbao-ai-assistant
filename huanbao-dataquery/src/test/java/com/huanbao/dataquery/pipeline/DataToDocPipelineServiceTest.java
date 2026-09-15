@@ -173,6 +173,9 @@ class DataToDocPipelineServiceTest {
         assertEquals(0, new BigDecimal("0.80").compareTo(valueForPeriod(result, "2025-06")));
         assertEquals(0, new BigDecimal("0.90").compareTo(valueForPeriod(result, "2025-07")));
         assertEquals(0, new BigDecimal("1.00").compareTo(valueForPeriod(result, "2025-08")));
+        assertEquals(DataValueSemantics.ANNUAL_SUM, result.valueSemantics().requestedMeasure());
+        assertEquals(DataValueSemantics.PERIOD_INCREMENT, result.valueSemantics().timeSemantics());
+        assertEquals("万吨", result.valueSemantics().displayUnit());
     }
 
     private static BigDecimal valueForPeriod(

@@ -243,7 +243,9 @@ const normalizedPayload = computed(() => {
   const source = sourceData.value
   const rawContent = isPlainObject(source.content) ? source.content : {}
   const rawAnalysisType = readText(source.analysisType || source.analysis_type).toUpperCase()
-  const trendContent = ['FACT', 'DETAIL'].includes(rawAnalysisType)
+  const isCanonicalV2 = readText(source.protocolVersion || source.protocol_version) === '2.0'
+    && source.protocolValid === true
+  const trendContent = !isCanonicalV2 && ['FACT', 'DETAIL'].includes(rawAnalysisType)
     ? buildFactTrendContent(rawContent)
     : null
 

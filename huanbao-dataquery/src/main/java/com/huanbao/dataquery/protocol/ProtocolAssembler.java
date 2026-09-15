@@ -6,6 +6,7 @@ import com.huanbao.dataquery.core.analysis.FactItem;
 import com.huanbao.dataquery.core.spi.MetricDefinition;
 import com.huanbao.dataquery.core.repository.PartitionTablePruner;
 import com.huanbao.dataquery.pipeline.CompositeExecutionResult;
+import com.huanbao.dataquery.pipeline.DataValueSemantics;
 import com.huanbao.dataquery.pipeline.StructuredFactPayload;
 import com.huanbao.dataquery.domain.ops.OpsDomainSemanticProvider;
 import com.huanbao.dataquery.router.AnalysisPlanDto;
@@ -116,7 +117,7 @@ public final class ProtocolAssembler {
             insights = List.copyOf(enrichedInsights);
         }
         List<MetricCardDto> metrics = hasData
-                ? assembleMetrics(facts, metric)
+                ? assembleMetrics(facts, metric, plan, result.valueSemantics())
                 : List.of();
         TableDataDto table = hasData
                 ? assembleTable(analysisType, result.tableRows(), metric.unit())
@@ -128,7 +129,7 @@ public final class ProtocolAssembler {
                 ? List.of(result.degradedMessage())
                 : List.of();
         DataInfoDto dataInfo = assembleDataInfo(
-                plan, analysisType, metric, dataCutoffDate, userContext, result.tableRows(),
+                result, plan, analysisType, metric, dataCutoffDate, userContext, result.tableRows(),
                 facts, warnings, coverage, status);
 
         String summary = summary(result, metric.name(), status);
@@ -242,7 +243,14 @@ public final class ProtocolAssembler {
         return List.copyOf(evidence);
     }
 
-    private List<MetricCardDto> assembleMetrics(List<FactView> facts, MetricMetadata metric) {
+    private List<MetricCardDto> assembleMetrics(
+            List<FactView> facts,
+            MetricMetadata metric,
+            AnalysisPlanDto plan,
+            DataValueSemantics valueSemantics) {
+        if (DataValueSemantics.ANNUAL_SUM.equals(valueSemantics.requestedMeasure())) {
+            return assembleAnnualMetrics(facts, metric, plan);
+        }
         String latestPeriod = facts.stream()
                 .map(FactView::period)
                 .filter(value -> !value.isBlank())
@@ -273,6 +281,49 @@ public final class ProtocolAssembler {
                     factMetric.unit(),
                     fact.yearOverYearPercent(),
                     fact.monthOverMonthPercent()));
+        }
+        return List.copyOf(cards);
+    }
+
+    private List<MetricCardDto> assembleAnnualMetrics(
+            List<FactView> facts,
+            MetricMetadata metric,
+            AnalysisPlanDto plan) {
+        Map<String, List<FactView>> grouped = facts.stream()
+                .filter(fact -> fact.currentValue() != null)
+                .collect(Collectors.groupingBy(
+                        fact -> fact.subject() + "|" + fact.metric(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+        if (grouped.isEmpty()) {
+            return List.of();
+        }
+
+        boolean singleGroup = grouped.size() == 1;
+        String periodLabel = plan.timeExpression().isBlank() ? "年度" : plan.timeExpression();
+        List<MetricCardDto> cards = new ArrayList<>();
+        for (List<FactView> group : grouped.values()) {
+            FactView latest = group.stream()
+                    .max(Comparator.comparing(FactView::period))
+                    .orElseThrow();
+            MetricMetadata factMetric = metricMetadata(latest.metric(), metric);
+            BigDecimal total = group.stream()
+                    .map(FactView::currentValue)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            String prefix = singleGroup ? "" : latest.subject() + " · ";
+            cards.add(new MetricCardDto(prefix + periodLabel + "累计", total, factMetric.unit()));
+            if (singleGroup) {
+                cards.add(new MetricCardDto("最新月（" + latest.period() + "）",
+                        latest.currentValue(), factMetric.unit()));
+                if (latest.yearOverYearPercent() != null) {
+                    cards.add(new MetricCardDto(latest.period() + "同比变动",
+                            latest.yearOverYearPercent(), "%"));
+                }
+                if (latest.monthOverMonthPercent() != null) {
+                    cards.add(new MetricCardDto(latest.period() + "环比变动",
+                            latest.monthOverMonthPercent(), "%"));
+                }
+            }
         }
         return List.copyOf(cards);
     }
@@ -413,6 +464,7 @@ public final class ProtocolAssembler {
     }
 
     private DataInfoDto assembleDataInfo(
+            CompositeExecutionResult result,
             AnalysisPlanDto plan,
             String analysisType,
             MetricMetadata metric,
@@ -487,6 +539,7 @@ public final class ProtocolAssembler {
                 timeRange,
                 dataCutoffDate.toString(),
                 metric.aggregation(),
+                result.valueSemantics().asMap(),
                 organizationScope,
                 rows.size(),
                 statistics,

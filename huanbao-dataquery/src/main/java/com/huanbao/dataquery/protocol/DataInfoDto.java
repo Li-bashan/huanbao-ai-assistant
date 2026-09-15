@@ -18,6 +18,7 @@ public record DataInfoDto(
         Map<String, Object> timeRange,
         String dataCutoffDate,
         String aggregation,
+        Map<String, Object> valueSemantics,
         Map<String, Object> organizationScope,
         int rowCount,
         Map<String, Object> statistics,
@@ -35,6 +36,7 @@ public record DataInfoDto(
         timeRange = immutableMap(timeRange);
         dataCutoffDate = optional(dataCutoffDate);
         aggregation = optional(aggregation);
+        valueSemantics = immutableMap(valueSemantics);
         organizationScope = immutableMap(organizationScope);
         rowCount = Math.max(0, rowCount);
         statistics = immutableMap(statistics);
@@ -47,7 +49,7 @@ public record DataInfoDto(
 
     public static DataInfoDto empty() {
         return new DataInfoDto(
-                "", "", "", "", Map.of(), "", "", Map.of(), 0,
+                "", "", "", "", Map.of(), "", "", Map.of(), Map.of(), 0,
                 Map.of(), Map.of(), List.of(), List.of(), Map.of(), Map.of());
     }
 

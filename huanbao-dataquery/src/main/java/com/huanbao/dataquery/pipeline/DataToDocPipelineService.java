@@ -164,7 +164,10 @@ public final class DataToDocPipelineService {
         List<SubjectScope> subjects = resolveSubjects(latestPlan, normalizedAllowedOrgs);
         String queryEntity = resolveQueryEntity(latestPlan);
         boolean ranking = "RANKING".equalsIgnoreCase(latestPlan.analysisType());
+        boolean annualExpression = isYearExpression(latestPlan.timeExpression(), rawQuery);
         boolean yearToDate = shouldUseYearToDate(latestPlan, rawQuery);
+        DataValueSemantics valueSemantics = DataValueSemantics.forPlan(
+                primaryMetric, latestPlan, annualExpression, yearToDate);
 
         Set<YearMonth> queryPeriods = comparisonPeriods(targetPeriods);
         MatrixFetchResult matrix = fetchValues(
@@ -248,7 +251,8 @@ public final class DataToDocPipelineService {
                 degraded,
                 degraded ? DEGRADED_MESSAGE : "",
                 factPayloads,
-                anomalySubjects);
+                anomalySubjects,
+                valueSemantics);
     }
 
     /** 构造公文阶段 Prompt，供诊断和单元测试检查事实注入及硬约束。 */

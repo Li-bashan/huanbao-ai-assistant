@@ -218,6 +218,7 @@ const normalizeDataInfo = (value) => {
     'timeRange',
     'dataCutoffDate',
     'aggregation',
+    'valueSemantics',
     'organizationScope',
     'rowCount',
     'statistics',

@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
+import DataQueryChart from '../../DataQueryChart.vue'
 import MetricGrid from '../shared/MetricGrid.vue'
 import AnalysisTable from '../shared/AnalysisTable.vue'
 import InsightList from '../shared/InsightList.vue'
 import FollowUpActions from '../shared/FollowUpActions.vue'
+import { createDataQueryChartOption } from '../../../utils/dataQueryProtocol.js'
 
 const NO_DATA_STATUSES = new Set(['NO_DATA', 'NO_DATA_IN_PERIOD', 'SUCCESS_EMPTY', 'EMPTY'])
 
@@ -38,6 +40,20 @@ const summary = computed(() => {
   return value || (isNoData.value ? '当前统计期间暂无可用数据。' : '查询已完成。')
 })
 const statusLabel = computed(() => (isNoData.value ? '暂无数据' : '已校验'))
+const chart = computed(() => {
+  const protocolChart = createDataQueryChartOption({ content: content.value })
+  return protocolChart || (isPlainObject(props.chartOption) ? props.chartOption : null)
+})
+const chartTitle = computed(() => `${dataInfo.value.indicatorName || '指标'}走势`)
+const chartSubtitle = computed(() => {
+  const timeRange = dataInfo.value.timeRange
+  if (!isPlainObject(timeRange)) return ''
+
+  const start = String(timeRange.start || '').trim()
+  const end = String(timeRange.end || '').trim()
+  return start && end ? `(${start} 至 ${end})` : ''
+})
+const chartUnit = computed(() => String(dataInfo.value.unit || '').trim())
 
 const formatValue = (value) => {
   if (value === null || value === undefined || value === '') return '-'
@@ -90,6 +106,7 @@ const dataInfoLabels = {
   timeRange: '统计期间',
   dataCutoffDate: '数据截止',
   aggregation: '聚合口径',
+  valueSemantics: '数值语义',
   organizationScope: '组织范围',
   rowCount: '数据行数',
   statistics: '统计摘要',
@@ -133,6 +150,14 @@ const formatDataInfoValue = (value) => {
       </strong>
     </section>
     <MetricGrid v-if="displayMetrics.length" :metrics="displayMetrics" />
+    <DataQueryChart
+      v-if="chart"
+      :option="chart"
+      :title="chartTitle"
+      :subtitle="chartSubtitle"
+      :unit="chartUnit"
+      :window-view="windowView"
+    />
     <InsightList :insights="insights" :data-info="dataInfo" />
     <AnalysisTable v-if="table" :table="table" :window-view="windowView" />
 
