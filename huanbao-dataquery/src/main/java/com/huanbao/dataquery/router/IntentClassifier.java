@@ -58,6 +58,7 @@ public class IntentClassifier {
             "近(?:最)?(?:半|[0-9一二三四五六七八九十百千万两]+)(?:个月|月|年)|"
                     + "(?:今年|去年|前年)(?:[0-9]{1,2}个?月?份?|全年)?|"
                     + "[0-9]{4}年[0-9]{1,2}个?月?份?|"
+                    + "20[0-9]{2}年(?:全年)?|"
                     + "[0-9一二三四五六七八九十]+月份?|本月|上月|本季度|上季度|去年同期|今年|去年");
     private static final Pattern RANKING_PATTERN = Pattern.compile(
             "排名|排行|最高|最低|top\\s*[0-9一二三四五六七八九十百千万两]+|前[0-9一二三四五六七八九十百千万两]+|倒数",
@@ -275,7 +276,8 @@ public class IntentClassifier {
         // 路由模型可能已将最近半年等时间表达式归一化为近6个月；不能因为
         // 归一化后的文本未逐字出现在原问题中而丢弃它，否则流水线会退化为单月锚点。
         String timeExpression = plan.timeExpression();
-        if (timeExpression == null || timeExpression.isBlank()) {
+        if (timeExpression == null || timeExpression.isBlank()
+                || !isSupportedTimeExpression(timeExpression)) {
             timeExpression = extractTimeExpression(query);
         }
         String analysisType = explicitAnalysisType(query);
@@ -367,6 +369,10 @@ public class IntentClassifier {
     private static String extractTimeExpression(String query) {
         Matcher matcher = TIME_PATTERN.matcher(query);
         return matcher.find() ? matcher.group() : "";
+    }
+
+    private static boolean isSupportedTimeExpression(String value) {
+        return value != null && TIME_PATTERN.matcher(value.trim()).matches();
     }
 
     private static List<String> buildMetricTerms(Collection<MetricDefinition> definitions) {

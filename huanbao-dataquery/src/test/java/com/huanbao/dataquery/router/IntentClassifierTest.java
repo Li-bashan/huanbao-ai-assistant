@@ -143,6 +143,17 @@ class IntentClassifierTest {
     }
 
     @Test
+    void replacesWholeQuestionReturnedAsTimeExpressionWithQueryTime() throws Exception {
+        respondWith(new AnalysisPlanDto(
+                "DATA_QUERY", List.of("生活垃圾入厂量"), List.of(),
+                "2025年生活垃圾入厂量是多少", "FACT", List.of()));
+
+        AnalysisPlanDto plan = classifier.classify("2025年生活垃圾入厂量是多少");
+
+        assertEquals("2025年", plan.timeExpression());
+    }
+
+    @Test
     void keepsSystemPromptWithin250CharactersAndInjectsControlledTerms() {
         String prompt = classifier.buildSystemPrompt("秦皇岛今年发电量排名");
 

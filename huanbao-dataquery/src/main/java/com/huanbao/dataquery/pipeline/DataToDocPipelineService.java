@@ -74,9 +74,11 @@ public final class DataToDocPipelineService {
             "(今年|去年|前年)\\s*([0-9]{1,2})个?月?份?");
     private static final Pattern ABSOLUTE_MONTH_PATTERN = Pattern.compile(
             "(20[0-9]{2})年\\s*([0-9]{1,2})个?月?份?");
+    private static final Pattern ABSOLUTE_YEAR_PATTERN = Pattern.compile(
+            "20[0-9]{2}年(?:全年)?(?!\\s*[0-9]{1,2}个?月(?:份?)?)");
     private static final Pattern ISO_MONTH_PATTERN = Pattern.compile("20[0-9]{2}-[0-9]{2}");
     private static final Pattern MONTH_ONLY_PATTERN = Pattern.compile(
-            "([0-9]{1,2})个?月?份?");
+            "(?<![0-9])([0-9]{1,2})个?月(?:份?)?");
     private static final Pattern YEAR_PATTERN = Pattern.compile("(今年|去年|前年)(?:全年)?");
 
     private final ConversationStateManager stateManager;
@@ -564,7 +566,8 @@ public final class DataToDocPipelineService {
         String expression = timeExpression == null || timeExpression.isBlank()
                 ? rawQuery == null ? "" : rawQuery.trim()
                 : timeExpression.trim();
-        return YEAR_PATTERN.matcher(expression).find();
+        return YEAR_PATTERN.matcher(expression).find()
+                || ABSOLUTE_YEAR_PATTERN.matcher(expression).find();
     }
 
     private List<YearMonth> resolveTargetPeriods(String timeExpression, String rawQuery) {
@@ -602,6 +605,14 @@ public final class DataToDocPipelineService {
             return List.of(YearMonth.of(
                     Integer.parseInt(absoluteMonth.group(1)),
                     parseMonth(absoluteMonth.group(2), expression)));
+        }
+        Matcher absoluteYear = ABSOLUTE_YEAR_PATTERN.matcher(expression);
+        if (absoluteYear.find()) {
+            int year = Integer.parseInt(absoluteYear.group().substring(0, 4));
+            YearMonth first = YearMonth.of(year, 1);
+            YearMonth maxAvailableMonth = YearMonth.from(tablePruner.maxDataDate());
+            YearMonth last = min(YearMonth.of(year, 12), maxAvailableMonth);
+            return monthsBetween(first, last);
         }
         if (ISO_MONTH_PATTERN.matcher(expression).find()) {
             try {

@@ -46,7 +46,8 @@ class DataToDocPipelineServiceTest {
     void setUp() {
         OpsDomainSemanticProvider provider = new OpsDomainSemanticProvider();
         dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:pipeline;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
+        dataSource.setURL("jdbc:h2:mem:pipeline-" + System.nanoTime()
+                + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         createDatabase(dataSource);
 
         RestClient.Builder builder = RestClient.builder().baseUrl("http://vllm.test/v1");
@@ -155,6 +156,21 @@ class DataToDocPipelineServiceTest {
         assertEquals(1, result.tableRows().get(0).get("rank"));
     }
 
+    @Test
+    void resolvesAbsoluteYearWithoutTreatingYearPrefixAsMonth() {
+        CompositeExecutionResult result = service.execute(
+                CONVERSATION_KEY + "-absolute-year",
+                new AnalysisPlanDto(
+                        "DATA_QUERY", List.of("生活垃圾入厂量"), List.of(),
+                        "2025年", "FACT", List.of()),
+                "2025年生活垃圾入厂量是多少",
+                List.of("10004024"));
+
+        assertEquals(12, result.tableRows().size());
+        assertEquals("2025-01", result.tableRows().get(0).get("period"));
+        assertEquals("2025-12", result.tableRows().get(11).get("period"));
+    }
+
     private static void createDatabase(JdbcDataSource dataSource) {
         org.springframework.jdbc.core.JdbcTemplate jdbc =
                 new org.springframework.jdbc.core.JdbcTemplate(dataSource);
@@ -167,6 +183,7 @@ class DataToDocPipelineServiceTest {
                 "垃圾焚烧发电项目", "华北大区", true);
 
         for (String table : List.of(
+                "CGXTAPPMISDate_2024_06", "CGXTAPPMISDate_2024_12",
                 "CGXTAPPMISDate_2025_06", "CGXTAPPMISDate_2025_12",
                 "CGXTAPPMISDate_2026_06", "CGXTAPPMISDate_2026_12")) {
             jdbc.execute("CREATE TABLE IF NOT EXISTS MSOKFPT.\"" + table + "\" ("
