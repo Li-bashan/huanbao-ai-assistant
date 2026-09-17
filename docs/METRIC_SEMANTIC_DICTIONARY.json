@@ -6,7 +6,7 @@
   "metricCount": 46,
   "sourceDocuments": [
     {
-      "path": "docs/DATABASE_RECONCILIATION_REPORT.md",
+      "path": "docs/数据源与指标基线.md",
       "role": "数据库资产、46项公式差异、参数覆盖及空值/零值事实来源"
     },
     {

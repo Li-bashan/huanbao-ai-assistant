@@ -54,7 +54,7 @@ Codex 修改代码前应先阅读：
 
 - 不要把真实 API Key 写进代码、文档、提交记录。
 - Dify API Key 只能使用 Gateway 后端环境变量，不能写入任何 `VITE_` 变量。
-- 当前工作区 Master 路由使用 `DIFY_MASTER_API_BASE` / `DIFY_MASTER_API_KEY`；制度、办公和问数分别有 Gateway 后端配置。
+- 当前工作区 Master 路由使用 `DIFY_MASTER_API_BASE` / `DIFY_MASTER_API_KEY`；制度和办公仍有 Gateway 后端 Dify 兼容配置，智能问数不再配置或调用 Dify。
 - 修改 `.env.local` 后必须重启 `npm run dev`。
 
 ## streaming 规则
@@ -119,7 +119,7 @@ git status
 
 ## 部署流程
 
-正式发布走 GitLab CI：必须先本地验证并 push，流水线自动测试、构建、备份、同步、重启和健康检查；生产 SSH 私钥、主机指纹、服务名和 Jar 路径只能配置在 GitLab CI/CD Variables。流水线脚本位于 `tools/deploy-production.sh`，失败会自动回滚。手工应急流程如下：
+正式发布走 GitHub Actions：必须先本地验证并 push 到 `github` 远端 main 分支，流水线自动测试、构建、备份、同步、重启和健康检查；生产 SSH 私钥、主机指纹、服务名和 Jar 路径只能配置在 GitHub 仓库 Settings → Secrets and variables → Actions。工作流脚本位于 `.github/workflows/deploy.yml`，发布脚本位于 `tools/deploy-production.sh`，失败会自动回滚。手工应急流程如下：
 
 ```bash
 # 本地

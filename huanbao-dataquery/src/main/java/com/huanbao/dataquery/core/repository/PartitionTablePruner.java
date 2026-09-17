@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 /**
  * 按查询日期裁剪人大金仓半年快照表。
  *
- * <p>默认清单来自 {@code docs/DATABASE_RECONCILIATION_REPORT.md}：只包含当前
+ * <p>默认清单来自 {@code docs/数据源与指标基线.md}：只包含当前
  * 对账确认有数据的六张表，2026 下半年表的有效数据截止到 2026-08-31。
  * 后续实库清单变化时，应通过构造器传入新的清单和 cutoff，而不是放宽表名规则。</p>
  */

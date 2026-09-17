@@ -2,26 +2,27 @@
 
 ## 什么时候使用
 
-当用户要求修改环宝 AI、智能助手、制度问答、办公智能、流程助手、历史记录、Dify 接入、门户嵌入、复制导出、部署时，应使用本 Skill。
+当用户要求修改环宝 AI、智能助手、制度问答、办公智能、流程助手、历史记录、Dify 兼容层、门户嵌入、复制导出或部署时，应使用本 Skill。它只保留项目专属边界，不重复完整架构说明。
 
 修改前先阅读：
 
-1. `README.md`
-2. `CLAUDE.md`
+1. `AGENTS.md`
+2. `README.md`
 3. `docs/项目交接说明.md`
 
 ## 项目能力范围
 
 - 企业门户右侧 AI 助手前端。
-- 制度问答 Dify blocking。
-- 办公智能 Dify Agent streaming。
+- 制度问答经 Gateway 兼容 Dify blocking。
+- 办公智能经 Gateway 兼容 Dify Agent streaming。
+- 智能问数经 Gateway 调用独立 `huanbao-dataquery`，不调用 Dify。
 - 流程助手前端动作卡片。
 - 自动意图识别。
 - Markdown、引用来源、历史、复制导出。
 
 ## 技术栈
 
-Vue 3、Vite、JavaScript、CSS、Dify API、localStorage、Nginx。
+Vue 3、Vite、JavaScript、CSS、AI Gateway、localStorage、Nginx；迁移期间保留 Dify 服务端兼容层。
 
 ## 主要文件
 
@@ -50,18 +51,19 @@ Vue 3、Vite、JavaScript、CSS、Dify API、localStorage、Nginx。
 - 不改成全屏后台。
 - 不删除现有欢迎区、模式切换、历史弹层、工具栏。
 
-## Dify 接入规则
+## Dify 兼容层规则
 
 - 不暴露密钥。
-- 制度问答必须 blocking。
-- 办公智能必须 streaming。
+- 制度问答兼容接口必须 blocking。
+- 办公智能兼容接口必须 streaming。
+- 智能问数不得恢复前端直连或 Dify 执行链路。
 - Agent Chat App 不支持 blocking。
 - `<think>` 内容必须过滤。
 
 ## 流程助手开发规则
 
 - 不直接调用 Dify。
-- 不打开真实表单。
+- 只允许已验证入口发送打开动作，不自动提交表单；当前只有采购请示单已验证。
 - 使用 `workflowActions` 配置。
 - 命中事项后展示动作卡片。
 - 后续真实动作通过 postMessage / iGIX 对接。
@@ -75,10 +77,9 @@ Vue 3、Vite、JavaScript、CSS、Dify API、localStorage、Nginx。
 ## 部署检查规则
 
 - 本地 `npm run build`。
-- 本地 `git push`。
-- 服务器 `git pull`。
-- 服务器 `npm ci && npm run build`。
-- `systemctl reload nginx`。
+- 需要发布时先确认本地验证结果，再按用户授权执行 `git push`。
+- 正式发布走 GitLab CI；服务器不是 Git 工作区，不在服务器 `git pull` 或重新构建。
+- 发布前本地执行 `npm run build` 和后端测试；发布脚本负责备份、重启和健康检查。
 
 ## 验证方式
 

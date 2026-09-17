@@ -47,6 +47,8 @@ data-query:
   allow-group-ranking: ${DATA_QUERY_ALLOW_GROUP_RANKING:false}
   allowed-indicator-codes: ${DATA_QUERY_ALLOWED_INDICATOR_CODES:}
   audit-enabled: ${DATA_QUERY_AUDIT_ENABLED:true}
+  # 置为 true 时关闭 ai_data_query_user 授权表校验，全部登录用户均可使用智能问数（全组织范围）。
+  access-open-to-all: ${DATA_QUERY_ACCESS_OPEN_TO_ALL:false}
 
 dataquery:
   service:

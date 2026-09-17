@@ -2,11 +2,11 @@
 
 环宝 AI 智能助手是一个基于 Vue 3 + Vite 的企业门户右侧智能助手前端项目，用于嵌入公司办公门户，为员工提供查制度、写材料、办流程、问生产数据的一站式入口。
 
-截至 2026-09-02，统一 Master Gateway 改动已提交并与 origin/main 同步；线上健康接口已验证，但生产服务器是否已拉取并重载该提交、Dify Key 实际绑定哪个 App、Kingbase 和门户身份是否联调完成，不能只从本 README 推出。详细证据见 [系统抓取与文档同步报告](./docs/系统抓取与文档同步报告-2026-09-02.md)。
+截至 2026-09-15，当前仓库基线为 `3dd2a71`。独立 `huanbao-dataquery` 已按该基线构建并部署到生产，`8089` 健康状态为 `UP`；智能问数的实际生产链路是 `前端 -> AI Gateway:8088 -> huanbao-dataquery:8089 -> KingbaseES`。制度问答、办公智能和统一 Master 仍处于 Dify 兼容运行阶段，尚未完成去 Dify 迁移。详细事实以 [项目现状总览](./docs/项目现状总览.md) 和 [项目交接说明](./docs/项目交接说明.md) 为准。
 
-当前版本是可演示、可使用的前端 V1：制度问答、办公智能和智能问数统一经 AI Gateway 接入 Dify，流程助手为前端动作卡片演示版，后续通过 postMessage、门户父页面、iGIX 菜单/表单能力完成真实办理。
+当前版本是可演示、可使用的前端 V1：智能问数已经由独立服务执行，制度问答和办公智能仍经 AI Gateway 接入 Dify，流程助手为前端动作卡片演示版。整体去 Dify 化建设方案见 [去 Dify 化智能助手整体建设方案](./docs/去Dify化智能助手整体建设方案.md)。
 
-项目整体最新状态见[项目现状总览](./docs/项目现状总览.md)；Dify 全部应用、已发布工作流、草稿和其他节点见[Dify 全部应用与工作流现状](./docs/Dify全部应用与工作流现状.md)，服务器和模型配置见[Dify 服务器部署与模型配置](./docs/Dify服务器部署与模型配置.md)。
+项目整体最新状态见[项目现状总览](./docs/项目现状总览.md)，完整文档入口见[docs 文档索引](./docs/README.md)。
 
 ## 当前能力
 
@@ -16,7 +16,7 @@
 - 制度问答：查询制度依据，通过 AI Gateway 访问 Dify blocking/统一 Master。
   - 办公智能：办公材料处理，通过 AI Gateway 访问 Dify Agent streaming/统一 Master。
   - 流程助手：流程办理辅助，当前为前端动作卡片，不接真实业务系统。
-  - 智能问数：查询生产指标数据，前端只持有用户专属会话句柄，由 AI Gateway 负责身份、DataScope、会话归属和 Dify SSE 代理；详见 [智能问数一体化升级交付报告](./docs/智能问数一体化升级交付报告.md)。
+  - 智能问数：查询生产指标数据，前端只持有用户专属会话句柄，由 AI Gateway 负责身份、DataScope、会话归属和独立问数服务 SSE 代理；详见 [项目交接说明](./docs/项目交接说明.md)。
 - 标题栏智能能力选择器，数量和菜单来自 `assistantModes` 配置。
 - 自动意图识别与模式分发。
 - Markdown 渲染与 DOMPurify 安全过滤。
@@ -32,7 +32,7 @@
 - Vite
 - JavaScript
 - CSS
-  - AI Gateway / Dify
+- AI Gateway / 独立模型服务 / 独立知识服务 / KingbaseES（制度和办公迁移期间仍兼容 Dify）
 - markdown-it
 - DOMPurify
 - localStorage
@@ -59,7 +59,10 @@ src/
 public/
   huanbao-avatar.png              Header 和气泡头像
   huanbao-welcome-bg.png          欢迎区背景图
-docs/                             项目交接文档
+docs/                             当前状态、方案、运行手册和数据源
+  reference/                      接口、门户和流程契约
+  sql/                            Gateway DDL/迁移脚本
+  业务Excel/                       业务输入源文件
 ```
 
 ## 本地启动
@@ -90,7 +93,7 @@ VITE_DATA_QUERY_DEFAULT_PERIOD=今年
 ```
 
 说明：
-- `VITE_AI_GATEWAY_BASE_URL` 是前端 Gateway 入口；Gateway 的 Dify Key 只放后端环境变量。
+- `VITE_AI_GATEWAY_BASE_URL` 是前端 Gateway 入口；Gateway 的 Dify Key 只放后端环境变量，且仅服务于迁移期间的制度、办公和 Master 兼容链路。
 - 旧版前端直连 Dify 变量已从运行链路移除，不要再写入 `.env.local`。
 - Vite 只能读取 `VITE_` 开头的变量。
 
@@ -111,12 +114,6 @@ VITE_DATA_QUERY_DEFAULT_PERIOD=今年
 前端由服务器上的 `docker-nginx-1` 容器挂载该目录的 `dist/` 提供服务；服务器不是该项目的 Git 工作区。
 
 访问地址：
-
-```text
-http://121.237.178.23:9002
-```
-
-Dify 地址：
 
 ```text
 http://121.237.178.23:9002
@@ -159,18 +156,18 @@ docker exec docker-nginx-1 nginx -s reload
 
 服务器只托管构建后的 `dist/`，不执行 `git pull`、`npm ci` 或重新构建。发布前必须先推送本地提交，并保留服务器上的压缩备份。
 
-日常发布已配置为 GitLab CI：提交到默认分支后自动执行前端、Gateway、`huanbao-dataquery` 的测试和打包，再使用 GitLab CI/CD Variables 中的 SSH 部署密钥发布到生产。发布脚本会备份前端和两个后端 Jar，重启服务并检查 `8089`、`8088`、`9002`；健康检查失败会自动回滚。首次启用必须先配置 `PROD_SSH_PRIVATE_KEY`、`PROD_SSH_KNOWN_HOSTS`、`PROD_DATAQUERY_SERVICE`、`PROD_DATAQUERY_JAR_PATH`、`PROD_GATEWAY_CONTAINER`、`PROD_GATEWAY_JAR_PATH`，详见 `docs/部署说明.md`。
+日常发布已配置为 GitHub Actions：提交到 GitHub `main` 分支后自动执行前端、Gateway、`huanbao-dataquery` 的测试和打包，再使用仓库 Actions Secrets 中的 SSH 部署密钥发布到生产。发布脚本会备份前端和两个后端 Jar，重启服务并检查 `8089`、`8088`、`9002`；健康检查失败会自动回滚。首次启用必须先配置 `PROD_SSH_PRIVATE_KEY`、`PROD_SSH_KNOWN_HOSTS`、`PROD_DATAQUERY_SERVICE`、`PROD_DATAQUERY_JAR_PATH`、`PROD_GATEWAY_CONTAINER`、`PROD_GATEWAY_JAR_PATH`，详见 `docs/部署说明.md`。
 
 ## 常见问题
 
 - 办公智能报 `Agent Chat App does not support blocking mode`：说明错误使用 blocking，请确认 Gateway/前端走 streaming 和 `response_mode: streaming`。
-- 401：通常是 Dify API Key 错误或环境变量未生效。
+- 401：问数通常先检查门户签名身份、Gateway 授权范围和会话归属；制度/办公兼容链路再检查 Gateway 后端的 Dify Key 和环境变量。
 - 页面仍是旧版本：确认本地已 push、服务器已同步 `dist/`，并检查容器内 Nginx 配置后强刷浏览器缓存。
 - 历史记录不互通：历史使用浏览器 localStorage，本地、服务器、不同浏览器之间不会同步。
 
 ## 后续开发方向
 
-- AI Gateway：作为前端与 Dify、审计日志之间的后端安全中间层。
+- 按 [去 Dify 化智能助手整体建设方案](./docs/去Dify化智能助手整体建设方案.md) 建设独立模型适配、知识库、办公和问数服务，并保留可回滚的兼容期。
 - 流程助手 pending 入口逐项实测，通过后再开放。
 - 服务端权限校验与操作审计。
 - postMessage origin 白名单收口。
@@ -188,8 +185,8 @@ ai-gateway/
 
 定位：
 
-- Dify 制度问答代理。
-- 智能问数开放范围和查询代理预留。
+- 制度、办公和 Master 兼容链路的服务端代理，迁移完成后逐步退出 Dify 依赖。
+- 智能问数身份、开放范围、会话、SSE 和审计入口；实际查询由 `huanbao-dataquery:8089` 执行。
 - 流程助手操作审计落库。
 - 动作参数校验预留。
 - 统一异常处理和参数校验。

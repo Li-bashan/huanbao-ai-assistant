@@ -19,7 +19,8 @@ public record DataQueryProperties(
     String defaultOrganizationScope,
     boolean allowGroupRanking,
     String allowedIndicatorCodes,
-    boolean auditEnabled
+    boolean auditEnabled,
+    boolean accessOpenToAll
 ) {
     @ConstructorBinding
     public DataQueryProperties(
@@ -37,7 +38,8 @@ public record DataQueryProperties(
         String defaultOrganizationScope,
         boolean allowGroupRanking,
         String allowedIndicatorCodes,
-        boolean auditEnabled
+        boolean auditEnabled,
+        boolean accessOpenToAll
     ) {
         this.apiBase = apiBase;
         this.apiKey = apiKey;
@@ -54,6 +56,7 @@ public record DataQueryProperties(
         this.allowGroupRanking = allowGroupRanking;
         this.allowedIndicatorCodes = allowedIndicatorCodes;
         this.auditEnabled = auditEnabled;
+        this.accessOpenToAll = accessOpenToAll;
     }
 
     /** Compatibility constructor for the original gateway tests/config shape. */
@@ -73,7 +76,7 @@ public record DataQueryProperties(
     ) {
         this(apiBase, apiKey, timeoutMs, null, identitySecret, identityMode, identitySecret,
             identityClockSkewSeconds, allowBodyIdentityTrial, maxRequestsPerMinute, 1,
-            defaultOrganizationScope, allowGroupRanking, allowedIndicatorCodes, auditEnabled);
+            defaultOrganizationScope, allowGroupRanking, allowedIndicatorCodes, auditEnabled, false);
     }
 
     public int safeTimeoutMs() {

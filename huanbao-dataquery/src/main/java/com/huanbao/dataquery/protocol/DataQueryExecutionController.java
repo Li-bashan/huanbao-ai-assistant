@@ -1,6 +1,8 @@
 package com.huanbao.dataquery.protocol;
 
 import com.huanbao.dataquery.core.repository.PartitionTablePruner;
+import com.huanbao.dataquery.domain.ops.OpsDomainSemanticProvider;
+import com.huanbao.dataquery.domain.ops.OpsOrganization;
 import com.huanbao.dataquery.pipeline.CompositeExecutionResult;
 import com.huanbao.dataquery.pipeline.DataToDocPipelineService;
 import com.huanbao.dataquery.router.AnalysisPlanDto;
@@ -35,22 +37,27 @@ public final class DataQueryExecutionController {
             "正在调用智能问数，检索生产数据并生成图表...";
     private static final String OFFICE_STAGE_MESSAGE =
             "正在调用智能办公，基于核验数据起草经营简报...";
+    /** 网关全组织开放（open-to-all）模式传入的通配标记。 */
+    static final String ALL_ORGS_WILDCARD = "*";
 
     private final IntentClassifier intentClassifier;
     private final DataToDocPipelineService pipelineService;
     private final ProtocolAssembler protocolAssembler;
     private final SseStreamDispatcher streamDispatcher;
+    private final OpsDomainSemanticProvider semanticProvider;
 
     @Autowired
     public DataQueryExecutionController(
             IntentClassifier intentClassifier,
             DataToDocPipelineService pipelineService,
             ProtocolAssembler protocolAssembler,
-            SseStreamDispatcher streamDispatcher) {
+            SseStreamDispatcher streamDispatcher,
+            OpsDomainSemanticProvider semanticProvider) {
         this.intentClassifier = intentClassifier;
         this.pipelineService = pipelineService;
         this.protocolAssembler = protocolAssembler;
         this.streamDispatcher = streamDispatcher;
+        this.semanticProvider = semanticProvider;
     }
 
     @PostMapping(value = "/execute", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -59,11 +66,7 @@ public final class DataQueryExecutionController {
             @RequestHeader("X-Internal-User-Id") String userId,
             @RequestHeader("X-Internal-Allowed-Orgs") String allowedOrgsHeader) {
         validateRequest(request, userId);
-        List<String> allowedOrgs = parseAllowedOrgs(allowedOrgsHeader);
-        if (allowedOrgs.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "X-Internal-Allowed-Orgs must not be empty");
-        }
+        List<String> allowedOrgs = resolveAllowedOrgs(allowedOrgsHeader);
 
         String requestId = UUID.randomUUID().toString();
         String conversationId = request.conversationId().isBlank()
@@ -154,6 +157,33 @@ public final class DataQueryExecutionController {
         if (userId == null || userId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "X-Internal-User-Id must not be blank");
         }
+    }
+
+    /**
+     * 解析网关传入的组织范围。通配 {@code *} 表示全组织开放，展开为语义包内的
+     * 全部组织编码，SQL 侧仍然注入具体的 {@code orgcode IN (:allowedOrgs)} 过滤。
+     */
+    private List<String> resolveAllowedOrgs(String allowedOrgsHeader) {
+        List<String> requested = parseAllowedOrgs(allowedOrgsHeader);
+        if (requested.size() == 1 && ALL_ORGS_WILDCARD.equals(requested.get(0))) {
+            List<String> allOrgs = semanticProvider.getOrganizations().stream()
+                    .map(OpsOrganization::formalCode)
+                    .filter(code -> code != null && !code.isBlank())
+                    .distinct()
+                    .sorted()
+                    .toList();
+            if (allOrgs.isEmpty()) {
+                throw new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Wildcard organization scope cannot be expanded: no organizations loaded");
+            }
+            return allOrgs;
+        }
+        if (requested.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "X-Internal-Allowed-Orgs must not be empty");
+        }
+        return requested;
     }
 
     private static List<String> parseAllowedOrgs(String header) {

@@ -1,18 +1,32 @@
 package com.huanbao.aigateway.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.huanbao.aigateway.config.DataQueryProperties;
 import com.huanbao.aigateway.dto.DataQueryAccessResponse;
+import com.huanbao.aigateway.dto.DataQueryAuthorization;
+import com.huanbao.aigateway.dto.DataQueryUserAccess;
 import com.huanbao.aigateway.exception.BusinessException;
 import com.huanbao.aigateway.repository.DataQueryUserRepository;
+import com.huanbao.aigateway.security.DataQueryIdentity;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class DataQueryAccessServiceTest {
+    private static final DataQueryIdentity IDENTITY = new DataQueryIdentity(
+        "user-1", "U1", "张三", "ORG-1", "组织一", "tenant-1", true, "SIGNED_HEADER"
+    );
+
     private final DataQueryUserRepository repository = org.mockito.Mockito.mock(DataQueryUserRepository.class);
-    private final DataQueryAccessService service = new DataQueryAccessService(repository);
+    private final DataQueryProperties properties = defaultProperties(false);
+    private final DataQueryAccessService service = new DataQueryAccessService(repository, properties);
 
     @Test
     void trimsNameAndReturnsCoveredForEnabledUser() {
@@ -21,7 +35,7 @@ class DataQueryAccessServiceTest {
         DataQueryAccessResponse result = service.check("  张三 ");
 
         assertEquals("张三", result.userName());
-        org.junit.jupiter.api.Assertions.assertTrue(result.covered());
+        assertTrue(result.covered());
         verify(repository).existsByUserNameAndEnabled("张三", true);
     }
 
@@ -45,5 +59,68 @@ class DataQueryAccessServiceTest {
         );
 
         assertEquals("CURRENT_USER_MISSING", exception.getCode());
+    }
+
+    @Test
+    void identityWithoutAuthorizationRowIsRejectedByDefault() {
+        when(repository.findEnabledAccess("tenant-1", "user-1")).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> service.requireCovered(IDENTITY)
+        );
+
+        assertEquals("DATA_QUERY_NOT_COVERED", exception.getCode());
+    }
+
+    @Test
+    void identityWithAuthorizationRowKeepsDatabaseScope() {
+        DataQueryUserAccess access = new DataQueryUserAccess(
+            "user-1", "U1", "张三", "tenant-1", "租户一", "oid-1", "ORG-1", "组织一",
+            true, "RESOLVED", "COMPANY", List.of("ORG-1"), List.of(), false, false
+        );
+        when(repository.findEnabledAccess("tenant-1", "user-1")).thenReturn(Optional.of(access));
+
+        DataQueryAuthorization authorization = service.requireCovered(IDENTITY);
+
+        assertEquals("COMPANY", authorization.organizationScope());
+        assertEquals(List.of("ORG-1"), authorization.allowedOrgCodes());
+        assertFalse(authorization.allowAllOrganizations());
+    }
+
+    @Test
+    void openToAllGrantsEveryIdentityFullScopeWithoutAuthorizationTable() {
+        DataQueryAccessService openService = new DataQueryAccessService(
+            repository, defaultProperties(true));
+
+        DataQueryAuthorization authorization = openService.requireCovered(IDENTITY);
+
+        assertEquals("ALL", authorization.organizationScope());
+        assertEquals(List.of(DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD), authorization.allowedOrgCodes());
+        assertTrue(authorization.allowAllOrganizations());
+        assertEquals("user-1", authorization.userId());
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void openToAllStillRequiresAuthenticatedIdentity() {
+        DataQueryAccessService openService = new DataQueryAccessService(
+            repository, defaultProperties(true));
+
+        BusinessException exception = assertThrows(
+            BusinessException.class,
+            () -> openService.requireCovered(new DataQueryIdentity(
+                "", "", "张三", "ORG-1", "组织一", "tenant-1", true, "SIGNED_HEADER"))
+        );
+
+        assertEquals("UNAUTHENTICATED", exception.getCode());
+        verifyNoInteractions(repository);
+    }
+
+    private static DataQueryProperties defaultProperties(boolean accessOpenToAll) {
+        return new DataQueryProperties(
+            "unused", "unused", 1000, null, null, "SIGNED_HEADER", "identity-secret",
+            300, false, 30, 1, "USER_AUTHORIZED", false, "", true, accessOpenToAll
+        );
     }
 }

@@ -1,10 +1,12 @@
 package com.huanbao.aigateway.service;
 
+import com.huanbao.aigateway.config.DataQueryProperties;
 import com.huanbao.aigateway.dto.DataQueryAccessResponse;
 import com.huanbao.aigateway.dto.DataQueryAuthorization;
 import com.huanbao.aigateway.exception.BusinessException;
 import com.huanbao.aigateway.repository.DataQueryUserRepository;
 import com.huanbao.aigateway.security.DataQueryIdentity;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,17 +15,40 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class DataQueryAccessService {
+    public static final String ALL_ORGANIZATIONS_WILDCARD = "*";
+
     private static final Logger log = LoggerFactory.getLogger(DataQueryAccessService.class);
 
     private final DataQueryUserRepository repository;
+    private final DataQueryProperties properties;
 
-    public DataQueryAccessService(DataQueryUserRepository repository) {
+    public DataQueryAccessService(DataQueryUserRepository repository, DataQueryProperties properties) {
         this.repository = repository;
+        this.properties = properties;
     }
 
     public DataQueryAuthorization requireCovered(DataQueryIdentity identity) {
         validateIdentity(identity);
         String tenantId = normalizeTenant(identity.tenantId());
+        if (properties.accessOpenToAll()) {
+            log.info("DATA_QUERY_ACCESS_OPEN_TO_ALL userIdHash={} tenantId={}",
+                shortHash(identity.userId()), tenantId);
+            return new DataQueryAuthorization(
+                identity.userId(),
+                identity.userCode(),
+                identity.userName(),
+                identity.orgCode(),
+                identity.orgName(),
+                tenantId,
+                identity.verified(),
+                identity.source(),
+                "ALL",
+                properties.allowGroupRanking(),
+                List.of(),
+                List.of(ALL_ORGANIZATIONS_WILDCARD),
+                true
+            );
+        }
         Optional<com.huanbao.aigateway.dto.DataQueryUserAccess> access =
             repository.findEnabledAccess(tenantId, identity.userId());
         if (access.isEmpty() && "BODY_TRIAL".equals(identity.source())) {

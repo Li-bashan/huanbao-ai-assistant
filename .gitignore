@@ -35,3 +35,10 @@ igix-*.har
 # 布局审计运行产物，保留在本地供复核，不进入业务提交
 tools/screenshots/
 tools/layout-audit-report-*.json
+
+# 发布、迁移和验收过程生成物，不进入项目源文件
+/artifacts/
+/release/
+/backups/
+huanbao-dataquery/artifacts/
+tools/design-review/

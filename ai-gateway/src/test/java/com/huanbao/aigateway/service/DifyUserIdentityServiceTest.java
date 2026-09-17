@@ -11,7 +11,7 @@ class DifyUserIdentityServiceTest {
     private final DifyUserIdentityService service = new DifyUserIdentityService(
         new DataQueryProperties(
             "http://dify", "key", 1000, null, "hmac-secret", "SIGNED_HEADER", "identity-secret",
-            300, false, 30, 1, "USER_AUTHORIZED", false, "", true
+            300, false, 30, 1, "USER_AUTHORIZED", false, "", true, false
         )
     );
 

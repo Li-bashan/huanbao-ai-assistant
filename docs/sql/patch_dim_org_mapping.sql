@@ -1,7 +1,7 @@
 -- 组织语义层标准映射视图补丁
 --
 -- 依据：
---   1. docs/DATABASE_RECONCILIATION_REPORT.md 的组织对账冲突清单；
+--   1. docs/数据源与指标基线.md 的组织对账冲突清单；
 --   2. docs/业务Excel/公司简称（数据）.xlsx：90 条非空记录，其中 85 家公司、5 个大区占位。
 --
 -- 本补丁只创建/替换视图，不修改 BFAdminOrganization 原始物理表结构，也不写入任何业务数据。

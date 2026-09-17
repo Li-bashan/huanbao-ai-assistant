@@ -252,6 +252,9 @@ public class DataQueryChatController {
     }
 
     private String allowedOrganizations(DataQueryAuthorization authorization) {
+        if (authorization.allowAllOrganizations()) {
+            return DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD;
+        }
         List<String> values = authorization.allowedOrgCodes() == null
             ? List.of()
             : authorization.allowedOrgCodes().stream()

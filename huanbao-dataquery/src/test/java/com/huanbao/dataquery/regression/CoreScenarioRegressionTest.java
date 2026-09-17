@@ -181,7 +181,8 @@ class CoreScenarioRegressionTest {
         protocolAssembler = new ProtocolAssembler(semanticProvider);
         recordingDispatcher = new RecordingSseStreamDispatcher();
         executionController = new DataQueryExecutionController(
-                intentClassifier, pipelineService, protocolAssembler, recordingDispatcher);
+                intentClassifier, pipelineService, protocolAssembler, recordingDispatcher,
+                semanticProvider);
     }
 
     @BeforeEach
@@ -702,13 +703,13 @@ class CoreScenarioRegressionTest {
 
     private String readReconciliationReport() throws Exception {
         for (Path path : List.of(
-                Path.of("docs", "DATABASE_RECONCILIATION_REPORT.md"),
-                Path.of("..", "docs", "DATABASE_RECONCILIATION_REPORT.md"))) {
+                Path.of("docs", "数据源与指标基线.md"),
+                Path.of("..", "docs", "数据源与指标基线.md"))) {
             if (Files.exists(path)) {
                 return Files.readString(path);
             }
         }
-        throw new AssertionError("找不到强制客观基准 docs/DATABASE_RECONCILIATION_REPORT.md");
+        throw new AssertionError("找不到强制客观基准 docs/数据源与指标基线.md");
     }
 
     private void runScenario(String id, String query, org.junit.jupiter.api.function.Executable executable)

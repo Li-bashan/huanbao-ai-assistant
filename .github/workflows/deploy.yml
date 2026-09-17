@@ -1,0 +1,121 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  frontend_verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  gateway_verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - run: mvn -B -ntp -f ai-gateway/pom.xml clean test package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gateway-jar
+          path: ai-gateway/target/ai-gateway-*.jar
+
+  dataquery_verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - run: mvn -B -ntp -f huanbao-dataquery/pom.xml clean test package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dataquery-jar
+          path: huanbao-dataquery/target/huanbao-dataquery-*.jar
+
+  deploy_production:
+    runs-on: ubuntu-latest
+    needs: [frontend_verify, gateway_verify, dataquery_verify]
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: gateway-jar
+          path: ai-gateway/target
+      - uses: actions/download-artifact@v4
+        with:
+          name: dataquery-jar
+          path: huanbao-dataquery/target
+      - name: Deploy to production
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+          PROD_WEB_ROOT: ${{ secrets.PROD_WEB_ROOT }}
+          PROD_NGINX_CONTAINER: ${{ secrets.PROD_NGINX_CONTAINER }}
+          PROD_DATAQUERY_SERVICE: ${{ secrets.PROD_DATAQUERY_SERVICE }}
+          PROD_DATAQUERY_JAR_PATH: ${{ secrets.PROD_DATAQUERY_JAR_PATH }}
+          PROD_GATEWAY_CONTAINER: ${{ secrets.PROD_GATEWAY_CONTAINER }}
+          PROD_GATEWAY_JAR_PATH: ${{ secrets.PROD_GATEWAY_JAR_PATH }}
+        run: |
+          set -Eeuo pipefail
+          test -n "${PROD_SSH_PRIVATE_KEY:-}" || (echo "PROD_SSH_PRIVATE_KEY is not configured" >&2; exit 1)
+          test -n "${PROD_SSH_KNOWN_HOSTS:-}" || (echo "PROD_SSH_KNOWN_HOSTS is not configured" >&2; exit 1)
+          test -n "${PROD_DATAQUERY_SERVICE:-}" || (echo "PROD_DATAQUERY_SERVICE is not configured" >&2; exit 1)
+          test -n "${PROD_DATAQUERY_JAR_PATH:-}" || (echo "PROD_DATAQUERY_JAR_PATH is not configured" >&2; exit 1)
+          test -n "${PROD_GATEWAY_CONTAINER:-}" || (echo "PROD_GATEWAY_CONTAINER is not configured" >&2; exit 1)
+          test -n "${PROD_GATEWAY_JAR_PATH:-}" || (echo "PROD_GATEWAY_JAR_PATH is not configured" >&2; exit 1)
+          export PROD_SSH_HOST="${PROD_SSH_HOST:-121.237.178.23}"
+          export PROD_SSH_USER="${PROD_SSH_USER:-root}"
+          export PROD_SSH_PORT="${PROD_SSH_PORT:-22}"
+          export PROD_WEB_ROOT="${PROD_WEB_ROOT:-/opt/huanbao-ai-assistant}"
+          export PROD_NGINX_CONTAINER="${PROD_NGINX_CONTAINER:-docker-nginx-1}"
+          export RELEASE_ID="${GITHUB_SHA::7}-${GITHUB_RUN_ID}"
+          export SSH_DIR="$RUNNER_TEMP/.deploy-ssh"
+          mkdir -p "$SSH_DIR"
+          chmod 700 "$SSH_DIR"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$SSH_DIR/id_ed25519"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$SSH_DIR/known_hosts"
+          chmod 600 "$SSH_DIR/id_ed25519" "$SSH_DIR/known_hosts"
+          export SSH_ARGS="-i $SSH_DIR/id_ed25519 -p $PROD_SSH_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$SSH_DIR/known_hosts"
+          export PROD_TARGET="$PROD_SSH_USER@$PROD_SSH_HOST"
+          export RELEASE_STAGE="$PROD_WEB_ROOT/.release-stage-$RELEASE_ID"
+          ssh $SSH_ARGS "$PROD_TARGET" "rm -rf -- '$RELEASE_STAGE' && mkdir -p -- '$RELEASE_STAGE/dist'"
+          tar -czf - -C dist . | ssh $SSH_ARGS "$PROD_TARGET" "tar -xzf - -C '$RELEASE_STAGE/dist'"
+          DATAQUERY_JAR="$(find huanbao-dataquery/target -maxdepth 1 -type f -name 'huanbao-dataquery-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+          GATEWAY_JAR="$(find ai-gateway/target -maxdepth 1 -type f -name 'ai-gateway-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+          test -f "$DATAQUERY_JAR"
+          test -f "$GATEWAY_JAR"
+          ssh $SSH_ARGS "$PROD_TARGET" "cat > '/tmp/huanbao-dataquery-$RELEASE_ID.jar'" < "$DATAQUERY_JAR"
+          ssh $SSH_ARGS "$PROD_TARGET" "cat > '/tmp/ai-gateway-$RELEASE_ID.jar'" < "$GATEWAY_JAR"
+          bash tools/deploy-production.sh "$RELEASE_ID" "$PROD_WEB_ROOT" "$PROD_NGINX_CONTAINER" "$PROD_DATAQUERY_SERVICE" "$PROD_DATAQUERY_JAR_PATH" "$PROD_GATEWAY_CONTAINER" "$PROD_GATEWAY_JAR_PATH" "$PROD_TARGET" "$SSH_ARGS"
