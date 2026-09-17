@@ -252,9 +252,6 @@ public class DataQueryChatController {
     }
 
     private String allowedOrganizations(DataQueryAuthorization authorization) {
-        if (authorization.allowAllOrganizations()) {
-            return DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD;
-        }
         List<String> values = authorization.allowedOrgCodes() == null
             ? List.of()
             : authorization.allowedOrgCodes().stream()
@@ -262,13 +259,21 @@ public class DataQueryChatController {
                 .map(String::trim)
                 .distinct()
                 .toList();
-        if (values.isEmpty()) {
-            throw new BusinessException(
-                "DATA_SCOPE_DENIED",
-                "no allowed organization scope is configured"
-            );
+        boolean wildcardOnly = values.size() == 1
+            && DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD.equals(values.get(0));
+        if (wildcardOnly) {
+            return DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD;
         }
-        return String.join(",", values);
+        if (!values.isEmpty()) {
+            return String.join(",", values);
+        }
+        if (authorization.allowAllOrganizations()) {
+            return DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD;
+        }
+        throw new BusinessException(
+            "DATA_SCOPE_DENIED",
+            "no allowed organization scope is configured"
+        );
     }
 
     private record QueryExecuteRequest(String query, String conversationId) {

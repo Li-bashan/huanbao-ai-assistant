@@ -174,6 +174,52 @@ class DataQueryChatControllerTest {
         assertTrue(result.getResponse().getContentAsString().contains("completed"));
     }
 
+    @Test
+    void explicitOrgListWinsOverAllowAllFlag() throws Exception {
+        DataQueryIdentityService identityService = mock(DataQueryIdentityService.class);
+        DataQueryAccessService accessService = mock(DataQueryAccessService.class);
+        DataQueryRateLimiter rateLimiter = mock(DataQueryRateLimiter.class);
+        DataQueryAuthorization listAuthorization = new DataQueryAuthorization(
+            "user-1", "U1", "张三", "ORG-1", "组织一", "tenant-1", true, "SIGNED_HEADER",
+            "ALL", false, List.of(), List.of("ORG-1", "ORG-2"), true
+        );
+        when(identityService.resolve(
+            any(DataQueryChatRequest.class),
+            isNull(String.class),
+            isNull(String.class),
+            isNull(String.class),
+            any(HttpServletRequest.class)
+        )).thenReturn(IDENTITY);
+        when(accessService.requireCovered(IDENTITY)).thenReturn(listAuthorization);
+        when(rateLimiter.tryAcquire("user-1")).thenReturn(true);
+
+        RestClient.Builder clientBuilder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(clientBuilder).build();
+        server.expect(requestTo("http://127.0.0.1:8089/api/query/execute"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("X-Internal-User-Id", "user-1"))
+            .andExpect(header("X-Internal-Allowed-Orgs", "ORG-1,ORG-2"))
+            .andRespond(withSuccess("event: completed\n\n", MediaType.TEXT_EVENT_STREAM));
+
+        MockMvc mvc = mockMvc(
+            identityService,
+            accessService,
+            rateLimiter,
+            clientBuilder.build()
+        );
+
+        MvcResult initial = mvc.perform(post("/api/ai/data-query/chat")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(REQUEST_BODY))
+            .andReturn();
+        MvcResult result = initial.getRequest().isAsyncStarted()
+            ? mvc.perform(asyncDispatch(initial)).andReturn()
+            : initial;
+        server.verify();
+        assertTrue(result.getResponse().getContentAsString().contains("completed"));
+    }
+
     private MockMvc mockMvc(
         DataQueryIdentityService identityService,
         DataQueryAccessService accessService,

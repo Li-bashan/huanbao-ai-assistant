@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
 public final class DataToDocPipelineService {
 
     public static final int DOCUMENT_REQUEST_TIMEOUT_SECONDS = 10;
+    public static final String ALL_ORGANIZATIONS_SUBJECT = "全组织";
     public static final String DEGRADED_MESSAGE =
             "简报生成稍有延迟，您可先查阅右侧图表与明细数据";
 
@@ -473,6 +474,11 @@ public final class DataToDocPipelineService {
                     mapping.canonicalName(), mapping.canonicalName(), List.copyOf(allowedOrgs)));
         }
         if ("GROUP".equalsIgnoreCase(mapping.entityType())) {
+            if (plan.orgInputs().isEmpty()) {
+                // 未指定组织时按全组织聚合；多数项目公司不隶属集团总部口径，默认主体不挂“集团”名
+                return List.of(new SubjectScope(
+                        ALL_ORGANIZATIONS_SUBJECT, ALL_ORGANIZATIONS_SUBJECT, List.copyOf(allowedOrgs)));
+            }
             return List.of(new SubjectScope("集团", "集团", List.copyOf(allowedOrgs)));
         }
         OpsOrganization organization = semanticProvider.findOrganization(mapping.canonicalName())

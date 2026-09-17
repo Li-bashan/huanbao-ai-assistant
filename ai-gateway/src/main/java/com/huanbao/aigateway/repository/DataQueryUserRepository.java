@@ -71,8 +71,7 @@ public class DataQueryUserRepository {
     }
 
     /** Name fallback is only used by the explicitly enabled BODY_TRIAL mode. */
-    public Optional<DataQueryUserAccess> findEnabledAccessByUserName(String userName) {
-        String sql = """
+    public Optional<DataQueryUserAccess> findEnabledAccessByUserName(String userName) {        String sql = """
             SELECT user_id, user_code, user_name, tenant_id, tenant_name, org_id, org_code, org_name,
                    enabled, migration_status, scope_type, allowed_org_codes, allowed_indicator_codes,
                    allow_group_ranking, allow_all_organizations
@@ -95,6 +94,25 @@ public class DataQueryUserRepository {
                 rs.getBoolean("allow_group_ranking"), rs.getBoolean("allow_all_organizations")
             )
         ).stream().findFirst();
+    }
+
+    /**
+     * 全员开放模式的组织范围清单：取最新一条启用中的全范围授权记录
+     * （scope_type=GROUP 或 allow_all_organizations）的 allowed_org_codes。
+     * 该清单是现场人工核对过的权威组织全集；查不到时返回空列表，由调用方回退通配。
+     */
+    public List<String> findOpenScopeOrgCodes() {
+        String sql = """
+            SELECT allowed_org_codes
+            FROM ai_data_query_user
+            WHERE enabled = TRUE
+              AND COALESCE(migration_status, 'UNRESOLVED') = 'RESOLVED'
+              AND (scope_type = 'GROUP' OR allow_all_organizations = TRUE)
+            ORDER BY id DESC
+            LIMIT 1
+            """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> readTextArray(rs.getArray("allowed_org_codes")))
+            .stream().findFirst().orElse(List.of());
     }
 
     /** Compatibility query for the retired name-only audit endpoint. */

@@ -89,17 +89,31 @@ class DataQueryAccessServiceTest {
     }
 
     @Test
-    void openToAllGrantsEveryIdentityFullScopeWithoutAuthorizationTable() {
+    void openToAllGrantsEveryIdentityTheAuthorizedOrgScope() {
         DataQueryAccessService openService = new DataQueryAccessService(
             repository, defaultProperties(true));
+        when(repository.findOpenScopeOrgCodes()).thenReturn(List.of("10004024", "10004025"));
 
         DataQueryAuthorization authorization = openService.requireCovered(IDENTITY);
 
         assertEquals("ALL", authorization.organizationScope());
-        assertEquals(List.of(DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD), authorization.allowedOrgCodes());
+        assertEquals(List.of("10004024", "10004025"), authorization.allowedOrgCodes());
         assertTrue(authorization.allowAllOrganizations());
         assertEquals("user-1", authorization.userId());
-        verifyNoInteractions(repository);
+        verify(repository).findOpenScopeOrgCodes();
+        verify(repository, org.mockito.Mockito.never()).findEnabledAccess(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void openToAllFallsBackToWildcardWhenNoAuthorizedScopeExists() {
+        DataQueryAccessService openService = new DataQueryAccessService(
+            repository, defaultProperties(true));
+        when(repository.findOpenScopeOrgCodes()).thenReturn(List.of());
+
+        DataQueryAuthorization authorization = openService.requireCovered(IDENTITY);
+
+        assertEquals(List.of(DataQueryAccessService.ALL_ORGANIZATIONS_WILDCARD), authorization.allowedOrgCodes());
+        assertTrue(authorization.allowAllOrganizations());
     }
 
     @Test

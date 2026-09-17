@@ -31,8 +31,14 @@ public class DataQueryAccessService {
         validateIdentity(identity);
         String tenantId = normalizeTenant(identity.tenantId());
         if (properties.accessOpenToAll()) {
-            log.info("DATA_QUERY_ACCESS_OPEN_TO_ALL userIdHash={} tenantId={}",
-                shortHash(identity.userId()), tenantId);
+            // 全员开放时组织范围以授权表中的全范围记录（现场人工核对的权威清单）为准，
+            // 清单缺失才回退 "*" 由问数服务按语义包展开。
+            List<String> openOrgCodes = repository.findOpenScopeOrgCodes();
+            List<String> allowedOrgCodes = openOrgCodes.isEmpty()
+                ? List.of(ALL_ORGANIZATIONS_WILDCARD)
+                : openOrgCodes;
+            log.info("DATA_QUERY_ACCESS_OPEN_TO_ALL userIdHash={} tenantId={} orgScopeSize={}",
+                shortHash(identity.userId()), tenantId, allowedOrgCodes.size());
             return new DataQueryAuthorization(
                 identity.userId(),
                 identity.userCode(),
@@ -45,7 +51,7 @@ public class DataQueryAccessService {
                 "ALL",
                 properties.allowGroupRanking(),
                 List.of(),
-                List.of(ALL_ORGANIZATIONS_WILDCARD),
+                allowedOrgCodes,
                 true
             );
         }
