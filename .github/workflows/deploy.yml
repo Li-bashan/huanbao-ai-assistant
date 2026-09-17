@@ -59,7 +59,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [frontend_verify, gateway_verify, dataquery_verify]
     environment: production
-    if: github.ref == 'refs/heads/main'
+    # 云端 runner 当前无法直连服务器 22 端口（连接超时，疑似防火墙拦截境外来源），
+    # push 触发时只做构建验证；确需云端发布请手动 workflow_dispatch 并确认网络可达，
+    # 日常发布用本机执行 tools/deploy-production.sh，见 docs/部署说明.md 5.2。
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
